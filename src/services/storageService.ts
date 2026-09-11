@@ -21,8 +21,6 @@ import {
   DebtRecord,
   ReceivableRecord,
   InvestmentRecord,
-  TelegramBotConfig,
-  TelegramLogItem,
   DashboardWidgetsState,
   DashboardWidgetId
 } from '../types';
@@ -79,13 +77,11 @@ const STORAGE_KEYS = {
   DEBTS: 'rajawali_finance_debts',
   RECEIVABLES: 'rajawali_finance_receivables',
   INVESTMENTS: 'rajawali_finance_investments',
-  TELEGRAM_CONFIG: 'rajawali_telegram_config',
-  TELEGRAM_LOGS: 'rajawali_telegram_logs',
   DASHBOARD_WIDGETS: 'rajawali_dashboard_widgets'
 };
 
 // =============================================================================
-// STORAGE MIDDLEWARE & CLOUD AUTO-SYNC PIPELINE
+// STORAGE MIDDLEWARE & EVENT PIPELINE
 // =============================================================================
 export type StorageActionType =
   | 'projects'
@@ -150,7 +146,7 @@ const storageMiddlewares: StorageMiddleware[] = [];
 
 /**
  * Register a storage middleware that intercepts and acts on every state update
- * (e.g. Supabase Real-time Cloud Upsert, Activity Logging).
+ * (e.g. Activity Logging, Persistence Hooks).
  */
 export function registerStorageMiddleware(middleware: StorageMiddleware) {
   storageMiddlewares.push(middleware);
@@ -168,7 +164,7 @@ export function registerDataChangeListener(listener: (key: string, data: any) =>
 /**
  * Core update wrapper: Persists to local storage instantly with zero latency,
  * dispatches optional DOM events, and runs all registered storage middlewares
- * (such as automatic Supabase upsert) without requiring manual sync triggers.
+ * without requiring manual sync triggers.
  */
 function applyStorageUpdate<T>(
   actionKey: StorageActionType,
@@ -200,7 +196,7 @@ function applyStorageUpdate<T>(
     // ignore
   }
 
-  // 4. Execute middleware pipeline (Supabase Auto Upsert, Realtime Broadcast, etc.)
+  // 4. Execute middleware pipeline (Audit Trail, Broadcast, etc.)
   const context: StorageMiddlewareContext<T> = {
     key: actionKey,
     storageKey,
@@ -221,6 +217,58 @@ function applyStorageUpdate<T>(
 function initStorageQuietly<T>(key: string, data: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
+
+// One-time client auto-cleanup: wipe sample data and preserve ONLY location data
+const CLEANUP_MIGRATION_VERSION = 'rajawali_clean_locations_only_v2';
+if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+  try {
+    if (localStorage.getItem('rajawali_data_cleaned_locations_only') !== CLEANUP_MIGRATION_VERSION) {
+      // Ensure projects (locations) exist
+      const existingProjects = localStorage.getItem(STORAGE_KEYS.PROJECTS);
+      if (!existingProjects) {
+        localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(INITIAL_PROJECTS));
+      }
+
+      // Clear sample/demo operational and finance records
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.TIMESHEETS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.MUTATIONS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.INVENTORY_ITEMS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.PROJECT_STOCKS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.INVENTORY_LOGS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.MATERIAL_REQUESTS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.BLASTS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.FINANCE_TRANSACTIONS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.BANK_STATEMENTS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.PERIOD_CLOSINGS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.AUDIT_TRAILS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.DEBTS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.RECEIVABLES, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.INVESTMENTS, JSON.stringify([]));
+
+      // Reset initial and current account balances to 0
+      const existingAccountsRaw = localStorage.getItem(STORAGE_KEYS.CHART_OF_ACCOUNTS);
+      if (existingAccountsRaw) {
+        try {
+          const accounts = JSON.parse(existingAccountsRaw);
+          if (Array.isArray(accounts)) {
+            const cleaned = accounts.map((acc: any) => ({
+              ...acc,
+              initialBalance: 0,
+              currentBalance: 0
+            }));
+            localStorage.setItem(STORAGE_KEYS.CHART_OF_ACCOUNTS, JSON.stringify(cleaned));
+          }
+        } catch {}
+      }
+
+      localStorage.setItem('rajawali_data_cleaned_locations_only', CLEANUP_MIGRATION_VERSION);
+    }
   } catch {
     // ignore
   }
@@ -873,115 +921,6 @@ export const storageService = {
     // Keep active user or reset to superadmin
     try {
       window.dispatchEvent(new Event('app_data_reset'));
-    } catch {
-      // ignore
-    }
-  },
-
-  // -------------------------------------------------------------------------
-  // REAL-TIME REMOTE DATA RECONCILIATION
-  // -------------------------------------------------------------------------
-  // Disimpan dari broadcast/postgres event Supabase tanpa memicu push keluar berulang (mencegah echo loop)
-  saveFromRemote(actionKey: StorageActionType, data: any) {
-    const storageKey = ACTION_TO_STORAGE_KEY_MAP[actionKey];
-    if (!storageKey || data === undefined || data === null) return;
-
-    applyStorageUpdate(actionKey, storageKey, data, `${actionKey}_updated`, 'remote_sync');
-
-    try {
-      window.dispatchEvent(
-        new CustomEvent('rajawali_remote_update', {
-          detail: { key: actionKey, data }
-        })
-      );
-    } catch {
-      // ignore
-    }
-  },
-
-  // -------------------------------------------------------------------------
-  // TELEGRAM BOT CONFIGURATION & AUDIT LOGS
-  // -------------------------------------------------------------------------
-  getTelegramConfig(): TelegramBotConfig {
-    const raw = localStorage.getItem(STORAGE_KEYS.TELEGRAM_CONFIG);
-    if (!raw) {
-      return {
-        botToken: '8810715512:AAHNTN8pwVIuXwfkwQIMHR6LFw_LNvk09qo',
-        groupChatId: '-1004355969725',
-        botUsername: 'RajawaliCycleBot',
-        botFirstName: 'Rajawali Cycle Notifier',
-        isEnabled: true,
-        notifyOnMaterialRequest: true,
-        notifyOnLowStock: true,
-        notifyOnTaskUpdate: true,
-        notifyOnDailyReport: true,
-        notifyOnFinanceTransaction: true,
-        notifyOnDataUpdates: true,
-        webhookActive: false
-      };
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return {
-        notifyOnDataUpdates: true,
-        ...parsed
-      };
-    } catch {
-      return {
-        botToken: '8810715512:AAHNTN8pwVIuXwfkwQIMHR6LFw_LNvk09qo',
-        groupChatId: '-1004355969725',
-        isEnabled: true,
-        notifyOnMaterialRequest: true,
-        notifyOnLowStock: true,
-        notifyOnTaskUpdate: true,
-        notifyOnDailyReport: true,
-        notifyOnFinanceTransaction: true,
-        notifyOnDataUpdates: true
-      };
-    }
-  },
-
-  saveTelegramConfig(config: TelegramBotConfig): TelegramBotConfig {
-    localStorage.setItem(STORAGE_KEYS.TELEGRAM_CONFIG, JSON.stringify(config));
-    try {
-      window.dispatchEvent(new CustomEvent('telegram_config_updated', { detail: config }));
-    } catch {
-      // ignore
-    }
-    return config;
-  },
-
-  getTelegramLogs(): TelegramLogItem[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.TELEGRAM_LOGS);
-    if (!raw) return [];
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return [];
-    }
-  },
-
-  addTelegramLog(logData: Omit<TelegramLogItem, 'id' | 'timestamp'>): TelegramLogItem {
-    const logs = this.getTelegramLogs();
-    const newLog: TelegramLogItem = {
-      ...logData,
-      id: `tg-log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      timestamp: new Date().toISOString()
-    };
-    const updated = [newLog, ...logs].slice(0, 50); // Keep latest 50 logs
-    localStorage.setItem(STORAGE_KEYS.TELEGRAM_LOGS, JSON.stringify(updated));
-    try {
-      window.dispatchEvent(new CustomEvent('telegram_logs_updated', { detail: updated }));
-    } catch {
-      // ignore
-    }
-    return newLog;
-  },
-
-  clearTelegramLogs() {
-    localStorage.removeItem(STORAGE_KEYS.TELEGRAM_LOGS);
-    try {
-      window.dispatchEvent(new CustomEvent('telegram_logs_updated', { detail: [] }));
     } catch {
       // ignore
     }

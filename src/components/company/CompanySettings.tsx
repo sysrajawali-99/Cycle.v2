@@ -27,7 +27,6 @@ import {
   Sun,
   Moon,
   Monitor,
-  Send,
   Wallet,
   Users,
   Megaphone
@@ -180,19 +179,6 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
-            {onNavigateView && (
-              <button
-                id="company-telegram-nav-btn"
-                type="button"
-                onClick={() => onNavigateView('telegram')}
-                className="flex items-center space-x-2 px-4 py-2.5 bg-sky-950/80 hover:bg-sky-900 text-sky-300 hover:text-white font-bold text-xs rounded-xl border border-sky-500/40 transition-all cursor-pointer shadow-sm"
-                title="Buka Pengaturan Integrasi Bot Telegram & Notifikasi Otomatis"
-              >
-                <Send className="w-4 h-4 text-sky-400" />
-                <span>Integrasi Bot Telegram</span>
-              </button>
-            )}
-
             <button
               id="company-reset-btn"
               type="button"
@@ -1025,7 +1011,7 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
                 <br />
                 2. Hanya akun role <b>Super Admin (HQ)</b> yang memiliki hak akses eksekusi.
                 <br />
-                3. Sekali dieksekusi, database divisi tersebut langsung terhapus bersih dan otomatis tersinkronisasi ke server bot Telegram.
+                3. Sekali dieksekusi, database divisi tersebut langsung terhapus bersih dari sistem.
               </p>
             </div>
           </div>
@@ -1226,7 +1212,7 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
             <div className="space-y-1">
               <span className="font-bold">Tips Keamanan Cadangan:</span>
               <p className="text-[11px] text-amber-200/80">
-                Sebelum melakukan pembersihan data divisi, Anda disarankan untuk membuat cadangan terlebih dahulu menggunakan menu <b>Cadangan / Sync Supabase Cloud & Ekspor File</b>.
+                Sebelum melakukan pembersihan data divisi, Anda disarankan untuk membuat cadangan terlebih dahulu menggunakan menu <b>Ekspor File / Cadangan Data</b>.
               </p>
             </div>
           </div>

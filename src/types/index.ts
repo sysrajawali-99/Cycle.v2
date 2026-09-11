@@ -312,55 +312,7 @@ export type AppView =
   | 'finance_bank_reconcile'
   | 'finance_analytics_audit'
   | 'access_control'
-  | 'company_settings'
-  | 'telegram';
-
-export interface TelegramBotConfig {
-  botToken: string;
-  groupChatId: string;
-  botUsername?: string;
-  botFirstName?: string;
-  isEnabled: boolean;
-  notifyOnMaterialRequest: boolean;
-  notifyOnLowStock: boolean;
-  notifyOnTaskUpdate: boolean;
-  notifyOnDailyReport: boolean;
-  notifyOnFinanceTransaction: boolean;
-  notifyOnDataUpdates?: boolean;
-  lastTestedAt?: string;
-  lastTestStatus?: 'success' | 'failed' | null;
-  lastTestError?: string;
-  webhookUrl?: string;
-  webhookActive?: boolean;
-}
-
-export interface TelegramLogItem {
-  id: string;
-  timestamp: string;
-  type:
-    | 'MATERIAL_REQUEST'
-    | 'LOW_STOCK'
-    | 'TASK'
-    | 'DAILY_REPORT'
-    | 'TEST'
-    | 'COMMAND'
-    | 'STOCK_UPDATE'
-    | 'FINANCE'
-    | 'HRD'
-    | 'DEBT'
-    | 'RECEIVABLE'
-    | 'INVESTMENT'
-    | 'DATA_UPDATE'
-    | 'TIMESHEET'
-    | 'PROJECT'
-    | 'BLAST'
-    | 'SOP';
-  title: string;
-  message: string;
-  targetChatId: string;
-  status: 'SUCCESS' | 'FAILED';
-  errorMessage?: string;
-}
+  | 'company_settings';
 
 export interface CompanyProfile {
   name: string;                // e.g. "PT RAJAWALI CYCLE INDONESIA"

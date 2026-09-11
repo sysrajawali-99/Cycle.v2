@@ -26,8 +26,7 @@ import {
   FileSpreadsheet,
   FileCheck,
   Edit3,
-  AlertCircle,
-  Send
+  AlertCircle
 } from 'lucide-react';
 import { UserAccount, AppView, Project, UserRole } from '../../types';
 import { ConfirmModal } from '../common/ConfirmModal';
@@ -144,13 +143,6 @@ const AVAILABLE_MENUS: {
     category: 'Lainnya',
     description: 'Identitas HQ, logo, legalitas NIB/NPWP, rekening bank & kop surat',
     icon: <Building2 className="w-4 h-4 text-amber-400" />
-  },
-  {
-    id: 'telegram',
-    label: 'Integrasi Telegram',
-    category: 'Lainnya',
-    description: 'Bot API, notifikasi otomatis permohonan material, stok & tugas',
-    icon: <Send className="w-4 h-4 text-sky-400" />
   },
   {
     id: 'access_control',

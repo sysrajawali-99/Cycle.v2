@@ -20,7 +20,6 @@ import {
   ShiftType,
   TaskCategoryType
 } from '../../types';
-import { telegramService } from '../../services/telegramService';
 
 interface NewAdHocTaskModalProps {
   projects: Project[];
@@ -150,17 +149,6 @@ export const NewAdHocTaskModal: React.FC<NewAdHocTaskModalProps> = ({
     };
 
     onSave(newTask);
-
-    // Kirim notifikasi langsung ke Telegram grup saat tugas berhasil dibuat
-    const selectedProj = projects.find((p) => p.id === selectedProjectId);
-    telegramService.notifyTaskStatusChange({
-      task: newTask,
-      action: 'CREATED',
-      projectName: selectedProj?.name || 'Site Lapangan',
-      updaterName: assignerName
-    }).catch((err) => {
-      console.warn('Telegram notification error:', err);
-    });
   };
 
   const selectedProjObj = projects.find((p) => p.id === selectedProjectId);
@@ -302,7 +290,7 @@ export const NewAdHocTaskModal: React.FC<NewAdHocTaskModalProps> = ({
               </div>
             )}
             <p className="text-[10px] text-slate-400 mt-1.5">
-              * Diisi secara manual sesuai personil bertugas. Notifikasi penugasan akan <b>otomatis terkirim ke grup Telegram</b> saat tugas berhasil disimpan.
+              * Diisi secara manual sesuai personil bertugas di lapangan.
             </p>
           </div>
 
@@ -412,7 +400,7 @@ export const NewAdHocTaskModal: React.FC<NewAdHocTaskModalProps> = ({
               className="flex items-center space-x-1.5 px-5 py-2 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>Kirim Tugas & Notifikasi Telegram</span>
+              <span>Simpan & Tugaskan</span>
             </button>
           </div>
         </form>

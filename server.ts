@@ -2,9 +2,7 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import { createTelegramRouter } from './src/server/telegramEndpoints.ts';
 
 dotenv.config();
 
@@ -12,39 +10,6 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '15mb' }));
-
-// Embedded Supabase Project Credentials
-export const SUPABASE_URL = 'https://trytwqpigfswkumpbfrp.supabase.co';
-export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_WsYAe5vdbfBKWlKtfbqUgQ_Lls3tbbF';
-export const SUPABASE_JWKS_URL = 'https://trytwqpigfswkumpbfrp.supabase.co/auth/v1/.well-known/jwks.json';
-
-// Active dynamic configuration for Supabase / VPS Database
-let activeSupabaseConfig = {
-  supabaseUrl: process.env.SUPABASE_URL || SUPABASE_URL,
-  supabaseKey: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || SUPABASE_PUBLISHABLE_KEY
-};
-
-export function updateServerSupabaseConfig(url: string, key?: string) {
-  if (url) activeSupabaseConfig.supabaseUrl = url;
-  if (key) activeSupabaseConfig.supabaseKey = key;
-  supabaseServerClient = null;
-}
-
-// Lazy initialize Supabase Server Client (Super Admin / Service Role)
-let supabaseServerClient: SupabaseClient | null = null;
-function getSupabaseServerClient(): SupabaseClient {
-  if (!supabaseServerClient) {
-    const rawUrl = activeSupabaseConfig.supabaseUrl || process.env.SUPABASE_URL || SUPABASE_URL;
-    const cleanUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
-    const supabaseKey =
-      activeSupabaseConfig.supabaseKey ||
-      process.env.SUPABASE_SECRET_KEY ||
-      process.env.SUPABASE_PUBLISHABLE_KEY ||
-      SUPABASE_PUBLISHABLE_KEY;
-    supabaseServerClient = createSupabaseClient(cleanUrl, supabaseKey);
-  }
-  return supabaseServerClient;
-}
 
 // Lazy initialize GoogleGenAI client
 let aiClient: GoogleGenAI | null = null;
@@ -58,173 +23,15 @@ function getGeminiClient(): GoogleGenAI | null {
 }
 
 // -------------------------------------------------------------
-// Telegram Bot API Router
+// Health Check
 // -------------------------------------------------------------
-app.use('/api/telegram', createTelegramRouter(getGeminiClient));
-
-// -------------------------------------------------------------
-// AI Financial Insights Endpoints
-// -------------------------------------------------------------
-
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Update active server-side database configuration
-app.post('/api/supabase/config', (req, res) => {
-  const { supabaseUrl, supabasePublishableKey, supabaseSecretKey } = req.body || {};
-  if (supabaseUrl) {
-    updateServerSupabaseConfig(supabaseUrl.trim(), (supabaseSecretKey || supabasePublishableKey || '').trim());
-  }
-  res.json({
-    success: true,
-    activeUrl: activeSupabaseConfig.supabaseUrl,
-    message: 'Server database configuration updated'
-  });
-});
-
-// Test database connection from server-side (avoids browser Mixed-Content / CORS blocking)
-app.post('/api/supabase/test', async (req, res) => {
-  try {
-    const rawUrl = (req.body?.supabaseUrl || activeSupabaseConfig.supabaseUrl || SUPABASE_URL)
-      .replace(/\/rest\/v1\/?$/, '')
-      .replace(/\/+$/, '');
-    const key = (req.body?.supabaseKey || activeSupabaseConfig.supabaseKey || SUPABASE_PUBLISHABLE_KEY).trim();
-
-    // 1. First test direct HTTP GET to check if OpenAPI / PostgREST root is reachable
-    let isReachable = false;
-    try {
-      const pingRes = await fetch(rawUrl, { method: 'GET', headers: { apikey: key } });
-      if (pingRes.ok || pingRes.status === 200 || pingRes.status === 300) {
-        isReachable = true;
-      }
-    } catch {
-      isReachable = false;
-    }
-
-    // 2. Test via Supabase client
-    const testClient = createSupabaseClient(rawUrl, key);
-    const syncRes = await testClient.from('app_sync_store').select('key', { count: 'exact', head: true });
-
-    if (!syncRes.error) {
-      updateServerSupabaseConfig(rawUrl, key);
-      return res.json({
-        ok: true,
-        message: 'Koneksi Database VPS/Supabase Terverifikasi & Aktif Sempurna!'
-      });
-    }
-
-    const projRes = await testClient.from('projects').select('id', { count: 'exact', head: true });
-    if (!projRes.error || projRes.error.code === '42P01' || projRes.error.code === 'PGRST205' || isReachable) {
-      updateServerSupabaseConfig(rawUrl, key);
-      return res.json({
-        ok: true,
-        message: 'Koneksi Database VPS/Supabase Terhubung & Siap Digunakan!'
-      });
-    }
-
-    return res.json({
-      ok: false,
-      message: `Database merespons dengan kendala: ${syncRes.error?.message || projRes.error?.message || 'Gagal memuat tabel'}`
-    });
-  } catch (err: any) {
-    return res.json({
-      ok: false,
-      message: `Gagal menghubungi database VPS: ${err?.message || 'Koneksi gagal'}`
-    });
-  }
-});
-
-// Transparent database proxy to solve Mixed-Content (HTTPS app accessing HTTP VPS)
-app.use('/api/supabase-proxy', async (req, res) => {
-  const targetBaseUrl = (activeSupabaseConfig.supabaseUrl || SUPABASE_URL)
-    .replace(/\/rest\/v1\/?$/, '')
-    .replace(/\/+$/, '');
-
-  const pathWithQuery = req.url;
-  const targetUrl = `${targetBaseUrl}${pathWithQuery}`;
-
-  try {
-    const headers: Record<string, string> = {};
-    for (const [key, value] of Object.entries(req.headers)) {
-      if (['host', 'connection', 'content-length', 'cookie'].includes(key.toLowerCase())) continue;
-      if (typeof value === 'string') {
-        headers[key] = value;
-      }
-    }
-
-    if (!headers['apikey'] && activeSupabaseConfig.supabaseKey) {
-      headers['apikey'] = activeSupabaseConfig.supabaseKey;
-    }
-    if (!headers['authorization'] && activeSupabaseConfig.supabaseKey) {
-      headers['authorization'] = `Bearer ${activeSupabaseConfig.supabaseKey}`;
-    }
-
-    const fetchOptions: RequestInit = {
-      method: req.method,
-      headers
-    };
-
-    if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body && Object.keys(req.body).length > 0) {
-      fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-      if (!headers['content-type']) {
-        headers['content-type'] = 'application/json';
-      }
-    }
-
-    const response = await fetch(targetUrl, fetchOptions);
-
-    res.status(response.status);
-    response.headers.forEach((val, key) => {
-      if (!['content-encoding', 'content-length', 'transfer-encoding'].includes(key.toLowerCase())) {
-        res.setHeader(key, val);
-      }
-    });
-
-    const buffer = await response.arrayBuffer();
-    res.send(Buffer.from(buffer));
-  } catch (err: any) {
-    console.error('Supabase Proxy Error:', err);
-    res.status(502).json({ error: 'Proxy error connecting to VPS/Supabase database', details: err?.message });
-  }
-});
-
-app.get('/api/supabase/status', async (_req, res) => {
-  try {
-    const supabase = getSupabaseServerClient();
-    // Test connection via universal app_sync_store first
-    const syncStoreRes = await supabase.from('app_sync_store').select('key', { count: 'exact', head: true });
-    if (!syncStoreRes.error) {
-      return res.json({
-        success: true,
-        status: 'connected',
-        message: 'Supabase Cloud Database connected and synchronized successfully.',
-        count: syncStoreRes.count
-      });
-    }
-    const { data, error } = await supabase.from('projects').select('count', { count: 'exact', head: true });
-    if (error && error.code !== '42P01' && error.code !== 'PGRST205') {
-      return res.json({
-        success: false,
-        status: 'reachable_with_schema_pending',
-        message: `Supabase server reachable, response: ${error.message} (${error.code || 'CODE'})`,
-        details: error
-      });
-    }
-    return res.json({
-      success: true,
-      status: 'connected',
-      message: 'Supabase Server Client connected successfully.',
-      count: data
-    });
-  } catch (err: any) {
-    return res.status(500).json({
-      success: false,
-      status: 'error',
-      message: err?.message || 'Failed to connect to Supabase from server backend'
-    });
-  }
-});
+// -------------------------------------------------------------
+// AI Financial Insights Endpoints
+// -------------------------------------------------------------
 
 /**
  * Endpoint 1: Comprehensive Financial Advisory & Insight
@@ -527,7 +334,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Rajawali Cycle Server with AI Finance running on http://0.0.0.0:${PORT}`);
+    console.log(`Rajawali Cycle Server running on http://0.0.0.0:${PORT}`);
   });
 }
 

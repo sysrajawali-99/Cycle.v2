@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import { UserAccount } from '../../types';
 import { storageService } from '../../services/storageService';
-import { telegramService } from '../../services/telegramService';
 
 export type DeletableDivision = 'finance' | 'hrm' | 'operations' | 'blast' | 'all';
 
@@ -255,16 +254,6 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
         } catch {
           // ignore
         }
-
-        // Instant reset of server cache and sync
-        fetch('/api/telegram/reset-cache', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ division: selectedDivision })
-        }).catch(() => {});
-
-        // Realtime sync to Telegram bot backend
-        telegramService.syncSnapshotToBackend();
 
         // Broadcast sync event to app
         window.dispatchEvent(new Event('app_data_reset'));

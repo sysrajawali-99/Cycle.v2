@@ -11,12 +11,10 @@ import {
   User,
   Shield,
   Sparkles,
-  Database,
   Sun,
   Moon,
   Monitor,
-  Trash2,
-  Send
+  Trash2
 } from 'lucide-react';
 import { Project, UserAccount, AppView, CompanyProfile } from '../../types';
 import { storageService } from '../../services/storageService';
@@ -35,7 +33,6 @@ interface NavbarProps {
   onToggleSidebar?: () => void;
   currentView?: AppView;
   onSelectView?: (view: AppView) => void;
-  onOpenSupabaseSync?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -48,28 +45,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   isSidebarOpen = false,
   onToggleSidebar,
   currentView,
-  onSelectView,
-  onOpenSupabaseSync
+  onSelectView
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(() => storageService.getCompanyProfile());
-  const [supabaseSyncStatus, setSupabaseSyncStatus] = useState<{ state: string; moduleKey?: string }>({
-    state: 'idle'
-  });
   const [themePref, setThemePref] = useState<ThemeMode>(() => themeService.getThemePreference());
   const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => themeService.getResolvedTheme());
 
   useEffect(() => {
     const handleProfileUpdate = () => {
       setCompanyProfile(storageService.getCompanyProfile());
-    };
-    const handleSyncStatus = (e: any) => {
-      if (e.detail) {
-        setSupabaseSyncStatus({
-          state: e.detail.state,
-          moduleKey: e.detail.moduleKey
-        });
-      }
     };
     const handleThemeChange = (e: any) => {
       setThemePref(themeService.getThemePreference());
@@ -78,12 +63,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     window.addEventListener('company_profile_updated', handleProfileUpdate);
     window.addEventListener('storage', handleProfileUpdate);
-    window.addEventListener('supabase_sync_status', handleSyncStatus as EventListener);
     window.addEventListener('theme_changed', handleThemeChange as EventListener);
     return () => {
       window.removeEventListener('company_profile_updated', handleProfileUpdate);
       window.removeEventListener('storage', handleProfileUpdate);
-      window.removeEventListener('supabase_sync_status', handleSyncStatus as EventListener);
       window.removeEventListener('theme_changed', handleThemeChange as EventListener);
     };
   }, []);
@@ -175,56 +158,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </select>
               </div>
             )}
-
-            {/* Supabase Cloud DB Button (Khusus Super Admin HQ) */}
-            {onOpenSupabaseSync && isSuperAdmin && (
-              <button
-                id="navbar-supabase-sync-btn"
-                type="button"
-                onClick={onOpenSupabaseSync}
-                className="relative flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-300 hover:text-white border border-emerald-500/40 shadow-sm transition-all cursor-pointer group"
-                title={
-                  supabaseSyncStatus.state === 'syncing'
-                    ? `Sedang Auto-Backup ${supabaseSyncStatus.moduleKey || 'Data'} ke Supabase...`
-                    : 'Supabase Cloud DB (Khusus Super Admin)'
-                }
-              >
-                <div className="relative">
-                  <Database className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
-                  <span
-                    className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
-                      supabaseSyncStatus.state === 'syncing'
-                        ? 'bg-cyan-400 animate-ping'
-                        : supabaseSyncStatus.state === 'error'
-                        ? 'bg-rose-500'
-                        : 'bg-emerald-400'
-                    }`}
-                  />
-                </div>
-                <span className="hidden md:inline">Supabase DB</span>
-                {supabaseSyncStatus.state === 'syncing' && (
-                  <span className="hidden lg:inline text-[10px] text-cyan-300 animate-pulse font-mono font-normal">
-                    Syncing...
-                  </span>
-                )}
-              </button>
-            )}
-
-            {/* Telegram Bot Button */}
-            <button
-              id="navbar-telegram-btn"
-              type="button"
-              onClick={() => onSelectView?.('telegram')}
-              className={`relative flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
-                currentView === 'telegram'
-                  ? 'bg-sky-600 text-white shadow-md shadow-sky-500/25 border border-sky-400 ring-2 ring-sky-400/50'
-                  : 'bg-sky-950/70 hover:bg-sky-900/90 text-sky-300 hover:text-white border border-sky-500/40 shadow-sm'
-              }`}
-              title="Integrasi Bot Telegram & Notifikasi Otomatis"
-            >
-              <Send className="w-3.5 h-3.5 text-sky-400 group-hover:scale-110 transition-transform" />
-              <span className="hidden md:inline">Telegram Bot</span>
-            </button>
 
             {/* Quick Theme Toggle Button */}
             <button
@@ -329,31 +262,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                           </button>
                         </div>
                       )}
-
-                      {onOpenSupabaseSync && isSuperAdmin && (
-                        <button
-                          onClick={() => {
-                            setIsUserMenuOpen(false);
-                            onOpenSupabaseSync();
-                          }}
-                          className="w-full text-left flex items-center space-x-2 p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-emerald-500/20"
-                        >
-                          <Database className="w-4 h-4 text-emerald-400" />
-                          <span>Supabase Cloud Database (Super Admin)</span>
-                        </button>
-                      )}
-
-                      <button
-                        id="navbar-telegram-menu-btn"
-                        onClick={() => {
-                          setIsUserMenuOpen(false);
-                          onSelectView?.('telegram');
-                        }}
-                        className="w-full text-left flex items-center space-x-2 p-2 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-sky-500/20"
-                      >
-                        <Send className="w-4 h-4 text-sky-400" />
-                        <span>Integrasi Bot Telegram</span>
-                      </button>
 
                       {/* Theme Mode Selector in Profile Dropdown */}
                       <div className="pt-2 border-t border-slate-800 space-y-1.5">
