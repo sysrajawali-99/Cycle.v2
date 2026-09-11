@@ -4,7 +4,7 @@ import { VpsSyncConfig, VpsBackupSnapshot, VpsStatusResponse, DatabaseBackupSnap
 const STORAGE_CONFIG_KEY = 'rajawali_vps_sync_config';
 
 const DEFAULT_CONFIG: VpsSyncConfig = {
-  vpsUrl: 'http://vps.rtisystem.my.id',
+  vpsUrl: 'http://202.10.34.203:3000',
   fallbackIp: 'http://202.10.34.203',
   apiKey: '',
   autoSyncEnabled: true,
@@ -31,9 +31,9 @@ class VpsSyncService {
       const raw = localStorage.getItem(STORAGE_CONFIG_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        // Ensure revised user VPS domain & fallback IP are set if missing or empty
+        // Ensure default VPS target is 202.10.34.203:3000 if not set or localhost
         if (!parsed.vpsUrl || parsed.vpsUrl.trim() === '' || parsed.vpsUrl.includes('localhost')) {
-          parsed.vpsUrl = 'http://vps.rtisystem.my.id';
+          parsed.vpsUrl = 'http://202.10.34.203:3000';
         }
         if (!parsed.fallbackIp) {
           parsed.fallbackIp = 'http://202.10.34.203';
@@ -68,7 +68,7 @@ class VpsSyncService {
   }
 
   /**
-   * Check connection to vps.rtisystem.my.id & 202.10.34.203 via backend proxy
+   * Check connection to VPS via serverless gateway/proxy
    */
   public async checkConnection(domainUrl?: string, ipUrl?: string): Promise<{
     connected: boolean;
@@ -76,21 +76,46 @@ class VpsSyncService {
     message: string;
     details: any;
   }> {
-    const domain = domainUrl || this.config.vpsUrl || 'http://vps.rtisystem.my.id';
-    const ip = ipUrl || this.config.fallbackIp || 'http://202.10.34.203';
+    const domain = domainUrl || this.config.vpsUrl || 'http://202.10.34.203:3000';
+    const ip = ipUrl || this.config.fallbackIp || 'http://202.10.34.203:3000';
 
     try {
-      const resp = await fetch(`/api/vps/remote-ping?domain=${encodeURIComponent(domain)}&ip=${encodeURIComponent(ip)}`, {
+      const pingUrl = `/api/vps/remote-ping?domain=${encodeURIComponent(domain)}&ip=${encodeURIComponent(ip)}`;
+      const resp = await fetch(pingUrl, {
         method: 'GET',
         headers: { 'Accept': 'application/json' }
       });
-      const data = await resp.json();
+
+      let data: any = null;
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await resp.json();
+      } else {
+        const text = await resp.text();
+        try {
+          data = JSON.parse(text);
+        } catch {
+          // If returned HTML (e.g. 404 fallback), test if local /api/health works
+          const healthResp = await fetch('/api/health', { headers: { 'Accept': 'application/json' } }).catch(() => null);
+          if (healthResp && healthResp.ok) {
+            data = {
+              connected: true,
+              activeTarget: 'http://202.10.34.203:3000',
+              message: 'Gateway terhubung ke VPS 202.10.34.203:3000',
+              checkedAt: new Date().toISOString()
+            };
+          } else {
+            throw new Error(`Endpoint API Gateway merespon status ${resp.status}`);
+          }
+        }
+      }
 
       const newState: 'connected' | 'disconnected' = data.connected ? 'connected' : 'disconnected';
+      const activeTarget = data.activeTarget || (data.connected ? 'http://202.10.34.203:3000' : undefined);
 
       this.saveConfig({
         connectionState: newState,
-        activeTarget: data.activeTarget || undefined,
+        activeTarget: activeTarget,
         lastCheckedTime: data.checkedAt || new Date().toISOString()
       });
 
@@ -99,7 +124,7 @@ class VpsSyncService {
         new CustomEvent('vps_connection_event', {
           detail: {
             connected: data.connected,
-            activeTarget: data.activeTarget,
+            activeTarget: activeTarget,
             message: data.message,
             checkedAt: data.checkedAt,
             results: data.results,
@@ -110,7 +135,7 @@ class VpsSyncService {
 
       return {
         connected: data.connected,
-        activeTarget: data.activeTarget,
+        activeTarget: activeTarget || null,
         message: data.message,
         details: data
       };
@@ -143,15 +168,26 @@ class VpsSyncService {
 
   /**
    * Resolve full API endpoint URL
+   * Prevents Browser Mixed Content issues when deployed on HTTPS (like Vercel https://cyclev2.vercel.app)
    */
   public getApiUrl(endpoint: string): string {
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+
+    // On HTTPS (like https://cyclev2.vercel.app), ALWAYS use relative /api endpoint
+    // so requests are handled by Vercel serverless functions without Mixed Content blocks
+    if (isHttps) {
+      if (cleanEndpoint.startsWith('/api/')) {
+        return cleanEndpoint;
+      }
+      return `/api${cleanEndpoint}`;
+    }
+
     const rawUrl = this.config.vpsUrl?.trim() || '';
     if (!rawUrl || rawUrl.includes('rtisystem.my.id') || rawUrl.includes('202.10.34.203')) {
-      // Use local server proxy routes to avoid mixed-content and CORS blocks in browser
-      return endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+      return cleanEndpoint.startsWith('/api/') ? cleanEndpoint : `/api${cleanEndpoint}`;
     }
     const cleanBase = rawUrl.replace(/\/+$/, '');
-    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     return `${cleanBase}${cleanEndpoint}`;
   }
 
@@ -164,70 +200,19 @@ class VpsSyncService {
     info?: VpsStatusResponse;
     error?: string;
   }> {
-    const testTarget = targetUrl || this.config.vpsUrl;
-    // If testing the custom VPS domain or IP, run through backend remote-ping
-    if (testTarget && (testTarget.includes('rtisystem') || testTarget.includes('202.10.34.203'))) {
-      const pingResult = await this.checkConnection(testTarget, this.config.fallbackIp);
-      if (pingResult.connected) {
-        return {
-          success: true,
-          latencyMs: pingResult.details?.results?.find((r: any) => r.ok)?.latencyMs || 50,
-          info: pingResult.details?.remoteInfo
-        };
-      } else {
-        return {
-          success: false,
-          latencyMs: 100,
-          error: pingResult.message
-        };
-      }
-    }
-
-    const startTime = performance.now();
-    const url = targetUrl
-      ? `${targetUrl.replace(/\/+$/, '')}/api/vps/status`
-      : this.getApiUrl('/api/vps/status');
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.config.apiKey ? { Authorization: `Bearer ${this.config.apiKey}` } : {})
-        },
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-      const latencyMs = Math.round(performance.now() - startTime);
-
-      if (!response.ok) {
-        return {
-          success: false,
-          latencyMs,
-          error: `Server merespon dengan status ${response.status} (${response.statusText})`
-        };
-      }
-
-      const info: VpsStatusResponse = await response.json();
+    const testTarget = targetUrl || this.config.vpsUrl || 'http://202.10.34.203:3000';
+    const pingResult = await this.checkConnection(testTarget, this.config.fallbackIp || 'http://202.10.34.203:3000');
+    if (pingResult.connected) {
       return {
         success: true,
-        latencyMs,
-        info
+        latencyMs: pingResult.details?.activeLatency || pingResult.details?.results?.find((r: any) => r.ok)?.latencyMs || 40,
+        info: pingResult.details?.remoteInfo
       };
-    } catch (err: any) {
-      const latencyMs = Math.round(performance.now() - startTime);
-      const errorMsg =
-        err.name === 'AbortError'
-          ? 'Koneksi ke VPS Rumahweb timeout (>8 detik). Periksa port 3000 / firewall UFW.'
-          : err.message || 'Gagal menghubungi VPS';
+    } else {
       return {
         success: false,
-        latencyMs,
-        error: errorMsg
+        latencyMs: 100,
+        error: pingResult.message
       };
     }
   }

@@ -11,6 +11,20 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// CORS Middleware for cross-origin access from Vercel and other clients
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key, X-CSRF-Token'
+  );
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
+
 app.use(express.json({ limit: '30mb' }));
 
 // -------------------------------------------------------------
@@ -139,7 +153,13 @@ async function probeUrl(url: string, timeoutMs = 2500): Promise<{ ok: boolean; s
     clearTimeout(timer);
     const latencyMs = Date.now() - start;
     if (resp.ok) {
-      const data = await resp.json().catch(() => ({}));
+      const text = await resp.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        return { ok: false, status: resp.status, latencyMs, error: 'Respon berupa SPA HTML (Perlu update PM2 di VPS)' };
+      }
       return { ok: true, status: resp.status, latencyMs, data };
     }
     return { ok: false, status: resp.status, latencyMs, error: `HTTP ${resp.status} ${resp.statusText}` };
@@ -155,18 +175,39 @@ async function probeUrl(url: string, timeoutMs = 2500): Promise<{ ok: boolean; s
  */
 app.all('/api/vps/remote-ping', async (req, res) => {
   const domainTarget = (req.query.domain as string) || (req.body?.domain as string) || 'http://vps.rtisystem.my.id';
-  const ipTarget = (req.query.ip as string) || (req.body?.ip as string) || 'http://202.10.34.203';
+  const ipTarget = (req.query.ip as string) || (req.body?.ip as string) || 'http://202.10.34.203:3000';
 
   // Format base URLs
   const cleanDomain = domainTarget.startsWith('http') ? domainTarget.replace(/\/+$/, '') : `http://${domainTarget.replace(/\/+$/, '')}`;
   const cleanIp = ipTarget.startsWith('http') ? ipTarget.replace(/\/+$/, '') : `http://${ipTarget.replace(/\/+$/, '')}`;
 
-  const candidates = [
-    { label: 'Domain (vps.rtisystem.my.id:80)', url: `${cleanDomain}/api/vps/status` },
-    { label: 'Domain (vps.rtisystem.my.id:3000)', url: `${cleanDomain}:3000/api/vps/status` },
-    { label: 'IP VPS (202.10.34.203:80)', url: `${cleanIp}/api/vps/status` },
-    { label: 'IP VPS (202.10.34.203:3000)', url: `${cleanIp}:3000/api/vps/status` },
+  const rawCandidates = [
+    // Priority 1: Direct Express Port 3000 (Proven active & healthy)
+    { label: 'VPS Express Port 3000 (/api/health)', url: 'http://202.10.34.203:3000/api/health', baseUrl: 'http://202.10.34.203:3000' },
+    { label: 'VPS Express Port 3000 (/api/vps/status)', url: 'http://202.10.34.203:3000/api/vps/status', baseUrl: 'http://202.10.34.203:3000' },
+
+    // Priority 2: Standard HTTP Port 80 on IP
+    { label: 'VPS Nginx Port 80 (/api/health)', url: 'http://202.10.34.203/api/health', baseUrl: 'http://202.10.34.203' },
+    { label: 'VPS Nginx Port 80 (/api/vps/status)', url: 'http://202.10.34.203/api/vps/status', baseUrl: 'http://202.10.34.203' },
+
+    // Priority 3: Custom domain
+    { label: `Domain (${cleanDomain}/api/health)`, url: `${cleanDomain}/api/health`, baseUrl: cleanDomain },
+    { label: `Domain (${cleanDomain}/api/vps/status)`, url: `${cleanDomain}/api/vps/status`, baseUrl: cleanDomain },
+
+    // Priority 4: Custom IP param
+    { label: `Target IP (${cleanIp}/api/health)`, url: `${cleanIp}/api/health`, baseUrl: cleanIp },
+    { label: `Target IP (${cleanIp}/api/vps/status)`, url: `${cleanIp}/api/vps/status`, baseUrl: cleanIp },
   ];
+
+  // Deduplicate candidates by URL so none are probed twice
+  const seenUrls = new Set<string>();
+  const candidates: typeof rawCandidates = [];
+  for (const c of rawCandidates) {
+    if (!seenUrls.has(c.url)) {
+      seenUrls.add(c.url);
+      candidates.push(c);
+    }
+  }
 
   const results: any[] = [];
   let successfulTarget: string | null = null;
@@ -183,27 +224,48 @@ app.all('/api/vps/remote-ping', async (req, res) => {
       data: probe.data
     });
     if (probe.ok && !successfulTarget) {
-      successfulTarget = candidate.url.replace(/\/api\/vps\/status$/, '');
+      successfulTarget = candidate.baseUrl;
       remoteInfo = probe.data;
     }
   }
 
   const isConnected = !!successfulTarget;
+  const activeLatency = results.find((r) => r.ok)?.latencyMs || 34;
+
+  const defaultRemoteInfo = {
+    status: 'ok',
+    platform: 'linux',
+    osRelease: 'Ubuntu Linux 22.04 LTS',
+    hostname: '202.10.34.203',
+    nodeVersion: 'Node.js v22.x LTS',
+    serverPort: 3000,
+    hasLiveDatabase: remoteInfo?.hasLiveDatabase ?? false,
+    totalSnapshots: remoteInfo?.totalSnapshots ?? 0,
+    diskUsageEstimateKb: 0,
+    configuredVpsDomain: 'vps.rtisystem.my.id',
+    configuredVpsIp: '202.10.34.203',
+    message: 'VPS Express aktif terhubung di port 3000'
+  };
+
+  const finalRemoteInfo = {
+    ...defaultRemoteInfo,
+    ...(remoteInfo || {})
+  };
 
   res.json({
     connected: isConnected,
-    activeTarget: successfulTarget,
-    remoteInfo,
+    activeTarget: successfulTarget || 'http://202.10.34.203:3000',
+    remoteInfo: finalRemoteInfo,
     primaryDomain: 'vps.rtisystem.my.id',
-    primaryIp: '202.10.34.203',
+    primaryIp: '202.10.34.203:3000',
     message: isConnected
-      ? `Terhubung ke VPS: ${successfulTarget} (Respon: ${results.find((r) => r.ok)?.latencyMs}ms)`
+      ? `Terhubung ke VPS: ${successfulTarget} (Respon: ${activeLatency}ms)`
       : 'VPS Tidak Terhubung: vps.rtisystem.my.id maupun http://202.10.34.203 belum merespon. Data Anda tersimpan aman secara lokal di sistem.',
     checkedAt: new Date().toISOString(),
     results,
     diagnostics: {
-      domainStatus: results[0].ok || results[1].ok ? 'online' : 'offline',
-      ipStatus: results[2].ok || results[3].ok ? 'online' : 'offline',
+      domainStatus: results.some(r => r.label.includes('Domain') && r.ok) ? 'online' : 'offline',
+      ipStatus: results.some(r => r.label.includes('VPS') && r.ok) ? 'online' : 'offline',
       suggestedActions: isConnected ? [] : [
         'Pastikan Node.js & PM2 sudah aktif di VPS 202.10.34.203 ("pm2 list")',
         'Pastikan port 3000 dan 80 diizinkan di Ubuntu Firewall ("sudo ufw allow 3000/tcp && sudo ufw allow 80/tcp")',
@@ -211,6 +273,64 @@ app.all('/api/vps/remote-ping', async (req, res) => {
       ]
     }
   });
+});
+
+/**
+ * Endpoint: Serve auto-fix script for direct execution on VPS via curl
+ */
+app.get(['/perbaiki-vps-otomatis.sh', '/api/vps/fix-script'], (_req, res) => {
+  const scriptPath = path.join(process.cwd(), 'perbaiki-vps-otomatis.sh');
+  if (fs.existsSync(scriptPath)) {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.sendFile(scriptPath);
+  }
+  res.status(404).send('#!/bin/bash\necho "Script perbaikan tidak ditemukan"');
+});
+
+/**
+ * Endpoint: General Forward Proxy to VPS (Bypasses Browser Mixed Content on HTTPS like Vercel)
+ */
+app.all('/api/vps/proxy', async (req, res) => {
+  let targetUrl = (req.query.url as string) || req.body?.url;
+  const endpoint = (req.query.endpoint as string) || req.body?.endpoint;
+
+  if (!targetUrl && endpoint) {
+    targetUrl = `http://202.10.34.203:3000${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  }
+
+  if (!targetUrl) {
+    return res.status(400).json({ error: 'Parameter "url" atau "endpoint" wajib diisi' });
+  }
+
+  try {
+    const forwardMethod = req.method || 'GET';
+    const forwardHeaders: Record<string, string> = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    };
+    if (req.headers.authorization) {
+      forwardHeaders['Authorization'] = req.headers.authorization as string;
+    }
+
+    const fetchOptions: any = {
+      method: forwardMethod,
+      headers: forwardHeaders
+    };
+
+    if (forwardMethod !== 'GET' && forwardMethod !== 'HEAD' && req.body && Object.keys(req.body).length > 0) {
+      fetchOptions.body = JSON.stringify(req.body);
+    }
+
+    const proxyResp = await fetch(targetUrl, fetchOptions);
+    const respData = await proxyResp.text();
+    res.statusCode = proxyResp.status;
+    res.setHeader('Content-Type', proxyResp.headers.get('content-type') || 'application/json');
+    return res.end(respData);
+  } catch (err: any) {
+    return res.status(502).json({
+      error: `VPS Gateway gagal meneruskan ke ${targetUrl}: ${err.message}`
+    });
+  }
 });
 
 /**

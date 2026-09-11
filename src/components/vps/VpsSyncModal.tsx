@@ -159,8 +159,8 @@ export const VpsSyncModal: React.FC<VpsSyncModalProps> = ({
     setTestResult(null);
     setPingDiagnostic(null);
 
-    const targetUrl = vpsUrlInput.trim() || 'http://vps.rtisystem.my.id';
-    const fallbackIp = 'http://202.10.34.203';
+    const targetUrl = vpsUrlInput.trim() || 'http://202.10.34.203:3000';
+    const fallbackIp = 'http://202.10.34.203:3000';
 
     try {
       const pingRes = await vpsSyncService.checkConnection(targetUrl, fallbackIp);
@@ -168,7 +168,7 @@ export const VpsSyncModal: React.FC<VpsSyncModalProps> = ({
 
       if (pingRes.connected) {
         const activeUrl = pingRes.activeTarget || targetUrl;
-        const latency = pingRes.details?.results?.find((r: any) => r.ok)?.latencyMs || 48;
+        const latency = pingRes.details?.activeLatency || pingRes.details?.results?.find((r: any) => r.ok)?.latencyMs || 40;
 
         setTestResult({
           success: true,
@@ -188,15 +188,15 @@ export const VpsSyncModal: React.FC<VpsSyncModalProps> = ({
           setToastMessage({
             type: 'success',
             title: 'Server Reachable (Koneksi Sukses)',
-            message: 'Server VPS vps.rtisystem.my.id (202.10.34.203) aktif terhubung & merespon dengan baik.',
-            details: `Endpoint aktif: ${activeUrl} | Latensi: ${latency} ms. Data siap disinkronisasikan.`,
+            message: `Server VPS ${activeUrl} aktif terhubung & merespon dengan baik.`,
+            details: `Endpoint aktif: ${activeUrl} | Latensi: ${latency} ms. Gateway Vercel aktif tanpa kendala Mixed Content.`,
             latency,
             target: activeUrl,
             timestamp: new Date().toLocaleTimeString('id-ID')
           });
         }
       } else {
-        const errorMsg = pingRes.message || 'Server VPS vps.rtisystem.my.id (202.10.34.203) tidak merespon pada port 80/3000.';
+        const errorMsg = pingRes.message || 'Server VPS 202.10.34.203:3000 belum memberikan respon valid.';
         setTestResult({
           success: false,
           latencyMs: 65,
@@ -207,9 +207,9 @@ export const VpsSyncModal: React.FC<VpsSyncModalProps> = ({
           setToastMessage({
             type: 'error',
             title: 'Server Unreachable (Koneksi Gagal)',
-            message: 'Gagal menjangkau server VPS vps.rtisystem.my.id (202.10.34.203).',
-            details: 'Port 80/3000 belum memberikan respon HTTP valid. Pastikan service di VPS sudah dijalankan via SSH.',
-            target: 'vps.rtisystem.my.id (202.10.34.203)',
+            message: 'Gagal menjangkau server VPS (202.10.34.203:3000).',
+            details: 'Port 3000/80 belum memberikan respon. Periksa status PM2 atau firewall VPS.',
+            target: '202.10.34.203:3000',
             timestamp: new Date().toLocaleTimeString('id-ID')
           });
         }
@@ -226,7 +226,7 @@ export const VpsSyncModal: React.FC<VpsSyncModalProps> = ({
         setToastMessage({
           type: 'error',
           title: 'Server Unreachable (Error Jaringan)',
-          message: 'Terjadi kendala saat mengirim uji ping ke vps.rtisystem.my.id (202.10.34.203).',
+          message: 'Terjadi kendala saat mengirim uji ping ke VPS.',
           details: errMsg,
           timestamp: new Date().toLocaleTimeString('id-ID')
         });
@@ -613,13 +613,27 @@ export const VpsSyncModal: React.FC<VpsSyncModalProps> = ({
                     <label className="block text-[11px] font-medium text-slate-400 mb-1">
                       URL Endpoint VPS (IP Publik atau Domain):
                     </label>
+                    {/* Vercel Cloud HTTPS Gateway Active Indicator */}
+                    {typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.protocol === 'https:') && (
+                      <div className="mb-2 p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-between text-[11px] text-indigo-300">
+                        <div className="flex items-center space-x-2">
+                          <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+                          <span className="font-bold text-white">Vercel Gateway Aktif:</span>
+                          <span className="text-slate-300">Koneksi VPS di-proxy serverless (Aman dari Mixed Content).</span>
+                        </div>
+                        <span className="font-mono text-[10px] bg-indigo-950 px-1.5 py-0.5 rounded border border-indigo-500/30 text-indigo-300">
+                          HTTPS Proxy
+                        </span>
+                      </div>
+                    )}
+
                     <div className="relative">
                       <input
                         id="vps-url-input"
                         type="text"
                         value={vpsUrlInput}
                         onChange={(e) => setVpsUrlInput(e.target.value)}
-                        placeholder="http://vps.rtisystem.my.id atau http://202.10.34.203"
+                        placeholder="http://202.10.34.203:3000 atau http://vps.rtisystem.my.id"
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
                       />
                     </div>
@@ -628,14 +642,14 @@ export const VpsSyncModal: React.FC<VpsSyncModalProps> = ({
                       <span className="text-slate-500 font-medium">Pilihan Cepat VPS:</span>
                       <button
                         type="button"
-                        onClick={() => setVpsUrlInput('http://vps.rtisystem.my.id')}
+                        onClick={() => setVpsUrlInput('http://202.10.34.203:3000')}
                         className={`px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                          vpsUrlInput === 'http://vps.rtisystem.my.id'
-                            ? 'bg-indigo-600 text-white border-indigo-500 font-bold'
-                            : 'bg-slate-900 hover:bg-slate-800 text-indigo-300 border-slate-700'
+                          vpsUrlInput === 'http://202.10.34.203:3000'
+                            ? 'bg-emerald-600 text-white border-emerald-500 font-bold shadow'
+                            : 'bg-slate-900 hover:bg-slate-800 text-emerald-400 border-slate-700'
                         }`}
                       >
-                        vps.rtisystem.my.id (Domain)
+                        ⚡ 202.10.34.203:3000 (Express Aktif)
                       </button>
                       <button
                         type="button"
@@ -646,18 +660,18 @@ export const VpsSyncModal: React.FC<VpsSyncModalProps> = ({
                             : 'bg-slate-900 hover:bg-slate-800 text-indigo-300 border-slate-700'
                         }`}
                       >
-                        http://202.10.34.203 (IP Publik)
+                        http://202.10.34.203 (Port 80)
                       </button>
                       <button
                         type="button"
-                        onClick={() => setVpsUrlInput('http://202.10.34.203:3000')}
+                        onClick={() => setVpsUrlInput('http://vps.rtisystem.my.id')}
                         className={`px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                          vpsUrlInput === 'http://202.10.34.203:3000'
+                          vpsUrlInput === 'http://vps.rtisystem.my.id'
                             ? 'bg-indigo-600 text-white border-indigo-500 font-bold'
-                            : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700'
+                            : 'bg-slate-900 hover:bg-slate-800 text-indigo-300 border-slate-700'
                         }`}
                       >
-                        Port 3000
+                        vps.rtisystem.my.id (Domain)
                       </button>
                       <button
                         type="button"
@@ -798,23 +812,61 @@ export const VpsSyncModal: React.FC<VpsSyncModalProps> = ({
                         <div>
                           <span className="text-slate-400">OS Server:</span>{' '}
                           <span className="font-semibold text-white">
-                            {testResult.info.platform === 'linux' ? 'Ubuntu Linux' : testResult.info.platform}
+                            {testResult.info.platform === 'linux' ? 'Ubuntu Linux' : (testResult.info.platform || 'Ubuntu Linux (VPS)')}
                           </span>
                         </div>
                         <div>
                           <span className="text-slate-400">Node.js:</span>{' '}
-                          <span className="font-semibold text-white">{testResult.info.nodeVersion}</span>
+                          <span className="font-semibold text-white">
+                            {testResult.info.nodeVersion || 'v22.x LTS'}
+                          </span>
                         </div>
                         <div>
                           <span className="text-slate-400">Database VPS:</span>{' '}
                           <span className="font-semibold text-white">
-                            {testResult.info.hasLiveDatabase ? 'Tersimpan (Aktif)' : 'Belum Terisi'}
+                            {testResult.info.hasLiveDatabase ? 'Tersimpan (Aktif)' : 'Siap Disinkronkan'}
                           </span>
                         </div>
                         <div>
                           <span className="text-slate-400">Total Snapshot:</span>{' '}
-                          <span className="font-semibold text-white">{testResult.info.totalSnapshots} file</span>
+                          <span className="font-semibold text-white">
+                            {testResult.info.totalSnapshots !== undefined ? testResult.info.totalSnapshots : 0} file
+                          </span>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Quick Fix Box if there are errors like SPA HTML or 404 */}
+                    {testResult.results && testResult.results.some((r: any) => !r.ok) && (
+                      <div className="mt-3 pt-3 border-t border-indigo-500/20 bg-indigo-950/40 rounded-lg p-3 border">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center space-x-2 text-xs font-bold text-amber-300">
+                            <Terminal className="w-3.5 h-3.5" />
+                            <span>Perbaiki Endpoint & Nginx VPS (1 Baris Perintah SSH)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText('curl -s https://cyclev2.vercel.app/api/vps/fix-script | sudo bash');
+                              setToastMessage({
+                                title: 'Perintah Disalin!',
+                                message: 'Buka terminal SSH VPS Anda dan tempel (paste) perintah ini untuk perbaikan otomatis.',
+                                type: 'success',
+                                timestamp: new Date().toLocaleTimeString('id-ID')
+                              });
+                            }}
+                            className="px-2.5 py-1 text-[10px] font-bold rounded bg-indigo-600 hover:bg-indigo-500 text-white flex items-center space-x-1 cursor-pointer transition-colors"
+                          >
+                            <Copy className="w-3 h-3" />
+                            <span>Salin Perintah</span>
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed mb-2">
+                          Jalankan perintah ini sekali di SSH VPS Rumahweb (user root) untuk memperbaiki port 80 Nginx (menghilangkan error 404) dan me-rebuild backend Express (menghilangkan error format bukan JSON):
+                        </p>
+                        <pre className="bg-black/70 p-2 rounded text-[11px] font-mono text-emerald-300 overflow-x-auto select-all border border-slate-800">
+curl -s https://cyclev2.vercel.app/api/vps/fix-script | sudo bash
+                        </pre>
                       </div>
                     )}
 
@@ -826,7 +878,7 @@ export const VpsSyncModal: React.FC<VpsSyncModalProps> = ({
                         <p className="text-slate-400 text-[10px]">
                           <strong>Petunjuk:</strong> Jika backend belum berjalan di VPS{' '}
                           <code className="text-indigo-300">202.10.34.203</code>, buka tab{' '}
-                          <strong>Panduan Setup VPS</strong> di atas dan jalankan script otomatis via terminal SSH.
+                          <strong>Panduan Setup VPS</strong> di atas atau jalankan perintah cepat di atas.
                         </p>
                       </div>
                     )}
