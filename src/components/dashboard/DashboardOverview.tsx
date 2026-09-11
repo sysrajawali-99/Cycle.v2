@@ -1,0 +1,975 @@
+import React, { useMemo, useState, useEffect } from 'react';
+import {
+  Users,
+  CalendarCheck2,
+  Package,
+  KanbanSquare,
+  TrendingUp,
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Building2,
+  Clock,
+  Sparkles,
+  ShieldCheck,
+  Megaphone,
+  CreditCard,
+  Building,
+  Wallet,
+  Landmark,
+  Banknote,
+  Pencil,
+  PlusCircle,
+  RotateCcw,
+  FileText,
+  Coins,
+  ArrowUpRight,
+  BellRing,
+  FileCheck2,
+  SlidersHorizontal
+} from 'lucide-react';
+import {
+  Project,
+  Employee,
+  TimesheetMonthRecord,
+  ProjectStock,
+  InventoryItem,
+  CleaningTask,
+  BlastAnnouncement,
+  AppView,
+  UserRole,
+  CompanyProfile,
+  ChartOfAccount,
+  FinanceTransaction,
+  UserAccount,
+  MaterialRequest,
+  DashboardWidgetsState
+} from '../../types';
+import { formatCurrency, formatNumber, getMonthName } from '../../utils/formatters';
+import { ComparativeCharts } from './ComparativeCharts';
+import { storageService } from '../../services/storageService';
+import { UpdateBalanceModal } from './UpdateBalanceModal';
+import { DashboardWidgetModal } from './DashboardWidgetModal';
+
+interface DashboardOverviewProps {
+  projects: Project[];
+  employees: Employee[];
+  timesheets: TimesheetMonthRecord[];
+  projectStocks: ProjectStock[];
+  inventoryItems: InventoryItem[];
+  tasks: CleaningTask[];
+  blasts: BlastAnnouncement[];
+  selectedProjectId: string;
+  onNavigate: (view: AppView) => void;
+  userRole: UserRole;
+  accounts?: ChartOfAccount[];
+  onUpdateAccounts?: (updated: ChartOfAccount[]) => void;
+  onAddFinanceTransaction?: (trx: FinanceTransaction) => void;
+  currentUser?: UserAccount | null;
+  materialRequests?: MaterialRequest[];
+}
+
+export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
+  projects = [],
+  employees = [],
+  timesheets = [],
+  projectStocks = [],
+  inventoryItems = [],
+  tasks = [],
+  blasts = [],
+  selectedProjectId = 'ALL',
+  onNavigate,
+  userRole,
+  accounts: propAccounts,
+  onUpdateAccounts,
+  onAddFinanceTransaction,
+  currentUser,
+  materialRequests: propMaterialRequests
+}) => {
+  const currentMonth = 8; // August 2026
+  const currentYear = 2026;
+  const todayDateNumber = 25; // August 25
+
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(() => storageService.getCompanyProfile());
+  const [internalAccounts, setInternalAccounts] = useState<ChartOfAccount[]>(() =>
+    propAccounts && propAccounts.length > 0 ? propAccounts : storageService.getChartOfAccounts()
+  );
+
+  // Directly derive active accounts: prefer props if provided, otherwise fallback to internal state
+  const activeAccounts = propAccounts && propAccounts.length > 0 ? propAccounts : internalAccounts;
+
+  // Update Balance Modal State
+  const [isBalanceModalOpen, setIsBalanceModalOpen] = useState<boolean>(false);
+  const [selectedAccCodeForModal, setSelectedAccCodeForModal] = useState<string>('1120');
+
+  // Dashboard Widget Customization Modal & State
+  const [isWidgetModalOpen, setIsWidgetModalOpen] = useState<boolean>(false);
+  const [widgetSettings, setWidgetSettings] = useState<DashboardWidgetsState>(() =>
+    storageService.getDashboardWidgets()
+  );
+
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      setCompanyProfile(storageService.getCompanyProfile());
+    };
+    const handleCoaUpdate = () => {
+      setInternalAccounts(storageService.getChartOfAccounts());
+    };
+    const handleWidgetsUpdate = (e: any) => {
+      if (e.detail) {
+        setWidgetSettings(e.detail);
+      } else {
+        setWidgetSettings(storageService.getDashboardWidgets());
+      }
+    };
+
+    window.addEventListener('company_profile_updated', handleProfileUpdate);
+    window.addEventListener('chart_of_accounts_updated', handleCoaUpdate);
+    window.addEventListener('dashboard_widgets_updated', handleWidgetsUpdate as EventListener);
+    window.addEventListener('storage', handleProfileUpdate);
+    window.addEventListener('storage', handleCoaUpdate);
+    window.addEventListener('storage', handleWidgetsUpdate as EventListener);
+    return () => {
+      window.removeEventListener('company_profile_updated', handleProfileUpdate);
+      window.removeEventListener('chart_of_accounts_updated', handleCoaUpdate);
+      window.removeEventListener('dashboard_widgets_updated', handleWidgetsUpdate as EventListener);
+      window.removeEventListener('storage', handleProfileUpdate);
+      window.removeEventListener('storage', handleCoaUpdate);
+      window.removeEventListener('storage', handleWidgetsUpdate as EventListener);
+    };
+  }, []);
+
+  const handleSaveWidgets = (updated: DashboardWidgetsState) => {
+    setWidgetSettings(updated);
+    storageService.saveDashboardWidgets(updated);
+  };
+
+  const handleResetWidgets = () => {
+    const reset = storageService.resetDashboardWidgets();
+    setWidgetSettings(reset);
+  };
+
+  // Filter accounts for Kas & Bank (Rekening Pemasukan & Likuiditas)
+  const cashAndBankAccounts = useMemo(() => {
+    return activeAccounts.filter((acc) => acc.category === 'Kas & Bank' && acc.isActive);
+  }, [activeAccounts]);
+
+  // Total Liquid Cash & Bank Balance
+  const totalLiquidBalance = useMemo(() => {
+    return cashAndBankAccounts.reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
+  }, [cashAndBankAccounts]);
+
+  const handleOpenBalanceModal = (accountCode?: string) => {
+    if (accountCode) {
+      setSelectedAccCodeForModal(accountCode);
+    } else {
+      setSelectedAccCodeForModal(cashAndBankAccounts[0]?.code || '1120');
+    }
+    setIsBalanceModalOpen(true);
+  };
+
+  const handleAccountsUpdated = (updated: ChartOfAccount[]) => {
+    setInternalAccounts(updated);
+    if (onUpdateAccounts) {
+      onUpdateAccounts(updated);
+    }
+  };
+
+  // Filtered employees
+  const filteredEmployees = useMemo(() => {
+    return employees.filter((e) => {
+      if (e.status === 'Resign') return false;
+      if (selectedProjectId !== 'ALL' && e.projectId !== selectedProjectId) return false;
+      return true;
+    });
+  }, [employees, selectedProjectId]);
+
+  // Today's attendance stats
+  const todayAttendance = useMemo(() => {
+    let present = 0;
+    let alpa = 0;
+    let izin = 0;
+    let off = 0;
+    let unrecorded = 0;
+
+    filteredEmployees.forEach((emp) => {
+      const rec = timesheets.find(
+        (ts) =>
+          ts.employeeId === emp.id &&
+          ts.month === currentMonth &&
+          ts.year === currentYear
+      );
+      const st = rec?.days[todayDateNumber] || '';
+      if (st === 'H') present++;
+      else if (st === 'A') alpa++;
+      else if (st === 'I') izin++;
+      else if (st === 'O') off++;
+      else unrecorded++;
+    });
+
+    const total = filteredEmployees.length || 1;
+    const rate = Math.round((present / total) * 100);
+
+    return { present, alpa, izin, off, unrecorded, rate };
+  }, [filteredEmployees, timesheets]);
+
+  // Critical stock items in projectStocks
+  const criticalStockList = useMemo(() => {
+    const list: Array<{
+      stock: ProjectStock;
+      item: InventoryItem;
+      project: Project | undefined;
+    }> = [];
+
+    projectStocks.forEach((ps) => {
+      if (selectedProjectId !== 'ALL' && ps.projectId !== selectedProjectId) return;
+      const item = inventoryItems.find((i) => i.id === ps.itemId);
+      const minStock = item ? item.minStock : 2;
+      if (ps.currentStock <= minStock) {
+        list.push({
+          stock: ps,
+          item: item || {
+            id: ps.itemId,
+            code: 'LOC-ITEM',
+            name: (ps as any).itemName || 'Barang Lokasi',
+            category: 'Chemical',
+            unit: 'Unit',
+            minStock: 2,
+            description: '',
+            unitPrice: 0
+          },
+          project: projects.find((p) => p.id === ps.projectId)
+        });
+      }
+    });
+
+    return list;
+  }, [projectStocks, inventoryItems, selectedProjectId, projects]);
+
+  // Pending Material Requests
+  const effectiveMaterialRequests = useMemo(() => {
+    return propMaterialRequests && propMaterialRequests.length > 0
+      ? propMaterialRequests
+      : storageService.getMaterialRequests();
+  }, [propMaterialRequests]);
+
+  const pendingMaterialRequests = useMemo(() => {
+    return effectiveMaterialRequests.filter((mr) => {
+      if (mr.status !== 'PENDING') return false;
+      if (selectedProjectId !== 'ALL' && mr.projectId !== selectedProjectId) return false;
+      return true;
+    });
+  }, [effectiveMaterialRequests, selectedProjectId]);
+
+  // Backward compatibility count
+  const criticalStocks = criticalStockList;
+
+  // Total payroll estimation this month
+  const totalPayrollEst = useMemo(() => {
+    let sum = 0;
+    filteredEmployees.forEach((emp) => {
+      const rec = timesheets.find(
+        (ts) =>
+          ts.employeeId === emp.id &&
+          ts.month === currentMonth &&
+          ts.year === currentYear
+      );
+      if (!rec) return;
+      let hadir = 0;
+      Object.values(rec.days).forEach((st) => {
+        if (st === 'H') hadir++;
+      });
+      const gross = hadir * emp.dailyRate + (rec.bonusAmount || 0);
+      const net = Math.max(0, gross - (rec.deductionAmount || 0));
+      sum += net;
+    });
+    return sum;
+  }, [filteredEmployees, timesheets]);
+
+  // Filtered tasks
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      if (selectedProjectId !== 'ALL' && t.projectId !== selectedProjectId) return false;
+      return true;
+    });
+  }, [tasks, selectedProjectId]);
+
+  const activeProjectObj = projects.find((p) => p.id === selectedProjectId);
+
+  return (
+    <div className="space-y-5">
+      {/* Top Banner (Widget: banner) */}
+      {widgetSettings.banner ? (
+        <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/40 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
+          <div className="absolute right-0 top-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+            <div className="flex items-start sm:items-center space-x-3.5 min-w-0">
+              {companyProfile.logoUrl ? (
+                <img
+                  src={companyProfile.logoUrl}
+                  alt={companyProfile.name}
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-contain bg-slate-950 p-1.5 border border-amber-500/30 shadow-md shrink-0"
+                />
+              ) : (
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-slate-950 font-black text-xl shadow-md shrink-0">
+                  {companyProfile.name?.charAt(0) || 'R'}
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="flex items-center space-x-2 text-amber-400 text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-0.5">
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{companyProfile.tagline || 'Command Center Outsourcing Cleaning Service'}</span>
+                </div>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight truncate">
+                  {companyProfile.name} Dashboard
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl truncate">
+                  {selectedProjectId === 'ALL'
+                    ? `Pengawasan terpusat ${projects.length} Lokasi Proyek • ${filteredEmployees.length} Petugas Kebersihan Aktif • Cut-off ${getMonthName(currentMonth)} ${currentYear}`
+                    : `Lokasi: ${activeProjectObj?.name} (${activeProjectObj?.address}) • Spv: ${activeProjectObj?.siteSupervisor}`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 md:pt-0">
+              <button
+                id="dash-custom-widgets-btn"
+                onClick={() => setIsWidgetModalOpen(true)}
+                className="flex items-center space-x-2 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-slate-800/90 hover:bg-slate-700 text-amber-300 font-bold text-xs rounded-xl border border-amber-500/30 shadow-sm transition-all cursor-pointer"
+                title="Atur modul dan widget yang tampil di Dashboard"
+              >
+                <SlidersHorizontal className="w-4 h-4 text-amber-400" />
+                <span>Atur Widget</span>
+              </button>
+
+              <button
+                id="dash-quick-project-settings-btn"
+                onClick={() => onNavigate('project_settings')}
+                className="flex items-center space-x-2 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition-all cursor-pointer"
+              >
+                <Building2 className="w-4 h-4 text-amber-400" />
+                <span>Spesifikasi Lokasi</span>
+              </button>
+
+              <button
+                id="dash-quick-timesheet-btn"
+                onClick={() => onNavigate('timesheet')}
+                className="flex items-center space-x-2 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+              >
+                <CalendarCheck2 className="w-4 h-4" />
+                <span>Buka Timesheet</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Minimalist header bar when banner is hidden, preserving access to widget customizer */
+        <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800/80 px-4 py-2.5 rounded-2xl">
+          <div className="flex items-center space-x-2 text-xs text-slate-300">
+            <span className="font-bold text-white">{companyProfile.name}</span>
+            <span className="text-slate-600">•</span>
+            <span className="text-slate-400">
+              {selectedProjectId === 'ALL' ? 'Semua Lokasi' : activeProjectObj?.name}
+            </span>
+          </div>
+          <button
+            id="dash-custom-widgets-compact-btn"
+            onClick={() => setIsWidgetModalOpen(true)}
+            className="flex items-center space-x-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs rounded-xl border border-amber-500/30 transition-all cursor-pointer"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>Atur Widget</span>
+          </button>
+        </div>
+      )}
+
+      {/* Real-time Notifications & Critical Alerts (Widget: critical_alerts) */}
+      {widgetSettings.critical_alerts && (criticalStockList.length > 0 || pendingMaterialRequests.length > 0) && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-rose-400">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+              </span>
+              <span>Pusat Notifikasi & Peringatan Real-Time Operasional</span>
+            </div>
+            <span className="text-[11px] text-slate-400 font-medium">
+              {criticalStockList.length} Stok Kritis • {pendingMaterialRequests.length} Permintaan Butuh Approval
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* Critical Stock Alert Card */}
+            {criticalStockList.length > 0 ? (
+              <div className="bg-gradient-to-r from-rose-950/40 via-slate-900 to-slate-900 border border-rose-500/40 rounded-2xl p-4 shadow-lg flex flex-col justify-between space-y-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-1.5 bg-rose-500/20 text-rose-400 rounded-lg border border-rose-500/30">
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                      <h4 className="text-xs font-bold text-rose-300">
+                        Peringatan Stok Level Kritis ({criticalStockList.length} Item)
+                      </h4>
+                    </div>
+                    <span className="text-[10px] uppercase font-extrabold bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/40">
+                      Restock Diperlukan
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    Stok barang berikut telah mencapai atau berada di bawah batas minimum aman operasional:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {criticalStockList.slice(0, 4).map(({ stock, item, project }) => (
+                      <span
+                        key={stock.id}
+                        className="inline-flex items-center space-x-1 bg-slate-950/80 border border-rose-500/30 text-slate-200 text-[11px] px-2.5 py-1 rounded-lg"
+                      >
+                        <b className="text-rose-400">{item.name}</b>
+                        <span className="text-slate-400 font-mono text-[10px]">({stock.currentStock}/{item.minStock} {item.unit})</span>
+                        {project && (
+                          <span className="text-amber-400 text-[10px] font-medium">• {project.name}</span>
+                        )}
+                      </span>
+                    ))}
+                    {criticalStockList.length > 4 && (
+                      <span className="text-[11px] text-slate-400 self-center font-medium">
+                        +{criticalStockList.length - 4} barang lainnya
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-rose-950/60 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400">Peringatan otomatis berdasar stok fisik lokasi</span>
+                  <button
+                    id="dash-review-critical-stock-btn"
+                    onClick={() => onNavigate('inventory')}
+                    className="flex items-center space-x-1.5 text-xs font-bold text-rose-300 hover:text-white bg-rose-500/20 hover:bg-rose-500/30 px-3 py-1.5 rounded-lg border border-rose-500/40 transition cursor-pointer"
+                  >
+                    <span>Periksa Stok di Lokasi</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex items-center space-x-3 text-xs text-slate-400">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <span>Seluruh stok barang di lokasi dalam kondisi aman dan memenuhi batas minimum.</span>
+              </div>
+            )}
+
+            {/* Pending Material Request Alert Card */}
+            {pendingMaterialRequests.length > 0 ? (
+              <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/40 rounded-2xl p-4 shadow-lg flex flex-col justify-between space-y-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg border border-amber-500/30">
+                        <FileCheck2 className="w-4 h-4" />
+                      </div>
+                      <h4 className="text-xs font-bold text-amber-300">
+                        Permintaan Material Menunggu Approval ({pendingMaterialRequests.length} Pengajuan)
+                      </h4>
+                    </div>
+                    <span className="text-[10px] uppercase font-extrabold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/40">
+                      Perlu Disetujui
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    Terdapat permintaan material dan kebutuhan chemical dari supervisor site yang belum disetujui:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {pendingMaterialRequests.slice(0, 3).map((mr) => (
+                      <span
+                        key={mr.id}
+                        className="inline-flex items-center space-x-1.5 bg-slate-950/80 border border-amber-500/30 text-slate-200 text-[11px] px-2.5 py-1 rounded-lg"
+                      >
+                        <b className="text-amber-400 font-mono text-[10px]">{mr.requestNumber}</b>
+                        <span className="text-white font-semibold">{mr.projectName}</span>
+                        <span className="text-slate-400 text-[10px]">({mr.items.length} item)</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                          mr.priority === 'Kritis' ? 'bg-rose-500/20 text-rose-300' : mr.priority === 'Urgent' ? 'bg-amber-500/20 text-amber-300' : 'bg-blue-500/20 text-blue-300'
+                        }`}>
+                          {mr.priority}
+                        </span>
+                      </span>
+                    ))}
+                    {pendingMaterialRequests.length > 3 && (
+                      <span className="text-[11px] text-slate-400 self-center font-medium">
+                        +{pendingMaterialRequests.length - 3} permintaan lainnya
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-amber-950/60 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400">Pengajuan dari SPV Site via Form Material Request</span>
+                  <button
+                    id="dash-review-material-requests-btn"
+                    onClick={() => onNavigate('inventory')}
+                    className="flex items-center space-x-1.5 text-xs font-bold text-amber-300 hover:text-white bg-amber-500/20 hover:bg-amber-500/30 px-3 py-1.5 rounded-lg border border-amber-500/40 transition cursor-pointer"
+                  >
+                    <span>Proses Approval Material</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex items-center space-x-3 text-xs text-slate-400">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <span>Tidak ada permintaan material yang tertunda (seluruh pengajuan telah diproses).</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 4 Stat Cards */}
+      {(widgetSettings.stat_employees || widgetSettings.stat_attendance || widgetSettings.stat_inventory || widgetSettings.stat_payroll) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Total Personil */}
+          {widgetSettings.stat_employees && (
+            <div
+              onClick={() => onNavigate('employees')}
+              className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 shadow-lg transition-all cursor-pointer group"
+            >
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                <span>Personil Aktif</span>
+                <div className="p-2 bg-blue-500/10 text-blue-400 rounded-xl group-hover:bg-blue-500 group-hover:text-slate-950 transition-colors">
+                  <Users className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-white mt-2">
+                {filteredEmployees.length}{' '}
+                <span className="text-xs font-normal text-slate-400">Cleaner</span>
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
+                <span>Shift Terbagi 4 Waktu</span>
+                <span className="text-blue-400 font-semibold flex items-center space-x-0.5">
+                  <span>Detail</span>
+                  <ArrowRight className="w-3 h-3" />
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Kehadiran Hari Ini */}
+          {widgetSettings.stat_attendance && (
+            <div
+              onClick={() => onNavigate('timesheet')}
+              className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 shadow-lg transition-all cursor-pointer group"
+            >
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                <span>Kehadiran Hari Ini (Tgl {todayDateNumber})</span>
+                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl group-hover:bg-emerald-500 group-hover:text-slate-950 transition-colors">
+                  <CalendarCheck2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-emerald-400 mt-2">
+                {todayAttendance.rate}%{' '}
+                <span className="text-xs font-normal text-slate-400">
+                  ({todayAttendance.present}/{filteredEmployees.length} Hadir)
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
+                <span>
+                  Alpa: <b className="text-rose-400">{todayAttendance.alpa}</b> • Izin:{' '}
+                  <b className="text-amber-400">{todayAttendance.izin}</b>
+                </span>
+                <span className="text-emerald-400 font-semibold flex items-center space-x-0.5">
+                  <span>Ceklis</span>
+                  <ArrowRight className="w-3 h-3" />
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Stok Kritis Alert */}
+          {widgetSettings.stat_inventory && (
+            <div
+              onClick={() => onNavigate('inventory')}
+              className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 shadow-lg transition-all cursor-pointer group"
+            >
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                <span>Stok Chemical & Alat</span>
+                <div
+                  className={`p-2 rounded-xl transition-colors ${
+                    criticalStocks.length > 0
+                      ? 'bg-rose-500/20 text-rose-400 group-hover:bg-rose-500 group-hover:text-white'
+                      : 'bg-emerald-500/10 text-emerald-400'
+                  }`}
+                >
+                  <Package className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-white mt-2">
+                {criticalStocks.length > 0 ? (
+                  <span className="text-rose-400">{criticalStocks.length} Kritis</span>
+                ) : (
+                  <span className="text-emerald-400">Aman</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
+                <span>{inventoryItems.length} Master Item</span>
+                <span className="text-amber-400 font-semibold flex items-center space-x-0.5">
+                  <span>Kelola</span>
+                  <ArrowRight className="w-3 h-3" />
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Estimasi Payroll Bulan Ini */}
+          {widgetSettings.stat_payroll && (
+            <div
+              onClick={() => onNavigate('reports')}
+              className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 shadow-lg transition-all cursor-pointer group"
+            >
+              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                <span>Estimasi Payroll ({getMonthName(currentMonth)})</span>
+                <div className="p-2 bg-amber-500/10 text-amber-400 rounded-xl group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-xl font-black text-amber-400 mt-2 truncate">
+                {formatCurrency(totalPayrollEst)}
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-800">
+                <span>Auto-Calculated</span>
+                <span className="text-amber-400 font-semibold flex items-center space-x-0.5">
+                  <span>Laporan</span>
+                  <ArrowRight className="w-3 h-3" />
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* PUSAT SALDO REKENING PEMASUKAN & KAS/BANK (LIQUIDITY MANAGEMENT CENTER - Widget: liquidity_accounts) */}
+      {widgetSettings.liquidity_accounts && (
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl">
+              <Landmark className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="font-extrabold text-white text-base sm:text-lg">Saldo Rekening Pemasukan & Kas/Bank</h3>
+                <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                  Real-time COA
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Pusat kontrol likuiditas kas operasional, rekening bank penerimaan klien & payroll
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              id="dash-update-balance-main-btn"
+              onClick={() => handleOpenBalanceModal()}
+              className="flex items-center space-x-2 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span>Update Saldo</span>
+            </button>
+
+            <button
+              id="dash-quick-income-trx-btn"
+              onClick={() => {
+                setSelectedAccCodeForModal('1120');
+                setIsBalanceModalOpen(true);
+              }}
+              className="flex items-center space-x-2 px-3.5 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs rounded-xl transition-all cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>+ Setoran Pemasukan</span>
+            </button>
+
+            <button
+              id="dash-view-finance-btn"
+              onClick={() => onNavigate('finance')}
+              className="flex items-center space-x-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl border border-slate-700 transition-all cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-400" />
+              <span>Buku Kas</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+
+        {/* Total Liquidity & Individual Accounts Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+          {cashAndBankAccounts.map((acc) => {
+            const isBca = acc.code === '1120';
+            const isMandiri = acc.code === '1121';
+            const isBni = acc.code === '1122';
+            const isKasBesar = acc.code === '1110';
+            const isKasKecil = acc.code === '1130';
+
+            const badgeColor = isBca
+              ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+              : isMandiri
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              : isBni
+              ? 'bg-teal-500/20 text-teal-300 border-teal-500/40'
+              : isKasBesar
+              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+              : 'bg-purple-500/20 text-purple-300 border-purple-500/40';
+
+            return (
+              <div
+                key={acc.code}
+                className="bg-slate-950/80 border border-slate-800 hover:border-slate-700 p-3.5 rounded-2xl transition-all flex flex-col justify-between group hover:shadow-lg hover:shadow-slate-900"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1 mb-2">
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${badgeColor}`}>
+                      {acc.code}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-semibold truncate">
+                      {isBca ? 'Penerimaan Klien' : isMandiri ? 'Payroll & Vendor' : isBni ? 'Giro Operasional' : isKasBesar ? 'Kas Brankas' : 'Kas Lapangan'}
+                    </span>
+                  </div>
+
+                  <h4 className="font-bold text-white text-xs line-clamp-1 group-hover:text-amber-400 transition-colors">
+                    {acc.name}
+                  </h4>
+                  <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
+                    {acc.description}
+                  </p>
+                </div>
+
+                <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Saldo Terkini</div>
+                    <div className="font-mono font-extrabold text-sm text-amber-400">
+                      {formatCurrency(acc.currentBalance || 0)}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenBalanceModal(acc.code)}
+                    className="p-1.5 bg-slate-800 hover:bg-amber-500 text-slate-400 hover:text-slate-950 rounded-lg transition-colors cursor-pointer"
+                    title={`Ubah saldo ${acc.name}`}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Bottom Total Liquidity Banner */}
+        <div className="p-3 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/20 border border-slate-800 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          <div className="flex items-center space-x-2 text-slate-300">
+            <Coins className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              Total Dana Kas & Bank Siap Pakai ({cashAndBankAccounts.length} Rekening Pemasukan):
+            </span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <span className="text-base font-black text-amber-400 font-mono tracking-tight">
+              {formatCurrency(totalLiquidBalance)}
+            </span>
+            <button
+              onClick={() => handleOpenBalanceModal()}
+              className="text-[11px] font-bold text-amber-400 hover:underline cursor-pointer"
+            >
+              Sinkronkan Saldo ➔
+            </button>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* EXECUTIVE COMPARATIVE ANALYTICS (Payroll MoM & Manpower Quota vs Actual) */}
+      {(widgetSettings.comparative_payroll || widgetSettings.comparative_manpower) && (
+        <ComparativeCharts
+          projects={projects}
+          employees={employees}
+          timesheets={timesheets}
+          currentMonth={currentMonth}
+          currentYear={currentYear}
+          selectedProjectId={selectedProjectId}
+          showPayrollChart={widgetSettings.comparative_payroll}
+          showManpowerChart={widgetSettings.comparative_manpower}
+        />
+      )}
+
+      {/* Main Grid: Live Tasks & Latest Blasts (Widgets: tasks_board & blasts_announcements) */}
+      {(widgetSettings.tasks_board || widgetSettings.blasts_announcements) && (
+        <div className={`grid grid-cols-1 ${widgetSettings.tasks_board && widgetSettings.blasts_announcements ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-5`}>
+          {/* Cleaning Tasks Progress */}
+          {widgetSettings.tasks_board && (
+            <div className={`${widgetSettings.blasts_announcements ? 'lg:col-span-2' : 'col-span-1'} bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg">
+                    <KanbanSquare className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-sm">Monitoring Area Kebersihan (Rajawali Boards)</h3>
+                    <p className="text-xs text-slate-400">Status pengerjaan checklist zona publik dan sanitasi</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => onNavigate('tasks')}
+                  className="text-xs text-amber-400 hover:underline font-semibold"
+                >
+                  Lihat Board Penuh ➔
+                </button>
+              </div>
+
+              <div className="space-y-2.5">
+                {filteredTasks.length === 0 ? (
+                  <div className="py-8 text-center text-slate-500 text-xs italic bg-slate-950/40 rounded-xl border border-dashed border-slate-800/80 p-4">
+                    Belum ada tugas kebersihan harian yang dibuat. Klik menu "Rajawali Boards" untuk menambahkan tugas baru.
+                  </div>
+                ) : (
+                  filteredTasks.slice(0, 4).map((task) => {
+                    const doneCount = task.checklist.filter((c) => c.done).length;
+                    const totalCount = task.checklist.length;
+                    const percent = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+
+                    return (
+                      <div
+                        key={task.id}
+                        className="bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 p-3.5 rounded-xl transition-colors space-y-2"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="font-bold text-white text-xs">{task.areaName}</h4>
+                            <div className="flex items-center space-x-2 text-[11px] text-slate-400 mt-0.5">
+                              <span className="text-slate-300">Petugas: {task.assignedEmployees.join(', ')}</span>
+                              <span>•</span>
+                              <span className="text-slate-500">{task.shift}</span>
+                            </div>
+                          </div>
+
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              task.status === 'done'
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                : task.status === 'review'
+                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                                : task.status === 'in_progress'
+                                ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}
+                          >
+                            {task.status === 'done'
+                              ? 'Selesai'
+                              : task.status === 'review'
+                              ? 'Audit QC'
+                              : task.status === 'in_progress'
+                              ? 'Sedang Dikerjakan'
+                              : 'Jadwal'}
+                          </span>
+                        </div>
+
+                        {/* Checklist progress bar */}
+                        <div>
+                          <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                            <span>Checklist Pengerjaan ({doneCount}/{totalCount} item)</span>
+                            <span className="font-semibold text-slate-300">{percent}%</span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full transition-all duration-300 ${
+                                percent === 100 ? 'bg-emerald-500' : 'bg-amber-500'
+                              }`}
+                              style={{ width: `${percent}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Announcements (1 col) */}
+          {widgetSettings.blasts_announcements && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4 flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-amber-500/10 text-amber-400 rounded-lg">
+                      <Megaphone className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white text-sm">Eagle Blast Pusat</h3>
+                      <p className="text-xs text-slate-400">Instruksi & kebijakan manajemen</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  {blasts.slice(0, 3).map((blast) => (
+                    <div
+                      key={blast.id}
+                      className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5 text-xs"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                            blast.category === 'PENTING'
+                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          }`}
+                        >
+                          {blast.category}
+                        </span>
+                        <span className="text-[10px] text-slate-500">{blast.date}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-200 text-xs line-clamp-1">{blast.title}</h4>
+                      <p className="text-slate-400 text-[11px] line-clamp-2 leading-relaxed">{blast.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={() => onNavigate('blast')}
+                className="w-full py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition-colors"
+              >
+                Buka Semua Pengumuman ➔
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Update Balance Modal */}
+      <UpdateBalanceModal
+        isOpen={isBalanceModalOpen}
+        onClose={() => setIsBalanceModalOpen(false)}
+        accounts={activeAccounts}
+        onUpdateAccounts={handleAccountsUpdated}
+        onAddFinanceTransaction={onAddFinanceTransaction}
+        initialSelectedAccountCode={selectedAccCodeForModal}
+        userRole={userRole}
+        userName={currentUser?.name || 'Admin'}
+      />
+
+      {/* Dashboard Widget Customization Modal */}
+      <DashboardWidgetModal
+        isOpen={isWidgetModalOpen}
+        onClose={() => setIsWidgetModalOpen(false)}
+        widgets={widgetSettings}
+        onSave={handleSaveWidgets}
+        onReset={handleResetWidgets}
+      />
+    </div>
+  );
+};

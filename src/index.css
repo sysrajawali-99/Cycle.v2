@@ -1,0 +1,416 @@
+@import "tailwindcss";
+
+/* Safe area support for iOS (iPhone notch / Dynamic Island / home bar) and Android navigation bar */
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 1rem);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0.5rem);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom, 1rem);
+  }
+  .touch-pan-y {
+    touch-action: pan-y;
+  }
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+}
+
+/* Base transitions for theme switching */
+html {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* =========================================================================
+   DARK THEME (Default)
+   ========================================================================= */
+html.dark,
+html:not(.light) {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #020617;
+  color: #f8fafc;
+}
+
+/* Custom smooth scrollbar for dark mode */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.8);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.9);
+}
+
+/* =========================================================================
+   LIGHT THEME (High Contrast & Daylight Readability on PC & Mobile)
+   ========================================================================= */
+html.light {
+  color-scheme: light;
+}
+
+html.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html.light main {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Custom smooth scrollbar for light mode */
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Light Theme Surface & Card Backgrounds */
+html.light .bg-slate-950 {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html.light .bg-slate-950\/95,
+html.light .bg-slate-950\/90,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/70,
+html.light .bg-slate-950\/60 {
+  background-color: rgba(248, 250, 252, 0.95) !important;
+}
+
+html.light .bg-slate-900,
+html.light .bg-slate-900\/95,
+html.light .bg-slate-900\/90,
+html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/70 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+}
+
+html.light .bg-slate-850,
+html.light .bg-slate-800,
+html.light .bg-slate-800\/90,
+html.light .bg-slate-800\/80,
+html.light .bg-slate-800\/70 {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .bg-slate-750,
+html.light .bg-slate-700 {
+  background-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Light Theme Text Hierarchy & Contrast */
+html.light .text-white {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-100 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400 {
+  color: #475569 !important;
+}
+
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.light .text-slate-600 {
+  color: #64748b !important;
+}
+
+/* Light Theme Borders */
+html.light .border-slate-900,
+html.light .border-slate-850,
+html.light .border-slate-800,
+html.light .border-slate-800\/80,
+html.light .border-slate-800\/60 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .border-slate-700,
+html.light .border-slate-700\/80 {
+  border-color: #cbd5e1 !important;
+}
+
+html.light .border-slate-600 {
+  border-color: #94a3b8 !important;
+}
+
+/* Light Theme Header & Navbars */
+html.light header {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light aside,
+html.light #app-sidebar {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light #mobile-bottom-nav {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Light Theme Form Controls (Inputs, Selects, Textareas) */
+html.light input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+html.light select,
+html.light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Fix text contrast inside solid colored buttons & badges */
+html.light .bg-amber-500,
+html.light .bg-amber-600,
+html.light .bg-amber-400 {
+  color: #0f172a !important;
+}
+
+html.light .bg-amber-500 .text-white,
+html.light .bg-amber-600 .text-white,
+html.light .bg-amber-400 .text-white {
+  color: #0f172a !important;
+}
+
+html.light .bg-blue-600 .text-white,
+html.light .bg-blue-500 .text-white,
+html.light .bg-emerald-600 .text-white,
+html.light .bg-emerald-500 .text-white,
+html.light .bg-rose-600 .text-white,
+html.light .bg-rose-500 .text-white,
+html.light .bg-purple-600 .text-white,
+html.light .bg-indigo-600 .text-white {
+  color: #ffffff !important;
+}
+
+html.light .text-amber-400 {
+  color: #d97706 !important;
+}
+
+html.light .text-amber-300 {
+  color: #b45309 !important;
+}
+
+html.light .text-emerald-400 {
+  color: #059669 !important;
+}
+
+html.light .text-emerald-300 {
+  color: #047857 !important;
+}
+
+html.light .text-blue-400 {
+  color: #2563eb !important;
+}
+
+html.light .text-blue-300 {
+  color: #1d4ed8 !important;
+}
+
+html.light .text-rose-400 {
+  color: #e11d48 !important;
+}
+
+html.light .text-rose-300 {
+  color: #be123c !important;
+}
+
+html.light .text-purple-400 {
+  color: #9333ea !important;
+}
+
+html.light .text-purple-300 {
+  color: #7e22ce !important;
+}
+
+html.light .text-cyan-400 {
+  color: #0891b2 !important;
+}
+
+/* Light Theme subtle colored container backgrounds */
+html.light .bg-blue-950,
+html.light .bg-blue-950\/70,
+html.light .bg-blue-950\/60,
+html.light .bg-blue-950\/30 {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+
+html.light .bg-emerald-950,
+html.light .bg-emerald-950\/70,
+html.light .bg-emerald-950\/60,
+html.light .bg-emerald-950\/30 {
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+}
+
+html.light .bg-amber-950,
+html.light .bg-amber-950\/70,
+html.light .bg-amber-950\/60,
+html.light .bg-amber-950\/30 {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+
+html.light .bg-rose-950,
+html.light .bg-rose-950\/70,
+html.light .bg-rose-950\/60,
+html.light .bg-rose-950\/30 {
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+}
+
+html.light .bg-purple-950,
+html.light .bg-purple-950\/70,
+html.light .bg-purple-950\/60,
+html.light .bg-purple-950\/30 {
+  background-color: #faf5ff !important;
+  border-color: #e9d5ff !important;
+}
+
+/* Modals & Popups in Light Mode */
+html.light .fixed.inset-0.bg-black\/80,
+html.light .fixed.inset-0.bg-black\/70,
+html.light .fixed.inset-0.bg-black\/60 {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(4px);
+}
+
+/* iOS tap highlight removal */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Print Specific Rules */
+@media print {
+  @page {
+    size: landscape;
+    margin: 6mm 6mm;
+  }
+
+  html, body {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-size: 10pt;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide website UI elements during print */
+  .no-print,
+  nav,
+  aside,
+  header,
+  footer,
+  #mobile-bottom-nav,
+  #app-sidebar,
+  button {
+    display: none !important;
+  }
+
+  /* Ensure modal backdrop doesn't dim or black out print */
+  .fixed.inset-0 {
+    position: static !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  .bg-slate-900,
+  .bg-slate-950 {
+    background: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  #printable-payroll-sheet,
+  #printable-payslip-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    color: #0f172a !important;
+    background-color: #ffffff !important;
+    display: block !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .page-break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Table styling during print */
+  table {
+    page-break-inside: auto;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Rajawali Cycle",
+  "description": "Portal Manajemen Operasional Terpadu & Sistem Hak Akses Multi-Role PT Rajawali Cycle Indonesia",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
