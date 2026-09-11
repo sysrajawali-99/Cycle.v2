@@ -56,6 +56,9 @@ import { FinanceProfitLoss } from './components/finance/FinanceProfitLoss';
 import { FinanceBankReconcile } from './components/finance/FinanceBankReconcile';
 import { FinanceStatements } from './components/finance/FinanceStatements';
 import { FinanceAnalyticsAudit } from './components/finance/FinanceAnalyticsAudit';
+import { VpsSyncModal } from './components/vps/VpsSyncModal';
+import { VpsNotificationBanner } from './components/vps/VpsNotificationBanner';
+import { vpsSyncService } from './services/vpsSyncService';
 import { INITIAL_USERS } from './data/initialData';
 
 export default function App() {
@@ -67,6 +70,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('ALL');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [isVpsModalOpen, setIsVpsModalOpen] = useState<boolean>(false);
 
   // Core Data States
   const [projects, setProjects] = useState<Project[]>([]);
@@ -152,6 +156,7 @@ export default function App() {
   // Initial Load from storage & listen to real-time sync / reset events
   useEffect(() => {
     loadAllData();
+    vpsSyncService.initRealTimeSync(() => currentUser);
 
     let reloadTimeout: ReturnType<typeof setTimeout> | null = null;
     const handleDataReload = (e?: any) => {
@@ -170,6 +175,7 @@ export default function App() {
     window.addEventListener('app_data_reset', handleDataReload);
     window.addEventListener('rajawali_remote_update', handleDataReload);
     window.addEventListener('rajawali_data_synced', handleDataReload);
+    window.addEventListener('vps_data_pulled', handleDataReload);
     window.addEventListener('storage', handleDataReload);
 
     return () => {
@@ -179,6 +185,7 @@ export default function App() {
       window.removeEventListener('app_data_reset', handleDataReload);
       window.removeEventListener('rajawali_remote_update', handleDataReload);
       window.removeEventListener('rajawali_data_synced', handleDataReload);
+      window.removeEventListener('vps_data_pulled', handleDataReload);
       window.removeEventListener('storage', handleDataReload);
     };
   }, []);
@@ -657,7 +664,11 @@ export default function App() {
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         currentView={currentView}
         onSelectView={handleNavigateView}
+        onOpenVpsSync={() => setIsVpsModalOpen(true)}
       />
+
+      {/* VPS Rumahweb Connection & Real-Time Status Notification */}
+      <VpsNotificationBanner onOpenVpsModal={() => setIsVpsModalOpen(true)} />
 
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Collapsible Sidebar */}
@@ -671,6 +682,7 @@ export default function App() {
           lowStockCount={lowStockCount}
           activeTasksCount={activeTasksCount}
           unreadBlastCount={unreadBlastCount}
+          onOpenVpsSync={() => setIsVpsModalOpen(true)}
         />
 
         {/* Main Content Area */}
@@ -974,6 +986,14 @@ export default function App() {
         lowStockCount={lowStockCount}
         activeTasksCount={activeTasksCount}
         unreadBlastCount={unreadBlastCount}
+      />
+
+      {/* VPS Rumahweb (Ubuntu) Real-Time Synchronization & Cloud Backup Modal */}
+      <VpsSyncModal
+        isOpen={isVpsModalOpen}
+        onClose={() => setIsVpsModalOpen(false)}
+        currentUser={currentUser}
+        onDataReload={loadAllData}
       />
     </div>
   );

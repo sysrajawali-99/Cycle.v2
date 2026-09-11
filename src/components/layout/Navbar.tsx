@@ -14,11 +14,13 @@ import {
   Sun,
   Moon,
   Monitor,
-  Trash2
+  Trash2,
+  Server
 } from 'lucide-react';
 import { Project, UserAccount, AppView, CompanyProfile } from '../../types';
 import { storageService } from '../../services/storageService';
 import { themeService, ThemeMode } from '../../services/themeService';
+import { vpsSyncService } from '../../services/vpsSyncService';
 
 interface NavbarProps {
   projects?: Project[];
@@ -33,6 +35,7 @@ interface NavbarProps {
   onToggleSidebar?: () => void;
   currentView?: AppView;
   onSelectView?: (view: AppView) => void;
+  onOpenVpsSync?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -45,12 +48,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   isSidebarOpen = false,
   onToggleSidebar,
   currentView,
-  onSelectView
+  onSelectView,
+  onOpenVpsSync
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(() => storageService.getCompanyProfile());
   const [themePref, setThemePref] = useState<ThemeMode>(() => themeService.getThemePreference());
   const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => themeService.getResolvedTheme());
+  const [vpsStatus, setVpsStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>(() => vpsSyncService.getConfig().lastSyncStatus);
+  const [vpsConnState, setVpsConnState] = useState<'connected' | 'disconnected' | 'checking'>(
+    () => vpsSyncService.getConfig().connectionState || 'checking'
+  );
 
   useEffect(() => {
     const handleProfileUpdate = () => {
@@ -60,14 +68,28 @@ export const Navbar: React.FC<NavbarProps> = ({
       setThemePref(themeService.getThemePreference());
       setResolvedTheme(themeService.getResolvedTheme());
     };
+    const handleVpsSyncEvent = (e: any) => {
+      if (e.detail?.status) {
+        setVpsStatus(e.detail.status);
+      }
+    };
+    const handleVpsConnectionEvent = (e: any) => {
+      if (e.detail) {
+        setVpsConnState(e.detail.connected ? 'connected' : 'disconnected');
+      }
+    };
 
     window.addEventListener('company_profile_updated', handleProfileUpdate);
     window.addEventListener('storage', handleProfileUpdate);
     window.addEventListener('theme_changed', handleThemeChange as EventListener);
+    window.addEventListener('vps_sync_event', handleVpsSyncEvent);
+    window.addEventListener('vps_connection_event', handleVpsConnectionEvent as EventListener);
     return () => {
       window.removeEventListener('company_profile_updated', handleProfileUpdate);
       window.removeEventListener('storage', handleProfileUpdate);
       window.removeEventListener('theme_changed', handleThemeChange as EventListener);
+      window.removeEventListener('vps_sync_event', handleVpsSyncEvent);
+      window.removeEventListener('vps_connection_event', handleVpsConnectionEvent as EventListener);
     };
   }, []);
 
@@ -181,6 +203,46 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </>
               )}
             </button>
+
+            {/* VPS Rumahweb Cloud Sync Indicator & Modal Trigger */}
+            {onOpenVpsSync && (
+              <button
+                id="navbar-vps-sync-btn"
+                onClick={onOpenVpsSync}
+                className={`flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-sm group border ${
+                  vpsConnState === 'connected'
+                    ? 'bg-emerald-950/70 hover:bg-emerald-900/90 border-emerald-500/40 text-emerald-200 hover:text-white'
+                    : vpsConnState === 'disconnected'
+                    ? 'bg-rose-950/70 hover:bg-rose-900/90 border-rose-500/40 text-rose-200 hover:text-white'
+                    : 'bg-indigo-950/60 hover:bg-indigo-900/80 border-indigo-500/40 text-indigo-200 hover:text-white'
+                }`}
+                title={`Koneksi VPS (vps.rtisystem.my.id): ${
+                  vpsConnState === 'connected'
+                    ? 'Terhubung (Online)'
+                    : vpsConnState === 'disconnected'
+                    ? 'Tidak Terhubung (Offline - Klik untuk detail & cek ulang)'
+                    : 'Sedang Memeriksa...'
+                }`}
+              >
+                <Server className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                <span className="hidden sm:inline text-[11px] font-bold">
+                  {vpsConnState === 'connected'
+                    ? 'VPS Terhubung'
+                    : vpsConnState === 'disconnected'
+                    ? 'VPS Terputus'
+                    : 'Cek VPS...'}
+                </span>
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    vpsConnState === 'connected'
+                      ? 'bg-emerald-400 animate-pulse'
+                      : vpsConnState === 'disconnected'
+                      ? 'bg-rose-400'
+                      : 'bg-amber-400 animate-spin'
+                  }`}
+                />
+              </button>
+            )}
 
             {/* User Session Profile Chip */}
             {currentUser && (
@@ -313,6 +375,26 @@ export const Navbar: React.FC<NavbarProps> = ({
                           </button>
                         </div>
                       </div>
+
+                      {/* VPS Sync Option in Dropdown */}
+                      {onOpenVpsSync && (
+                        <button
+                          id="navbar-dropdown-vps-sync"
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            onOpenVpsSync();
+                          }}
+                          className="w-full text-left flex items-center space-x-2.5 p-2 bg-indigo-950/40 hover:bg-indigo-900/60 text-indigo-200 hover:text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-indigo-500/30"
+                        >
+                          <Server className="w-4 h-4 text-indigo-400 shrink-0" />
+                          <div className="min-w-0">
+                            <div className="font-bold">Koneksi VPS Rumahweb</div>
+                            <div className="text-[10px] text-indigo-300/80 truncate">
+                              Real-Time Cloud Backup & Multi-User
+                            </div>
+                          </div>
+                        </button>
+                      )}
 
                       <div className="pt-2 border-t border-slate-800">
                         <button

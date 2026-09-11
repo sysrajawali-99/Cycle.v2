@@ -30,9 +30,11 @@ import {
   TrendingUp,
   CreditCard,
   Trash2,
-  Send
+  Send,
+  Server
 } from 'lucide-react';
 import { AppView, UserAccount } from '../../types';
+import { vpsSyncService } from '../../services/vpsSyncService';
 
 interface SidebarProps {
   currentView: AppView;
@@ -45,6 +47,7 @@ interface SidebarProps {
   activeTasksCount?: number;
   unreadBlastCount?: number;
   onOpenDriveSync?: () => void;
+  onOpenVpsSync?: () => void;
 }
 
 interface MenuItemConfig {
@@ -66,8 +69,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
   lowStockCount = 0,
   activeTasksCount = 0,
   unreadBlastCount = 0,
-  onOpenDriveSync
+  onOpenDriveSync,
+  onOpenVpsSync
 }) => {
+  const [vpsConnState, setVpsConnState] = useState<'connected' | 'disconnected' | 'checking'>(
+    () => vpsSyncService.getConfig().connectionState || 'checking'
+  );
+
+  useEffect(() => {
+    const handleVpsConn = (e: any) => {
+      if (e.detail) {
+        setVpsConnState(e.detail.connected ? 'connected' : 'disconnected');
+      }
+    };
+    window.addEventListener('vps_connection_event', handleVpsConn as EventListener);
+    return () => {
+      window.removeEventListener('vps_connection_event', handleVpsConn as EventListener);
+    };
+  }, []);
+
   // Allowed views check
   const allowedViews = currentUser?.allowedViews || [
     'dashboard',
@@ -728,6 +748,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <p className="text-[11px] text-slate-400 leading-relaxed">
             Role-Based Access Control aktif. Hak akses dikelola oleh Super Admin HQ.
           </p>
+
+          {onOpenVpsSync && (
+            <button
+              id="sidebar-vps-sync-btn"
+              type="button"
+              onClick={() => {
+                onOpenVpsSync();
+                onCloseMobile();
+              }}
+              className={`w-full flex items-center justify-between py-2 px-3 text-xs font-bold rounded-xl border cursor-pointer shadow-sm transition-all group ${
+                vpsConnState === 'connected'
+                  ? 'bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-200 hover:text-white border-emerald-500/40'
+                  : vpsConnState === 'disconnected'
+                  ? 'bg-rose-950/70 hover:bg-rose-900/90 text-rose-200 hover:text-white border-rose-500/40'
+                  : 'bg-indigo-950/70 hover:bg-indigo-900/90 text-indigo-300 hover:text-white border-indigo-500/40'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Server className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                <span>Koneksi VPS Rumahweb</span>
+              </div>
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  vpsConnState === 'connected'
+                    ? 'bg-emerald-400 animate-pulse'
+                    : vpsConnState === 'disconnected'
+                    ? 'bg-rose-400'
+                    : 'bg-amber-400 animate-spin'
+                }`}
+                title={
+                  vpsConnState === 'connected'
+                    ? 'VPS Terhubung'
+                    : vpsConnState === 'disconnected'
+                    ? 'VPS Tidak Terhubung'
+                    : 'Sedang Memeriksa...'
+                }
+              />
+            </button>
+          )}
 
           {onOpenDriveSync && (
             <button
