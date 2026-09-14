@@ -87,7 +87,7 @@ export const themeService = {
     // Set meta theme-color for browser tab and mobile status bar
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', resolved === 'dark' ? '#020617' : '#f8fafc');
+      metaThemeColor.setAttribute('content', resolved === 'dark' ? '#020617' : '#f0f7ff');
     }
 
     // Apple mobile status bar

@@ -680,7 +680,7 @@ export default function App() {
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 pb-24 md:pb-8 bg-slate-950 scrollbar-thin scrollbar-thumb-slate-800">
+        <main className="flex-1 overflow-y-auto p-2.5 sm:p-5 lg:p-6 pb-28 sm:pb-32 md:pb-8 bg-slate-950 scrollbar-thin scrollbar-thumb-slate-800">
           <div className="max-w-7xl mx-auto space-y-4">
             {/* Dashboard Overview */}
             {currentView === 'dashboard' && (

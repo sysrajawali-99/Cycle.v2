@@ -274,12 +274,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* Mobile Backdrop Overlay */}
+      {/* Mobile & Tablet Backdrop Overlay */}
       {isOpen && (
         <div
           id="mobile-sidebar-backdrop"
           onClick={onCloseMobile}
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 lg:hidden transition-opacity"
           aria-hidden="true"
         />
       )}
@@ -287,12 +287,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar Drawer Container */}
       <aside
         id="app-sidebar"
-        className={`fixed md:sticky top-0 md:top-14 z-40 md:z-20 w-72 md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 h-screen md:h-[calc(100vh-3.5rem)] transition-transform duration-300 ease-in-out overflow-y-auto ${
-          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        className={`fixed lg:sticky top-0 lg:top-14 z-40 lg:z-20 w-72 lg:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 h-screen lg:h-[calc(100vh-3.5rem)] transition-transform duration-300 ease-in-out overflow-y-auto ${
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        {/* Mobile Header Inside Drawer */}
-        <div className="p-3 border-b border-slate-800 md:hidden flex items-center justify-between">
+        {/* Mobile & Tablet Header Inside Drawer */}
+        <div className="p-3 border-b border-slate-800 lg:hidden flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span className="text-xl">🦅</span>
             <span className="font-extrabold text-white text-sm">RAJAWALI CYCLE</span>
@@ -300,7 +300,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             id="close-sidebar-mobile-btn"
             onClick={onCloseMobile}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-800"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-800 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -346,23 +346,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all group min-h-[44px] cursor-pointer ${
                 currentView === 'dashboard'
-                  ? 'bg-amber-500/15 text-amber-400 font-semibold border border-amber-500/30 shadow-sm'
-                  : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                  ? 'bg-[#ffedd5] dark:bg-amber-500/20 text-[#431407] dark:text-amber-100 font-extrabold border border-[#fdba74] dark:border-amber-500/40 shadow-sm'
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-[#431407] dark:hover:text-white'
               }`}
             >
               <div className="flex items-center space-x-3 min-w-0">
                 <div
                   className={`p-1.5 rounded-lg transition-colors shrink-0 ${
                     currentView === 'dashboard'
-                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
-                      : 'text-slate-400 group-hover:text-amber-400 group-hover:bg-slate-800'
+                      ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
+                      : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60 dark:group-hover:bg-slate-800'
                   }`}
                 >
                   {dashboardItem.icon}
                 </div>
                 <div className="truncate">
-                  <div className="text-sm font-medium leading-tight truncate">{dashboardItem.label}</div>
-                  <div className="text-[11px] text-slate-500 truncate group-hover:text-slate-400">
+                  <div className={`text-sm font-extrabold leading-tight truncate ${
+                    currentView === 'dashboard' ? 'text-black dark:text-amber-100 opacity-100' : 'text-black dark:text-white font-bold'
+                  }`}>
+                    {dashboardItem.label}
+                  </div>
+                  <div className={`text-[11px] truncate ${
+                    currentView === 'dashboard' ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                  }`}>
                     {dashboardItem.description}
                   </div>
                 </div>
@@ -380,8 +386,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setIsHrmOpen(!isHrmOpen)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer group ${
                   isCurrentInHrm
-                    ? 'bg-blue-950/40 text-blue-300 border border-blue-500/30'
-                    : 'bg-slate-950/40 text-slate-300 hover:bg-slate-800/70 hover:text-white border border-slate-800/60'
+                    ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30'
+                    : 'bg-slate-50 dark:bg-slate-950/40 text-slate-700 dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] dark:hover:bg-slate-800/70 hover:text-[#431407] dark:hover:text-white border border-slate-200 dark:border-slate-800/60'
                 }`}
               >
                 <div className="flex items-center space-x-2.5 min-w-0">
@@ -389,29 +395,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className={`p-1.5 rounded-lg shrink-0 transition-colors ${
                       isCurrentInHrm
                         ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                        : 'bg-slate-800 text-blue-400 group-hover:bg-blue-600/20'
+                        : 'bg-slate-200 dark:bg-slate-800 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600/20'
                     }`}
                   >
                     <Briefcase className="w-4 h-4" />
                   </div>
                   <div className="truncate">
-                    <div className="text-xs font-bold tracking-tight text-white flex items-center space-x-1.5">
+                    <div className="text-xs font-bold tracking-tight text-black dark:text-white flex items-center space-x-1.5">
                       <span>Human Resource Management (HRM)</span>
                     </div>
-                    <div className="text-[10px] text-slate-400 truncate">
+                    <div className="text-[10px] text-black dark:text-slate-400 truncate font-medium">
                       Timesheet, Karyawan, SOP & Payroll
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-1.5 shrink-0 ml-1">
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-300 border border-blue-500/30">
                     {visibleHrmItems.length}
                   </span>
                   {isHrmOpen ? (
-                    <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-white transition-transform" />
+                    <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform" />
                   ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-transform" />
+                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform" />
                   )}
                 </div>
               </button>
@@ -432,23 +438,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         }}
                         className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-all group min-h-[38px] cursor-pointer ${
                           isActive
-                            ? 'bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/40 shadow-sm'
-                            : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                            ? 'bg-[#ffedd5] dark:bg-amber-500/20 text-[#431407] dark:text-amber-100 font-extrabold border border-[#fdba74] dark:border-amber-500/40 shadow-sm'
+                            : 'text-black dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-black dark:hover:text-white'
                         }`}
                       >
                         <div className="flex items-center space-x-2.5 min-w-0">
                           <div
-                            className={`p-1 rounded-md shrink-0 ${
+                            className={`p-1 rounded-md shrink-0 transition-colors ${
                               isActive
-                                ? 'bg-blue-500 text-white shadow-sm'
-                                : 'text-slate-400 group-hover:text-blue-400 group-hover:bg-slate-800'
+                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
+                                : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60 dark:group-hover:bg-slate-800'
                             }`}
                           >
                             {item.icon}
                           </div>
                           <div className="truncate">
-                            <div className="text-xs font-medium leading-tight truncate">{item.label}</div>
-                            <div className="text-[10px] text-slate-500 truncate group-hover:text-slate-400">
+                            <div className={`text-xs leading-tight truncate ${
+                              isActive ? 'text-black dark:text-amber-100 font-extrabold opacity-100' : 'text-black dark:text-slate-200 font-bold'
+                            }`}>
+                              {item.label}
+                            </div>
+                            <div className={`text-[10px] truncate ${
+                              isActive ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                            }`}>
                               {item.description}
                             </div>
                           </div>
@@ -479,8 +491,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setIsOmOpen(!isOmOpen)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer group ${
                   isCurrentInOm
-                    ? 'bg-amber-950/40 text-amber-300 border border-amber-500/30'
-                    : 'bg-slate-950/40 text-slate-300 hover:bg-slate-800/70 hover:text-white border border-slate-800/60'
+                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30'
+                    : 'bg-slate-50 dark:bg-slate-950/40 text-slate-700 dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] dark:hover:bg-slate-800/70 hover:text-[#431407] dark:hover:text-white border border-slate-200 dark:border-slate-800/60'
                 }`}
               >
                 <div className="flex items-center space-x-2.5 min-w-0">
@@ -488,29 +500,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className={`p-1.5 rounded-lg shrink-0 transition-colors ${
                       isCurrentInOm
                         ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
-                        : 'bg-slate-800 text-amber-400 group-hover:bg-amber-500/20'
+                        : 'bg-slate-200 dark:bg-slate-800 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500/20'
                     }`}
                   >
                     <Layers className="w-4 h-4" />
                   </div>
                   <div className="truncate">
-                    <div className="text-xs font-bold tracking-tight text-white flex items-center space-x-1.5">
+                    <div className="text-xs font-bold tracking-tight text-black dark:text-white flex items-center space-x-1.5">
                       <span>Operations Management (OM)</span>
                     </div>
-                    <div className="text-[10px] text-slate-400 truncate">
+                    <div className="text-[10px] text-black dark:text-slate-400 truncate font-medium">
                       Lokasi, Inventory & Monitoring Board
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-1.5 shrink-0 ml-1">
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30">
                     {visibleOmItems.length}
                   </span>
                   {isOmOpen ? (
-                    <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-white transition-transform" />
+                    <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform" />
                   ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-transform" />
+                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform" />
                   )}
                 </div>
               </button>
@@ -530,23 +542,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         }}
                         className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-all group min-h-[38px] cursor-pointer ${
                           isActive
-                            ? 'bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/40 shadow-sm'
-                            : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                            ? 'bg-[#ffedd5] dark:bg-amber-500/20 text-[#431407] dark:text-amber-100 font-extrabold border border-[#fdba74] dark:border-amber-500/40 shadow-sm'
+                            : 'text-black dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-black dark:hover:text-white'
                         }`}
                       >
                         <div className="flex items-center space-x-2.5 min-w-0">
                           <div
-                            className={`p-1 rounded-md shrink-0 ${
+                            className={`p-1 rounded-md shrink-0 transition-colors ${
                               isActive
-                                ? 'bg-amber-500 text-slate-950 shadow-sm'
-                                : 'text-slate-400 group-hover:text-amber-400 group-hover:bg-slate-800'
+                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
+                                : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60 dark:group-hover:bg-slate-800'
                             }`}
                           >
                             {item.icon}
                           </div>
                           <div className="truncate">
-                            <div className="text-xs font-medium leading-tight truncate">{item.label}</div>
-                            <div className="text-[10px] text-slate-500 truncate group-hover:text-slate-400">
+                            <div className={`text-xs leading-tight truncate ${
+                              isActive ? 'text-black dark:text-amber-100 font-extrabold opacity-100' : 'text-black dark:text-slate-200 font-bold'
+                            }`}>
+                              {item.label}
+                            </div>
+                            <div className={`text-[10px] truncate ${
+                              isActive ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                            }`}>
                               {item.description}
                             </div>
                           </div>
@@ -577,8 +595,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setIsFinanceOpen(!isFinanceOpen)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer group ${
                   isCurrentInFinance
-                    ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-500/30'
-                    : 'bg-slate-950/40 text-slate-300 hover:bg-slate-800/70 hover:text-white border border-slate-800/60'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30'
+                    : 'bg-slate-50 dark:bg-slate-950/40 text-slate-700 dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] dark:hover:bg-slate-800/70 hover:text-[#431407] dark:hover:text-white border border-slate-200 dark:border-slate-800/60'
                 }`}
               >
                 <div className="flex items-center space-x-2.5 min-w-0">
@@ -586,29 +604,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className={`p-1.5 rounded-lg shrink-0 transition-colors ${
                       isCurrentInFinance
                         ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                        : 'bg-slate-800 text-emerald-400 group-hover:bg-emerald-600/20'
+                        : 'bg-slate-200 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600/20'
                     }`}
                   >
                     <Wallet className="w-4 h-4" />
                   </div>
                   <div className="truncate">
-                    <div className="text-xs font-bold tracking-tight text-white flex items-center space-x-1.5">
+                    <div className="text-xs font-bold tracking-tight text-black dark:text-white flex items-center space-x-1.5">
                       <span>Divisi Finance & Accounting</span>
                     </div>
-                    <div className="text-[10px] text-slate-400 truncate">
+                    <div className="text-[10px] text-black dark:text-slate-400 truncate font-medium">
                       Kas COA, Rekening Koran & Laporan SAK
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-1.5 shrink-0 ml-1">
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">
                     {visibleFinanceItems.length}
                   </span>
                   {isFinanceOpen ? (
-                    <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-white transition-transform" />
+                    <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform" />
                   ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-transform" />
+                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform" />
                   )}
                 </div>
               </button>
@@ -628,23 +646,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         }}
                         className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-all group min-h-[38px] cursor-pointer ${
                           isActive
-                            ? 'bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/40 shadow-sm'
-                            : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                            ? 'bg-[#ffedd5] dark:bg-amber-500/20 text-[#431407] dark:text-amber-100 font-extrabold border border-[#fdba74] dark:border-amber-500/40 shadow-sm'
+                            : 'text-black dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-black dark:hover:text-white'
                         }`}
                       >
                         <div className="flex items-center space-x-2.5 min-w-0">
                           <div
-                            className={`p-1 rounded-md shrink-0 ${
+                            className={`p-1 rounded-md shrink-0 transition-colors ${
                               isActive
-                                ? 'bg-emerald-500 text-white shadow-sm'
-                                : 'text-slate-400 group-hover:text-emerald-400 group-hover:bg-slate-800'
+                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
+                                : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60 dark:group-hover:bg-slate-800'
                             }`}
                           >
                             {item.icon}
                           </div>
                           <div className="truncate">
-                            <div className="text-xs font-medium leading-tight truncate">{item.label}</div>
-                            <div className="text-[10px] text-slate-500 truncate group-hover:text-slate-400">
+                            <div className={`text-xs leading-tight truncate ${
+                              isActive ? 'text-black dark:text-amber-100 font-extrabold opacity-100' : 'text-black dark:text-slate-200 font-bold'
+                            }`}>
+                              {item.label}
+                            </div>
+                            <div className={`text-[10px] truncate ${
+                              isActive ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                            }`}>
                               {item.description}
                             </div>
                           </div>
@@ -667,8 +691,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* 4. Other Remaining Menus (Eagle Blast, Hak Akses Pengguna) */}
           {visibleOtherItems.length > 0 && (
-            <div className="space-y-1 pt-1.5 border-t border-slate-800/80">
-              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <div className="space-y-1 pt-1.5 border-t border-slate-200 dark:border-slate-800/80">
+              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-black dark:text-slate-400">
                 Lainnya & Administrasi
               </div>
               {visibleOtherItems.map((item) => {
@@ -683,23 +707,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all group min-h-[44px] cursor-pointer ${
                       isActive
-                        ? 'bg-amber-500/15 text-amber-400 font-semibold border border-amber-500/30 shadow-sm'
-                        : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                        ? 'bg-[#ffedd5] dark:bg-amber-500/20 text-[#431407] dark:text-amber-100 font-extrabold border border-[#fdba74] dark:border-amber-500/40 shadow-sm'
+                        : 'text-black dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-black dark:hover:text-white'
                     }`}
                   >
                     <div className="flex items-center space-x-3 min-w-0">
                       <div
                         className={`p-1.5 rounded-lg transition-colors shrink-0 ${
                           isActive
-                            ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
-                            : 'text-slate-400 group-hover:text-amber-400 group-hover:bg-slate-800'
+                            ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
+                            : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60 dark:group-hover:bg-slate-800'
                         }`}
                       >
                         {item.icon}
                       </div>
                       <div className="truncate">
-                        <div className="text-sm font-medium leading-tight truncate">{item.label}</div>
-                        <div className="text-[11px] text-slate-500 truncate group-hover:text-slate-400">
+                        <div className={`text-sm leading-tight truncate ${
+                          isActive ? 'text-black dark:text-amber-100 font-extrabold opacity-100' : 'text-black dark:text-slate-200 font-bold'
+                        }`}>
+                          {item.label}
+                        </div>
+                        <div className={`text-[11px] truncate ${
+                          isActive ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                        }`}>
                           {item.description}
                         </div>
                       </div>
@@ -707,7 +737,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                     {item.badge !== undefined && (
                       <span
-                        className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${item.badgeColor}`}
+                        className={`ml-1.5 text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0 ${item.badgeColor}`}
                       >
                         {item.badge}
                       </span>
