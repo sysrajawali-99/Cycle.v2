@@ -33,6 +33,7 @@ import {
 } from './types/finance';
 import { storageService } from './services/storageService';
 import { financeService } from './services/financeService';
+import { vpsSyncService } from './services/vpsSyncService';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
@@ -152,6 +153,7 @@ export default function App() {
   // Initial Load from storage & listen to real-time sync / reset events
   useEffect(() => {
     loadAllData();
+    vpsSyncService.init();
 
     let reloadTimeout: ReturnType<typeof setTimeout> | null = null;
     const handleDataReload = (e?: any) => {
@@ -210,15 +212,19 @@ export default function App() {
   };
 
   const handleAddInventoryLog = (log: InventoryLog) => {
-    const nextLogs = [log, ...inventoryLogs];
-    setInventoryLogs(nextLogs);
-    storageService.saveInventoryLogs(nextLogs);
+    setInventoryLogs((prev) => {
+      const nextLogs = [log, ...prev];
+      storageService.saveInventoryLogs(nextLogs);
+      return nextLogs;
+    });
   };
 
   const handleAddMasterItem = (item: InventoryItem) => {
-    const nextItems = [...inventoryItems, item];
-    setInventoryItems(nextItems);
-    storageService.saveInventoryItems(nextItems);
+    setInventoryItems((prev) => {
+      const nextItems = [...prev, item];
+      storageService.saveInventoryItems(nextItems);
+      return nextItems;
+    });
   };
 
   const handleUpdateInventoryItems = (updatedItems: InventoryItem[]) => {

@@ -1,12 +1,29 @@
 import express from 'express';
+import http from 'http';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
+import { Server as SocketIOServer } from 'socket.io';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import {
+  initVpsDatabase,
+  getVpsDbStatus,
+  saveVpsState,
+  getVpsState,
+  getAllVpsStates,
+  bulkSaveVpsStates
+} from './server/vpsDatabase';
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
 const PORT = 3000;
 
 app.use(express.json({ limit: '15mb' }));
@@ -27,6 +44,109 @@ function getGeminiClient(): GoogleGenAI | null {
 // -------------------------------------------------------------
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// -------------------------------------------------------------
+// VPS Database & Real-Time Sync Endpoints
+// -------------------------------------------------------------
+app.get('/api/vps/status', async (_req, res) => {
+  try {
+    const status = getVpsDbStatus();
+    res.json({ success: true, ...status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Gagal mengecek status VPS' });
+  }
+});
+
+app.post('/api/vps/reconnect', async (_req, res) => {
+  try {
+    const status = await initVpsDatabase();
+    res.json({ success: true, ...status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Gagal menyambung ke VPS' });
+  }
+});
+
+app.get('/api/vps/states', async (_req, res) => {
+  try {
+    const states = await getAllVpsStates();
+    res.json({ success: true, states });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Gagal membaca state VPS' });
+  }
+});
+
+app.get('/api/vps/state/:key', async (req, res) => {
+  try {
+    const data = await getVpsState(req.params.key);
+    res.json({ success: true, key: req.params.key, data });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Gagal membaca key' });
+  }
+});
+
+app.post('/api/vps/state/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    const { data, meta } = req.body;
+    await saveVpsState(key, data, meta);
+    io.emit('state_updated', {
+      key,
+      data,
+      senderId: meta?.userId || 'server',
+      timestamp: new Date().toISOString()
+    });
+    res.json({ success: true, key, updated: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Gagal menyimpan state' });
+  }
+});
+
+app.post('/api/vps/bulk-sync', async (req, res) => {
+  try {
+    const { states, meta } = req.body;
+    if (states && typeof states === 'object') {
+      const count = await bulkSaveVpsStates(states);
+      io.emit('bulk_synced', {
+        keys: Object.keys(states),
+        senderId: meta?.userId || 'server',
+        timestamp: new Date().toISOString()
+      });
+      res.json({ success: true, count });
+    } else {
+      res.status(400).json({ success: false, error: 'Data states tidak valid' });
+    }
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Gagal sinkronisasi bulk' });
+  }
+});
+
+// Socket.io real-time broadcast and synchronization
+io.on('connection', (socket) => {
+  socket.on('sync_state', async (payload: { key: string; data: any; meta?: any }) => {
+    try {
+      if (payload?.key) {
+        await saveVpsState(payload.key, payload.data, payload.meta);
+        socket.broadcast.emit('state_updated', {
+          key: payload.key,
+          data: payload.data,
+          senderId: payload.meta?.userId || socket.id,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.error('Socket sync_state error:', err);
+    }
+  });
+
+  socket.on('request_full_sync', async () => {
+    try {
+      const states = await getAllVpsStates();
+      socket.emit('full_sync_data', states);
+    } catch (err) {
+      console.error('Socket request_full_sync error:', err);
+    }
+  });
 });
 
 // -------------------------------------------------------------
@@ -333,8 +453,10 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Rajawali Cycle Server running on http://0.0.0.0:${PORT}`);
+  await initVpsDatabase();
+
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Rajawali Cycle Server running with Socket.IO on http://0.0.0.0:${PORT}`);
   });
 }
 

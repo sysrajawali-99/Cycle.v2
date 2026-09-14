@@ -972,6 +972,43 @@ export const storageService = {
     return this.saveDashboardWidgets(defaults);
   },
 
+  saveRemoteState(key: StorageActionType, data: any) {
+    const keyMap: Record<StorageActionType, string> = {
+      company_profile: STORAGE_KEYS.COMPANY_PROFILE,
+      projects: STORAGE_KEYS.PROJECTS,
+      employees: STORAGE_KEYS.EMPLOYEES,
+      timesheets: STORAGE_KEYS.TIMESHEETS,
+      mutations: STORAGE_KEYS.MUTATIONS,
+      inventory_items: STORAGE_KEYS.INVENTORY_ITEMS,
+      project_stocks: STORAGE_KEYS.PROJECT_STOCKS,
+      inventory_logs: STORAGE_KEYS.INVENTORY_LOGS,
+      material_requests: STORAGE_KEYS.MATERIAL_REQUESTS,
+      tasks: STORAGE_KEYS.TASKS,
+      blasts: STORAGE_KEYS.BLASTS,
+      sops: STORAGE_KEYS.SOPS,
+      users: STORAGE_KEYS.USERS,
+      chart_of_accounts: STORAGE_KEYS.CHART_OF_ACCOUNTS,
+      finance_transactions: STORAGE_KEYS.FINANCE_TRANSACTIONS,
+      bank_statements: STORAGE_KEYS.BANK_STATEMENTS,
+      period_closings: STORAGE_KEYS.PERIOD_CLOSINGS,
+      audit_trails: STORAGE_KEYS.AUDIT_TRAILS,
+      currency_rates: STORAGE_KEYS.CURRENCY_RATES,
+      debts: STORAGE_KEYS.DEBTS,
+      receivables: STORAGE_KEYS.RECEIVABLES,
+      investments: STORAGE_KEYS.INVESTMENTS
+    };
+    const storageKey = keyMap[key];
+    if (storageKey) {
+      applyStorageUpdate(
+        key,
+        storageKey,
+        data,
+        key === 'company_profile' ? 'company_profile_updated' : undefined,
+        'remote_sync'
+      );
+    }
+  },
+
   registerStorageMiddleware(middleware: StorageMiddleware) {
     return registerStorageMiddleware(middleware);
   }

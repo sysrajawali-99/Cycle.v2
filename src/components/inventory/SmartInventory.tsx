@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Package,
   ArrowDownLeft,
@@ -39,6 +39,7 @@ import {
   UserAccount,
   CompanyProfile
 } from '../../types';
+import { storageService } from '../../services/storageService';
 import { MaterialRequestTab } from './MaterialRequestTab';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 import { generateInventoryUsagePDF } from '../../utils/pdfExport';
@@ -94,6 +95,15 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
   const [activeProjectFilter, setActiveProjectFilter] = useState<string>(
     selectedProjectId !== 'ALL' ? selectedProjectId : projects[0]?.id || 'proj-1'
   );
+
+  // Sync active project filter when projects or selected project changes
+  useEffect(() => {
+    if (selectedProjectId !== 'ALL' && selectedProjectId) {
+      setActiveProjectFilter(selectedProjectId);
+    } else if (projects.length > 0 && (!activeProjectFilter || !projects.some((p) => p.id === activeProjectFilter))) {
+      setActiveProjectFilter(projects[0].id);
+    }
+  }, [selectedProjectId, projects]);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
 
@@ -174,7 +184,7 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
     unitPrice: 75000
   });
 
-  // Tambah Stok di Lokasi (Dropdown Nama Barang, Kategori, Satuan, Qty & Tambah Baris Otomatis)
+  // Tambah Stok di Lokasi (Ketik Manual Nama Barang, Kategori, Satuan, Qty & Tambah Baris)
   interface LocationStockRowItem {
     id: string;
     itemName: string;
@@ -184,8 +194,9 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
   }
 
   const [showAddLocationStockModal, setShowAddLocationStockModal] = useState(false);
+  const [targetLocationProjectId, setTargetLocationProjectId] = useState<string>('');
   const [addStockRows, setAddStockRows] = useState<LocationStockRowItem[]>([
-    { id: 'row-1', itemName: '', category: '', unit: '', qty: 1 }
+    { id: 'row-1', itemName: '', category: 'Chemical', unit: 'Pcs', qty: 1 }
   ]);
   const [addStockPic, setAddStockPic] = useState<string>('Supervisor Site');
   const [addStockNotes, setAddStockNotes] = useState<string>('Input stok barang lokasi');
@@ -197,47 +208,40 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
 
   const masterCategories = useMemo(() => {
     const cats = new Set(inventoryItems.map((i) => i.category).filter(Boolean));
-    ['Chemical', 'Equipment', 'Consumable', 'Safety / APD'].forEach((c) => cats.add(c as any));
+    ['Chemical', 'Equipment', 'Consumable', 'Safety / APD', 'Lainnya'].forEach((c) => cats.add(c as any));
     return Array.from(cats).sort();
   }, [inventoryItems]);
 
   const masterUnits = useMemo(() => {
     const units = new Set(inventoryItems.map((i) => i.unit).filter(Boolean));
-    ['Jerigen 5L', 'Botol 1L', 'Pcs', 'Unit', 'Roll', 'Box', 'Pasang', 'Set', 'Pack (10 pcs)'].forEach((u) => units.add(u));
+    ['Jerigen 5L', 'Botol 1L', 'Pcs', 'Unit', 'Roll', 'Box', 'Pasang', 'Set', 'Pack', 'Kg', 'Liter', 'Meter'].forEach((u) => units.add(u));
     return Array.from(units).sort();
   }, [inventoryItems]);
 
   const handleOpenAddLocationStock = () => {
+    const validProj = projects.find((p) => p.id === activeProjectFilter)?.id || projects[0]?.id || 'proj-1';
+    setTargetLocationProjectId(validProj);
     setAddStockRows([
-      { id: `row-${Date.now()}-1`, itemName: '', category: '', unit: '', qty: 1 }
+      { id: `row-${Date.now()}-1`, itemName: '', category: 'Chemical', unit: 'Pcs', qty: 1 }
     ]);
-    setAddStockPic(currentUser?.name || userRole);
-    setAddStockNotes(`Input stok lokasi ${activeProjectObj?.name || ''}`);
+    const currentPic = currentUser?.name || (userRole === 'MANAGEMENT' ? 'Manajemen HQ' : 'Supervisor Site');
+    setAddStockPic(currentPic);
+    const projName = projects.find((p) => p.id === validProj)?.name || activeProjectObj?.name || '';
+    setAddStockNotes(`Input stok barang lokasi ${projName}`);
     setShowAddLocationStockModal(true);
   };
 
-  const handleAddStockRowNameChange = (index: number, selectedName: string) => {
+  const handleAddStockRowNameChange = (index: number, typedName: string) => {
     const updated = [...addStockRows];
-    const matched = inventoryItems.find((it) => it.name === selectedName);
+    const trimmed = typedName.trim().toLowerCase();
+    const matched = inventoryItems.find((it) => it.name.trim().toLowerCase() === trimmed);
 
     updated[index] = {
       ...updated[index],
-      itemName: selectedName,
+      itemName: typedName,
       category: matched ? matched.category : (updated[index].category || 'Chemical'),
-      unit: matched ? matched.unit : (updated[index].unit || 'Pcs'),
-      qty: updated[index].qty === '' || updated[index].qty <= 0 ? 1 : updated[index].qty
+      unit: matched ? matched.unit : (updated[index].unit || 'Pcs')
     };
-
-    // Otomatis tambah baris baru jika user memilih barang pada baris terakhir
-    if (index === updated.length - 1 && selectedName.trim() !== '') {
-      updated.push({
-        id: `row-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        itemName: '',
-        category: '',
-        unit: '',
-        qty: 1
-      });
-    }
 
     setAddStockRows(updated);
   };
@@ -256,14 +260,18 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
 
   const handleAddStockRowQtyChange = (index: number, val: string) => {
     const updated = [...addStockRows];
-    const numVal = val === '' ? '' : Math.max(1, parseInt(val, 10) || 1);
-    updated[index] = { ...updated[index], qty: numVal };
+    if (val === '') {
+      updated[index] = { ...updated[index], qty: '' };
+    } else {
+      const parsed = parseInt(val, 10);
+      updated[index] = { ...updated[index], qty: isNaN(parsed) ? '' : Math.max(1, parsed) };
+    }
     setAddStockRows(updated);
   };
 
   const handleRemoveAddStockRow = (index: number) => {
     if (addStockRows.length <= 1) {
-      setAddStockRows([{ id: `row-${Date.now()}-1`, itemName: '', category: '', unit: '', qty: 1 }]);
+      setAddStockRows([{ id: `row-${Date.now()}-1`, itemName: '', category: 'Chemical', unit: 'Pcs', qty: 1 }]);
       return;
     }
     const updated = addStockRows.filter((_, i) => i !== index);
@@ -276,8 +284,8 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
       {
         id: `row-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         itemName: '',
-        category: '',
-        unit: '',
+        category: 'Chemical',
+        unit: 'Pcs',
         qty: 1
       }
     ]);
@@ -285,12 +293,25 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
 
   const handleSaveAddStockRows = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const targetProject = projects.find((p) => p.id === targetLocationProjectId) 
+      || projects.find((p) => p.id === activeProjectFilter)
+      || projects[0];
+
+    const resolvedProjectId = targetProject?.id || activeProjectFilter;
+
+    if (!resolvedProjectId) {
+      alert('Lokasi / Proyek tujuan belum dipilih. Silakan pilih lokasi terlebih dahulu.');
+      return;
+    }
+
+    // Filter valid rows: non-empty item name and valid qty > 0
     const validRows = addStockRows.filter(
-      (r) => r.itemName.trim() !== '' && typeof r.qty === 'number' && r.qty > 0
+      (r) => r.itemName && r.itemName.trim() !== '' && Number(r.qty) > 0
     );
 
     if (validRows.length === 0) {
-      alert('Silakan pilih minimal 1 Nama Barang dan tentukan Qty untuk disimpan.');
+      alert('Silakan ketik minimal 1 Nama Barang dan tentukan Jumlah (Qty) yang valid untuk disimpan.');
       return;
     }
 
@@ -299,9 +320,14 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
     const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
     let savedCount = 0;
 
+    const newMasterItemsToSave: InventoryItem[] = [];
+    const newLogsToSave: InventoryLog[] = [];
+    const currentMasterCatalog = [...inventoryItems];
+
     validRows.forEach((r) => {
-      let matchedItem = inventoryItems.find(
-        (it) => it.name.trim().toLowerCase() === r.itemName.trim().toLowerCase()
+      const cleanName = r.itemName.trim();
+      let matchedItem = currentMasterCatalog.find(
+        (it) => it.name.trim().toLowerCase() === cleanName.toLowerCase()
       );
       let itemId = matchedItem?.id;
 
@@ -309,24 +335,23 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
         const newItem: InventoryItem = {
           id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           code: `ITM-${Math.floor(1000 + Math.random() * 9000)}`,
-          name: r.itemName,
+          name: cleanName,
           category: (r.category || 'Chemical') as InventoryCategory,
           unit: r.unit || 'Pcs',
           minStock: 2,
           description: 'Ditambahkan via Tambah Stok Lokasi',
           unitPrice: 0
         };
-        if (onAddMasterItem) {
-          onAddMasterItem(newItem);
-        }
+        newMasterItemsToSave.push(newItem);
+        currentMasterCatalog.push(newItem);
         itemId = newItem.id;
       }
 
       if (!itemId) return;
 
-      const inputQty = Number(r.qty);
+      const inputQty = Math.max(1, Math.round(Number(r.qty) || 1));
       const existingIdx = nextStocks.findIndex(
-        (ps) => ps.itemId === itemId && ps.projectId === activeProjectFilter
+        (ps) => ps.itemId === itemId && ps.projectId === resolvedProjectId
       );
 
       if (existingIdx >= 0) {
@@ -338,46 +363,69 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
           lastUpdated: dateOnly
         };
 
-        onAddLog({
+        newLogsToSave.push({
           id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          projectId: activeProjectFilter,
+          projectId: resolvedProjectId,
           itemId,
           type: 'IN',
           quantity: inputQty,
           previousStock: prev,
           newStock: updatedStock,
           date: nowStr,
-          pic: addStockPic || userRole,
-          notes: addStockNotes || `Penambahan stok lokasi ${activeProjectObj?.name || ''}`
+          pic: addStockPic.trim() || currentUser?.name || userRole || 'Petugas Site',
+          notes: addStockNotes.trim() || `Penambahan stok lokasi ${targetProject?.name || ''}`
         });
       } else {
         nextStocks.push({
           id: `stk-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          projectId: activeProjectFilter,
+          projectId: resolvedProjectId,
           itemId,
           currentStock: inputQty,
           lastUpdated: dateOnly
         });
 
-        onAddLog({
+        newLogsToSave.push({
           id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          projectId: activeProjectFilter,
+          projectId: resolvedProjectId,
           itemId,
           type: 'IN',
           quantity: inputQty,
           previousStock: 0,
           newStock: inputQty,
           date: nowStr,
-          pic: addStockPic || userRole,
-          notes: addStockNotes || `Input stok awal lokasi ${activeProjectObj?.name || ''}`
+          pic: addStockPic.trim() || currentUser?.name || userRole || 'Petugas Site',
+          notes: addStockNotes.trim() || `Input stok awal lokasi ${targetProject?.name || ''}`
         });
       }
 
       savedCount++;
     });
 
+    // 1. Update Master Items if new items were typed
+    if (newMasterItemsToSave.length > 0) {
+      if (onUpdateInventoryItems) {
+        onUpdateInventoryItems(currentMasterCatalog);
+      } else if (onAddMasterItem) {
+        newMasterItemsToSave.forEach((itm) => onAddMasterItem(itm));
+      }
+      storageService.saveInventoryItems(currentMasterCatalog);
+    }
+
+    // 2. Update Project Stocks
     onUpdateStocks(nextStocks);
-    alert(`Berhasil menyimpan ${savedCount} item ke stok lokasi ${activeProjectObj?.name || ''}!`);
+    storageService.saveProjectStocks(nextStocks);
+
+    // 3. Update Inventory Logs
+    const updatedLogs = [...newLogsToSave, ...inventoryLogs];
+    storageService.saveInventoryLogs(updatedLogs);
+    newLogsToSave.forEach((log) => onAddLog(log));
+
+    // 4. Ensure view focuses on the target location so user sees newly added items immediately
+    if (activeProjectFilter !== resolvedProjectId) {
+      setActiveProjectFilter(resolvedProjectId);
+    }
+
+    alert(`Berhasil menyimpan ${savedCount} item ke stok lokasi ${targetProject?.name || ''}!`);
     setShowAddLocationStockModal(false);
   };
 
@@ -2777,10 +2825,22 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
         </div>
       )}
 
-      {/* Modal Tambah Stok di Lokasi (Dropdown Nama Barang, Kategori, Satuan, Qty & Tambah Baris Otomatis) */}
+      {/* Modal Tambah Stok di Lokasi (Ketik Manual Nama Barang, Kategori, Satuan, Qty & Tambah Baris) */}
       {showAddLocationStockModal && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Datalist for Autocomplete Suggestions */}
+            <datalist id="datalist-master-item-names">
+              {masterItemNames.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+            <datalist id="datalist-master-units">
+              {masterUnits.map((unit) => (
+                <option key={unit} value={unit} />
+              ))}
+            </datalist>
+
             {/* Modal Header */}
             <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/70">
               <div>
@@ -2789,11 +2849,11 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                     <Plus className="w-4 h-4" />
                   </span>
                   <h3 className="text-base font-bold text-white">
-                    Tambah Stok di Lokasi: <span className="text-amber-400">{activeProjectObj?.name}</span>
+                    Tambah Stok di Lokasi
                   </h3>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
-                  Pilih Nama Barang, Kategori, Satuan (dropdown dari katalog master) dan tentukan Qty. Baris baru akan bertambah otomatis saat memilih barang.
+                  Ketik nama barang secara manual atau pilih dari saran. Jika barang baru, sistem otomatis menambahkannya ke master katalog dan stok lokasi.
                 </p>
               </div>
               <button
@@ -2808,13 +2868,42 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
             {/* Modal Form Content */}
             <form onSubmit={handleSaveAddStockRows} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-5 overflow-y-auto space-y-4 flex-1">
+                {/* Target Location Selector */}
+                <div className="bg-slate-950/80 border border-slate-800 p-3.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center space-x-2">
+                    <Building2 className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div>
+                      <span className="text-xs font-semibold text-slate-300">Lokasi / Proyek Penempatan Stok:</span>
+                      <p className="text-[11px] text-slate-500">Pilih proyek/gedung yang akan menerima penambahan stok ini</p>
+                    </div>
+                  </div>
+                  <select
+                    id="select-target-project-stock"
+                    value={targetLocationProjectId}
+                    onChange={(e) => {
+                      setTargetLocationProjectId(e.target.value);
+                      const selectedP = projects.find((p) => p.id === e.target.value);
+                      if (selectedP) {
+                        setAddStockNotes(`Input stok barang lokasi ${selectedP.name}`);
+                      }
+                    }}
+                    className="bg-slate-900 border border-slate-700 hover:border-amber-500/50 rounded-xl px-3 py-2 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-500"
+                  >
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id} className="bg-slate-900 text-white font-normal">
+                        {p.name} ({p.code || 'SITE'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Table of items to add */}
                 <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950/60 shadow-inner">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="bg-slate-950 text-slate-400 font-bold uppercase border-b border-slate-800">
                       <tr>
                         <th className="p-3 w-10 text-center">No</th>
-                        <th className="p-3 w-2/5">Nama Barang <span className="text-rose-400">*</span></th>
+                        <th className="p-3 w-2/5">Nama Barang (Ketik Manual) <span className="text-rose-400">*</span></th>
                         <th className="p-3 w-1/4">Kategori</th>
                         <th className="p-3 w-1/5">Satuan</th>
                         <th className="p-3 w-28 text-center">Qty <span className="text-rose-400">*</span></th>
@@ -2826,25 +2915,21 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                         <tr key={row.id} className="hover:bg-slate-900/60 transition-colors">
                           <td className="p-3 text-center font-mono text-slate-500">{idx + 1}</td>
 
-                          {/* Dropdown Nama Barang (Diambil dari Katalog Master) */}
+                          {/* Input Nama Barang (Ketik Manual dengan Datalist Rekomendasi) */}
                           <td className="p-2.5">
-                            <select
-                              id={`dropdown-add-stock-name-${idx}`}
+                            <input
+                              id={`input-add-stock-name-${idx}`}
+                              type="text"
+                              list="datalist-master-item-names"
                               value={row.itemName}
                               onChange={(e) => handleAddStockRowNameChange(idx, e.target.value)}
-                              required={idx === 0 || addStockRows.length === 1}
-                              className="w-full bg-slate-900 border border-slate-700 hover:border-slate-600 focus:border-amber-500 rounded-xl px-3 py-2 text-white font-medium focus:outline-none cursor-pointer"
-                            >
-                              <option value="">-- Pilih Nama Barang --</option>
-                              {masterItemNames.map((name) => (
-                                <option key={name} value={name} className="bg-slate-900 text-white">
-                                  {name}
-                                </option>
-                              ))}
-                            </select>
+                              placeholder="Ketik nama barang..."
+                              autoComplete="off"
+                              className="w-full bg-slate-900 border border-slate-700 hover:border-slate-600 focus:border-amber-500 rounded-xl px-3 py-2 text-white font-medium focus:outline-none placeholder:text-slate-500"
+                            />
                           </td>
 
-                          {/* Dropdown Kategori (Diambil dari Katalog Master) */}
+                          {/* Dropdown Kategori */}
                           <td className="p-2.5">
                             <select
                               id={`dropdown-add-stock-category-${idx}`}
@@ -2852,7 +2937,6 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                               onChange={(e) => handleAddStockRowCategoryChange(idx, e.target.value)}
                               className="w-full bg-slate-900 border border-slate-700 hover:border-slate-600 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-200 focus:outline-none cursor-pointer"
                             >
-                              <option value="">-- Kategori --</option>
                               {masterCategories.map((cat) => (
                                 <option key={cat} value={cat} className="bg-slate-900 text-white">
                                   {cat}
@@ -2861,21 +2945,17 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                             </select>
                           </td>
 
-                          {/* Dropdown Satuan (Diambil dari Katalog Master) */}
+                          {/* Satuan (Bisa Pilih / Ketik Manual via Datalist) */}
                           <td className="p-2.5">
-                            <select
-                              id={`dropdown-add-stock-unit-${idx}`}
+                            <input
+                              id={`input-add-stock-unit-${idx}`}
+                              type="text"
+                              list="datalist-master-units"
                               value={row.unit}
                               onChange={(e) => handleAddStockRowUnitChange(idx, e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-700 hover:border-slate-600 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-200 focus:outline-none cursor-pointer"
-                            >
-                              <option value="">-- Satuan --</option>
-                              {masterUnits.map((u) => (
-                                <option key={u} value={u} className="bg-slate-900 text-white">
-                                  {u}
-                                </option>
-                              ))}
-                            </select>
+                              placeholder="Satuan (Pcs, Box, dll)"
+                              className="w-full bg-slate-900 border border-slate-700 hover:border-slate-600 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-200 focus:outline-none placeholder:text-slate-500"
+                            />
                           </td>
 
                           {/* Input Qty */}
@@ -2922,7 +3002,7 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                     <span>+ Tambah Baris Baru</span>
                   </button>
                   <span className="text-[11px] text-slate-400 italic">
-                    * Otomatis menambah baris saat memilih Nama Barang di baris paling bawah.
+                    * Ketik nama barang secara manual. Klik "+ Tambah Baris Baru" untuk menginput beberapa barang sekaligus.
                   </span>
                 </div>
 
@@ -2937,6 +3017,7 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                       value={addStockPic}
                       onChange={(e) => setAddStockPic(e.target.value)}
                       required
+                      placeholder="Nama petugas / supervisor..."
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500"
                     />
                   </div>
@@ -2948,7 +3029,7 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                       type="text"
                       value={addStockNotes}
                       onChange={(e) => setAddStockNotes(e.target.value)}
-                      placeholder="Contoh: Stok awal fisik di lokasi gedung..."
+                      placeholder="Contoh: Stok awal fisik di lokasi, pengadaan lokal..."
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500"
                     />
                   </div>
@@ -2958,7 +3039,7 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
               {/* Modal Footer */}
               <div className="p-4 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
                 <span className="text-xs text-slate-400">
-                  {addStockRows.filter((r) => r.itemName.trim() !== '' && Number(r.qty) > 0).length} barang valid siap disimpan ke lokasi {activeProjectObj?.name}
+                  {addStockRows.filter((r) => r.itemName && r.itemName.trim() !== '' && Number(r.qty) > 0).length} barang valid siap disimpan ke lokasi
                 </span>
                 <div className="flex items-center space-x-2">
                   <button

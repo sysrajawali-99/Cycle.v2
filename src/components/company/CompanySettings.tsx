@@ -29,13 +29,20 @@ import {
   Monitor,
   Wallet,
   Users,
-  Megaphone
+  Megaphone,
+  Server,
+  UploadCloud,
+  DownloadCloud,
+  Copy,
+  Check,
+  Radio
 } from 'lucide-react';
 import { CompanyProfile, UserAccount, AppView } from '../../types';
 import { INITIAL_COMPANY_PROFILE } from '../../data/initialData';
 import { storageService } from '../../services/storageService';
 import { themeService, ThemeMode } from '../../services/themeService';
 import { BulkDeleteDivisionModal, DeletableDivision } from '../common/BulkDeleteDivisionModal';
+import { vpsSyncService, VpsConnectionStatus } from '../../services/vpsSyncService';
 
 interface CompanySettingsProps {
   companyProfile: CompanyProfile;
@@ -53,19 +60,29 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
   onNavigateView
 }) => {
   const [formData, setFormData] = useState<CompanyProfile>({ ...companyProfile });
-  const [activeTab, setActiveTab] = useState<'profile' | 'contact' | 'signees' | 'bank' | 'preview' | 'danger'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'contact' | 'signees' | 'bank' | 'preview' | 'vps' | 'danger'>('profile');
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [themePref, setThemePref] = useState<ThemeMode>(() => themeService.getThemePreference());
   const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => themeService.getResolvedTheme());
+  const [vpsStatus, setVpsStatus] = useState<VpsConnectionStatus>(() => vpsSyncService.getStatus());
+  const [vpsLoading, setVpsLoading] = useState(false);
+  const [vpsMsg, setVpsMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [vpsSnippetCopied, setVpsSnippetCopied] = useState<string | null>(null);
 
   useEffect(() => {
     const handleThemeChange = () => {
       setThemePref(themeService.getThemePreference());
       setResolvedTheme(themeService.getResolvedTheme());
     };
+    const unsubVps = vpsSyncService.subscribeStatus((status) => {
+      setVpsStatus(status);
+    });
     window.addEventListener('theme_changed', handleThemeChange);
-    return () => window.removeEventListener('theme_changed', handleThemeChange);
+    return () => {
+      unsubVps();
+      window.removeEventListener('theme_changed', handleThemeChange);
+    };
   }, []);
 
   // Reset All System Data & Bulk Delete Division states (Super Admin)
@@ -291,6 +308,20 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
           <span>5. Pratinjau Kop Surat</span>
         </button>
 
+        <button
+          id="tab-company-vps"
+          type="button"
+          onClick={() => setActiveTab('vps')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            activeTab === 'vps'
+              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <Server className="w-4 h-4" />
+          <span>6. Integrasi VPS & Real-Time</span>
+        </button>
+
         {isSuperAdmin && (
           <button
             id="tab-company-danger-zone"
@@ -303,7 +334,7 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
             }`}
           >
             <AlertTriangle className="w-4 h-4 text-rose-400" />
-            <span>6. Reset Sistem (Super Admin)</span>
+            <span>7. Reset Sistem (Super Admin)</span>
           </button>
         )}
       </div>
@@ -957,7 +988,360 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
         </div>
       )}
 
-      {/* TAB 6: DANGER ZONE & HAPUS DATA MASAL PER DIVISI (KHUSUS SUPER ADMIN) */}
+      {/* TAB 6: INTEGRASI VPS & DATABASE REAL-TIME */}
+      {activeTab === 'vps' && (
+        <div className="space-y-6">
+          {/* VPS Feedback alert */}
+          {vpsMsg && (
+            <div
+              className={`p-4 rounded-2xl border flex items-center space-x-3 text-xs animate-in fade-in duration-200 ${
+                vpsMsg.type === 'success'
+                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                  : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+              }`}
+            >
+              {vpsMsg.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
+              ) : (
+                <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
+              )}
+              <span className="font-semibold">{vpsMsg.text}</span>
+            </div>
+          )}
+
+          {/* VPS Hero & Status Card */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
+                  <Server className="w-4 h-4" />
+                  <span>Konektivitas Cloud Server Mandiri</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white">
+                  Integrasi Database VPS & Real-Time Sync
+                </h3>
+                <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                  Hubungkan sistem langsung ke server VPS Anda. Data master karyawan, timesheet, mutasi stok, transaksi kas keuangan, dan izin operasional akan tersimpan permanen di database PostgreSQL VPS dan terbarui secara instan antar pengguna.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  disabled={vpsLoading}
+                  onClick={async () => {
+                    setVpsLoading(true);
+                    setVpsMsg(null);
+                    try {
+                      const res = await vpsSyncService.reconnect();
+                      if (res.connected) {
+                        setVpsMsg({ type: 'success', text: 'Koneksi ke PostgreSQL VPS berhasil diverifikasi!' });
+                      } else {
+                        setVpsMsg({
+                          type: 'error',
+                          text: res.error || 'Belum terhubung ke PostgreSQL VPS. Sistem saat ini berjalan dalam mode file lokal.'
+                        });
+                      }
+                    } catch {
+                      setVpsMsg({ type: 'error', text: 'Gagal menghubungi backend VPS.' });
+                    } finally {
+                      setVpsLoading(false);
+                    }
+                  }}
+                  className="flex items-center space-x-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${vpsLoading ? 'animate-spin text-amber-400' : 'text-slate-400'}`} />
+                  <span>Cek / Hubungkan Ulang</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Status Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 space-y-1">
+                <span className="text-[11px] font-bold uppercase text-slate-400 block">Status Database Engine</span>
+                <div className="flex items-center space-x-2 pt-0.5">
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      vpsStatus.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                    }`}
+                  />
+                  <span className="font-bold text-sm text-white">
+                    {vpsStatus.connected ? 'PostgreSQL Aktif' : 'Local File Store'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 block">
+                  {vpsStatus.connected ? 'Terhubung ke PostgreSQL VPS' : 'Fallback aman lokal'}
+                </span>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 space-y-1">
+                <span className="text-[11px] font-bold uppercase text-slate-400 block">Aliran Real-Time</span>
+                <div className="flex items-center space-x-2 pt-0.5">
+                  <Radio
+                    className={`w-4 h-4 ${
+                      vpsStatus.socketConnected ? 'text-emerald-400 animate-pulse' : 'text-slate-500'
+                    }`}
+                  />
+                  <span className="font-bold text-sm text-white">
+                    {vpsStatus.socketConnected ? 'Socket.IO Online' : 'Standby / Polling'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 block">Sinkronisasi instan multi-tab & multi-device</span>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 space-y-1">
+                <span className="text-[11px] font-bold uppercase text-slate-400 block">Host Database VPS</span>
+                <span className="font-mono text-xs font-bold text-amber-300 truncate block pt-1" title={vpsStatus.host || 'Localhost'}>
+                  {vpsStatus.host || '127.0.0.1 (Local)'}
+                </span>
+                <span className="text-[10px] text-slate-400 block truncate">
+                  DB: {vpsStatus.database || 'rajawali_db'}
+                </span>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 space-y-1">
+                <span className="text-[11px] font-bold uppercase text-slate-400 block">Sinkronisasi Terakhir</span>
+                <span className="font-mono text-xs font-bold text-slate-200 block pt-1">
+                  {vpsStatus.lastSync ? new Date(vpsStatus.lastSync).toLocaleString('id-ID') : '-'}
+                </span>
+                <span className="text-[10px] text-slate-400 block">Auto-sync realtime aktif</span>
+              </div>
+            </div>
+
+            {/* Quick Bulk Sync Actions */}
+            <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <span className="font-bold text-xs text-white block">Sinkronisasi Data Masal:</span>
+                <span className="text-[11px] text-slate-400 block">
+                  Unggah data browser ke database VPS, atau tarik seluruh data VPS ke browser ini.
+                </span>
+              </div>
+              <div className="flex items-center space-x-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={vpsLoading}
+                  onClick={async () => {
+                    if (!window.confirm('Unggah seluruh data lokal saat ini ke server VPS? Data di VPS akan diperbarui.')) {
+                      return;
+                    }
+                    setVpsLoading(true);
+                    setVpsMsg(null);
+                    try {
+                      const res = await vpsSyncService.pushAllDataToVps();
+                      if (res.success) {
+                        setVpsMsg({
+                          type: 'success',
+                          text: `Berhasil mengunggah ${res.count ?? 20} modul data lokal ke database VPS!`
+                        });
+                      } else {
+                        setVpsMsg({ type: 'error', text: res.error || 'Gagal mengunggah data.' });
+                      }
+                    } catch {
+                      setVpsMsg({ type: 'error', text: 'Kendala jaringan saat sinkronisasi.' });
+                    } finally {
+                      setVpsLoading(false);
+                    }
+                  }}
+                  className="flex items-center space-x-1.5 px-3 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Upload Lokal ke VPS</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={vpsLoading}
+                  onClick={async () => {
+                    if (!window.confirm('Tarik data terbaru dari server VPS? Data lokal browser Anda akan disinkronkan dengan data VPS.')) {
+                      return;
+                    }
+                    setVpsLoading(true);
+                    setVpsMsg(null);
+                    try {
+                      const res = await vpsSyncService.pullAllDataFromVps();
+                      if (res.success) {
+                        setVpsMsg({
+                          type: 'success',
+                          text: `Berhasil memperbarui data browser dari VPS (${res.count ?? 0} modul tersinkronisasi)!`
+                        });
+                      } else {
+                        setVpsMsg({ type: 'error', text: res.error || 'Gagal menarik data dari VPS.' });
+                      }
+                    } catch {
+                      setVpsMsg({ type: 'error', text: 'Kendala jaringan saat mengambil data.' });
+                    } finally {
+                      setVpsLoading(false);
+                    }
+                  }}
+                  className="flex items-center space-x-1.5 px-3 py-2 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <DownloadCloud className="w-4 h-4" />
+                  <span>Download dari VPS</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Deployment Step-by-Step Documentation Guide */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+            <div className="border-b border-slate-800 pb-4">
+              <h4 className="text-base font-bold text-white flex items-center space-x-2">
+                <Database className="w-5 h-5 text-amber-400" />
+                <span>Panduan Lengkap Menghubungkan VPS & Konfigurasi Real-Time</span>
+              </h4>
+              <p className="text-xs text-slate-400 mt-1">
+                Ikuti 4 langkah berikut pada terminal SSH VPS Anda untuk mengaktifkan sistem secara permanen.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Step 1: Install PostgreSQL */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center">
+                      1
+                    </span>
+                    <span className="font-bold text-sm text-white">Setup PostgreSQL di VPS</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `sudo apt update && sudo apt install -y postgresql postgresql-contrib\nsudo -u postgres psql -c "CREATE USER rajawali_user WITH PASSWORD 'PasswordRahasia123';"\nsudo -u postgres psql -c "CREATE DATABASE rajawali_db OWNER rajawali_user;"`
+                      );
+                      setVpsSnippetCopied('s1');
+                      setTimeout(() => setVpsSnippetCopied(null), 2500);
+                    }}
+                    className="text-[11px] text-amber-400 hover:underline flex items-center space-x-1 cursor-pointer"
+                  >
+                    {vpsSnippetCopied === 's1' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{vpsSnippetCopied === 's1' ? 'Tersalin' : 'Salin'}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Jalankan perintah ini di terminal SSH VPS Ubuntu/Debian untuk membuat user dan database:
+                </p>
+                <pre className="p-3 bg-slate-900 rounded-xl font-mono text-[11px] text-emerald-300 overflow-x-auto">
+{`sudo apt update && sudo apt install -y postgresql
+sudo -u postgres psql -c "CREATE USER rajawali_user WITH PASSWORD 'PasswordRahasia123';"
+sudo -u postgres psql -c "CREATE DATABASE rajawali_db OWNER rajawali_user;"`}
+                </pre>
+              </div>
+
+              {/* Step 2: Set .env */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center">
+                      2
+                    </span>
+                    <span className="font-bold text-sm text-white">Atur Variabel Lingkungan (.env)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `PORT=3000\nDATABASE_URL="postgresql://rajawali_user:PasswordRahasia123@127.0.0.1:5432/rajawali_db"\nNODE_ENV=production`
+                      );
+                      setVpsSnippetCopied('s2');
+                      setTimeout(() => setVpsSnippetCopied(null), 2500);
+                    }}
+                    className="text-[11px] text-amber-400 hover:underline flex items-center space-x-1 cursor-pointer"
+                  >
+                    {vpsSnippetCopied === 's2' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{vpsSnippetCopied === 's2' ? 'Tersalin' : 'Salin'}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Buat atau edit file <code className="text-amber-300 font-mono">.env</code> di direktori root aplikasi:
+                </p>
+                <pre className="p-3 bg-slate-900 rounded-xl font-mono text-[11px] text-amber-300 overflow-x-auto">
+{`PORT=3000
+DATABASE_URL="postgresql://rajawali_user:PasswordRahasia123@127.0.0.1:5432/rajawali_db"
+NODE_ENV=production`}
+                </pre>
+              </div>
+
+              {/* Step 3: Run with PM2 */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center">
+                      3
+                    </span>
+                    <span className="font-bold text-sm text-white">Build & Jalankan via PM2</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `npm install -g pm2\nnpm install\nnpm run build\npm2 start npm --name "rajawali-app" -- start\npm2 save && pm2 startup`
+                      );
+                      setVpsSnippetCopied('s3');
+                      setTimeout(() => setVpsSnippetCopied(null), 2500);
+                    }}
+                    className="text-[11px] text-amber-400 hover:underline flex items-center space-x-1 cursor-pointer"
+                  >
+                    {vpsSnippetCopied === 's3' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{vpsSnippetCopied === 's3' ? 'Tersalin' : 'Salin'}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  PM2 menjaga aplikasi tetap menyala 24/7 dan otomatis hidup kembali saat server reboot:
+                </p>
+                <pre className="p-3 bg-slate-900 rounded-xl font-mono text-[11px] text-cyan-300 overflow-x-auto">
+{`npm install -g pm2
+npm install && npm run build
+pm2 start npm --name "rajawali-app" -- start
+pm2 save && pm2 startup`}
+                </pre>
+              </div>
+
+              {/* Step 4: Nginx Proxy */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center">
+                      4
+                    </span>
+                    <span className="font-bold text-sm text-white">Nginx Reverse Proxy & WebSocket</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `location / {\n    proxy_pass http://127.0.0.1:3000;\n    proxy_http_version 1.1;\n    proxy_set_header Upgrade $http_upgrade;\n    proxy_set_header Connection "upgrade";\n    proxy_set_header Host $host;\n}`
+                      );
+                      setVpsSnippetCopied('s4');
+                      setTimeout(() => setVpsSnippetCopied(null), 2500);
+                    }}
+                    className="text-[11px] text-amber-400 hover:underline flex items-center space-x-1 cursor-pointer"
+                  >
+                    {vpsSnippetCopied === 's4' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{vpsSnippetCopied === 's4' ? 'Tersalin' : 'Salin'}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Pastikan konfigurasi Nginx mendukung Upgrade Header agar WebSocket berjalan mulus:
+                </p>
+                <pre className="p-3 bg-slate-900 rounded-xl font-mono text-[11px] text-amber-300 overflow-x-auto">
+{`location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}`}
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: DANGER ZONE & HAPUS DATA MASAL PER DIVISI (KHUSUS SUPER ADMIN) */}
       {activeTab === 'danger' && isSuperAdmin && (
         <div className="bg-slate-900 border border-rose-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
           <div className="border-b border-rose-500/20 pb-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
