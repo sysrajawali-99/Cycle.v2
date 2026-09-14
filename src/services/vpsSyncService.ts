@@ -35,8 +35,10 @@ class VpsSyncService {
     if (this.isInitialized || typeof window === 'undefined') return;
     this.isInitialized = true;
 
-    // 1. Check initial VPS DB status
-    this.checkStatus();
+    // 1. Check initial VPS DB status and silently sync in background
+    this.checkStatus().then(() => {
+      this.autoSyncOnStartup();
+    });
 
     // 2. Initialize Socket.IO connection
     try {
@@ -50,6 +52,8 @@ class VpsSyncService {
       this.socket.on('connect', () => {
         this.currentStatus.socketConnected = true;
         this.notifyStatusListeners();
+        // Silently pull latest state on socket reconnect
+        this.autoSyncOnStartup();
       });
 
       this.socket.on('disconnect', () => {
@@ -289,6 +293,36 @@ class VpsSyncService {
     } finally {
       this.currentStatus.isSyncing = false;
       this.notifyStatusListeners();
+    }
+  }
+
+  /**
+   * Automatically synchronize with VPS on startup in background
+   */
+  private async autoSyncOnStartup() {
+    try {
+      const res = await fetch('/api/vps/states');
+      if (!res.ok) return;
+
+      const json = await res.json();
+      const states = json.states;
+      const keys = states && typeof states === 'object' ? Object.keys(states) : [];
+
+      if (keys.length > 0) {
+        // VPS already has records: hydrate local memory silently
+        for (const [key, data] of Object.entries(states)) {
+          if (data !== undefined && data !== null) {
+            this.applyRemoteUpdate(key as StorageActionType, data);
+          }
+        }
+        this.currentStatus.lastSync = new Date().toISOString();
+        this.notifyStatusListeners();
+      } else {
+        // Fresh database: seed VPS with current state automatically
+        await this.pushAllDataToVps();
+      }
+    } catch (err) {
+      console.warn('[VPS Auto-Sync] Background startup sync:', err);
     }
   }
 

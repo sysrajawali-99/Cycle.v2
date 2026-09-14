@@ -14,14 +14,11 @@ import {
   Sun,
   Moon,
   Monitor,
-  Trash2,
-  Server
+  Trash2
 } from 'lucide-react';
 import { Project, UserAccount, AppView, CompanyProfile } from '../../types';
 import { storageService } from '../../services/storageService';
 import { themeService, ThemeMode } from '../../services/themeService';
-import { vpsSyncService, VpsConnectionStatus } from '../../services/vpsSyncService';
-import { VpsSyncModal } from '../vps/VpsSyncModal';
 
 interface NavbarProps {
   projects?: Project[];
@@ -51,8 +48,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectView
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isVpsModalOpen, setIsVpsModalOpen] = useState(false);
-  const [vpsStatus, setVpsStatus] = useState<VpsConnectionStatus>(() => vpsSyncService.getStatus());
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(() => storageService.getCompanyProfile());
   const [themePref, setThemePref] = useState<ThemeMode>(() => themeService.getThemePreference());
   const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => themeService.getResolvedTheme());
@@ -66,15 +61,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       setResolvedTheme(themeService.getResolvedTheme());
     };
 
-    const unsubVps = vpsSyncService.subscribeStatus((status) => {
-      setVpsStatus(status);
-    });
-
     window.addEventListener('company_profile_updated', handleProfileUpdate);
     window.addEventListener('storage', handleProfileUpdate);
     window.addEventListener('theme_changed', handleThemeChange as EventListener);
     return () => {
-      unsubVps();
       window.removeEventListener('company_profile_updated', handleProfileUpdate);
       window.removeEventListener('storage', handleProfileUpdate);
       window.removeEventListener('theme_changed', handleThemeChange as EventListener);
@@ -192,33 +182,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
 
-            {/* Live VPS Real-time Database Status Badge */}
-            <button
-              id="navbar-vps-status-btn"
-              type="button"
-              onClick={() => setIsVpsModalOpen(true)}
-              className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-amber-500/40 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer text-slate-200"
-              title={`Integrasi VPS Database & Real-Time Sync: ${
-                vpsStatus.connected
-                  ? 'PostgreSQL VPS Terhubung (Real-Time)'
-                  : 'Penyimpanan File Lokal Aktif (Klik untuk Panduan VPS)'
-              }`}
-            >
-              <Server className="w-3.5 h-3.5 text-amber-400" />
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  vpsStatus.connected
-                    ? 'bg-emerald-400 animate-pulse'
-                    : vpsStatus.socketConnected
-                    ? 'bg-sky-400'
-                    : 'bg-amber-400'
-                }`}
-              />
-              <span className="hidden md:inline text-[11px] font-medium text-slate-300">
-                {vpsStatus.connected ? 'VPS DB' : 'VPS Ready'}
-              </span>
-            </button>
-
             {/* User Session Profile Chip */}
             {currentUser && (
               <div className="relative">
@@ -296,17 +259,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                           >
                             <ShieldCheck className="w-4 h-4 text-amber-400" />
                             <span>Kelola Hak Akses Pengguna</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setIsUserMenuOpen(false);
-                              setIsVpsModalOpen(true);
-                            }}
-                            className="w-full text-left flex items-center space-x-2 p-2 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-slate-700"
-                          >
-                            <Server className="w-4 h-4 text-amber-400" />
-                            <span>Integrasi & Status VPS Database</span>
                           </button>
                         </div>
                       )}
@@ -429,12 +381,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
       )}
-
-      {/* VPS Database & Real-Time Sync Modal */}
-      <VpsSyncModal
-        isOpen={isVpsModalOpen}
-        onClose={() => setIsVpsModalOpen(false)}
-      />
     </header>
   );
 };

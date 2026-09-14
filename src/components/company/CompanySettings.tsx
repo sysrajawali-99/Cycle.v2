@@ -31,8 +31,6 @@ import {
   Users,
   Megaphone,
   Server,
-  UploadCloud,
-  DownloadCloud,
   Copy,
   Check,
   Radio
@@ -1109,76 +1107,16 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
               </div>
             </div>
 
-            {/* Quick Bulk Sync Actions */}
-            <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-0.5">
-                <span className="font-bold text-xs text-white block">Sinkronisasi Data Masal:</span>
-                <span className="text-[11px] text-slate-400 block">
-                  Unggah data browser ke database VPS, atau tarik seluruh data VPS ke browser ini.
-                </span>
+            {/* Automatic Synchronization Status Notice */}
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
               </div>
-              <div className="flex items-center space-x-2 shrink-0">
-                <button
-                  type="button"
-                  disabled={vpsLoading}
-                  onClick={async () => {
-                    if (!window.confirm('Unggah seluruh data lokal saat ini ke server VPS? Data di VPS akan diperbarui.')) {
-                      return;
-                    }
-                    setVpsLoading(true);
-                    setVpsMsg(null);
-                    try {
-                      const res = await vpsSyncService.pushAllDataToVps();
-                      if (res.success) {
-                        setVpsMsg({
-                          type: 'success',
-                          text: `Berhasil mengunggah ${res.count ?? 20} modul data lokal ke database VPS!`
-                        });
-                      } else {
-                        setVpsMsg({ type: 'error', text: res.error || 'Gagal mengunggah data.' });
-                      }
-                    } catch {
-                      setVpsMsg({ type: 'error', text: 'Kendala jaringan saat sinkronisasi.' });
-                    } finally {
-                      setVpsLoading(false);
-                    }
-                  }}
-                  className="flex items-center space-x-1.5 px-3 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <UploadCloud className="w-4 h-4" />
-                  <span>Upload Lokal ke VPS</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={vpsLoading}
-                  onClick={async () => {
-                    if (!window.confirm('Tarik data terbaru dari server VPS? Data lokal browser Anda akan disinkronkan dengan data VPS.')) {
-                      return;
-                    }
-                    setVpsLoading(true);
-                    setVpsMsg(null);
-                    try {
-                      const res = await vpsSyncService.pullAllDataFromVps();
-                      if (res.success) {
-                        setVpsMsg({
-                          type: 'success',
-                          text: `Berhasil memperbarui data browser dari VPS (${res.count ?? 0} modul tersinkronisasi)!`
-                        });
-                      } else {
-                        setVpsMsg({ type: 'error', text: res.error || 'Gagal menarik data dari VPS.' });
-                      }
-                    } catch {
-                      setVpsMsg({ type: 'error', text: 'Kendala jaringan saat mengambil data.' });
-                    } finally {
-                      setVpsLoading(false);
-                    }
-                  }}
-                  className="flex items-center space-x-1.5 px-3 py-2 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <DownloadCloud className="w-4 h-4" />
-                  <span>Download dari VPS</span>
-                </button>
+              <div className="space-y-0.5">
+                <span className="font-bold text-xs text-white block">Sinkronisasi Otomatis Latar Belakang (Real-Time Auto-Sync)</span>
+                <span className="text-[11px] text-emerald-300/80 block">
+                  Server VPS bekerja 100% otomatis di latar belakang. Setiap penambahan atau perubahan data (stok gudang, absensi, karyawan, jurnal kas, mutasi) langsung disimpan ke database VPS dan disinkronkan ke seluruh perangkat tanpa memerlukan perintah sinkronisasi manual.
+                </span>
               </div>
             </div>
           </div>
