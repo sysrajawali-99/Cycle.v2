@@ -2816,10 +2816,18 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                                 <Edit className="w-3.5 h-3.5" />
                               </button>
 
-                              {!acc.isSystem && (
+                              {acc.isSystem ? (
+                                <button
+                                  disabled
+                                  className="p-1 rounded-lg bg-slate-800/40 text-slate-600 cursor-not-allowed transition-colors"
+                                  title="Akun standar sistem PSAK (tidak dapat dihapus)"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              ) : (
                                 <button
                                   onClick={() => setAccountToDelete(acc)}
-                                  className="p-1 rounded-lg bg-slate-800 hover:bg-rose-900/50 text-rose-400 hover:text-rose-300 transition-colors"
+                                  className="p-1 rounded-lg bg-slate-800 hover:bg-rose-900/50 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
                                   title="Hapus Akun"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -3833,12 +3841,18 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                    Nama Akun / Sub-Akun *
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-slate-300">
+                      Nama Akun / Sub-Akun *
+                    </label>
+                    <span className="text-[10px] text-amber-400/80 font-normal">
+                      Ketik manual atau pilih rekomendasi
+                    </span>
+                  </div>
                   <input
                     type="text"
                     required
+                    list="coa-account-name-suggestions"
                     placeholder={
                       coaFormData.accountKind === 'SUB'
                         ? 'e.g. Bank Mandiri KCP Sudirman (Rek. Operasional)'
@@ -3848,6 +3862,35 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                     onChange={(e) => setCoaFormData({ ...coaFormData, name: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-medium"
                   />
+                  <datalist id="coa-account-name-suggestions">
+                    {coaFormData.accountKind === 'SUB' ? (
+                      <>
+                        <option value="Rek. Operasional Site" />
+                        <option value="Rek. Payroll Karyawan" />
+                        <option value="Rek. Penerimaan Invoice Klien" />
+                        <option value="Kas Kecil Proyek / Site Operasional" />
+                        <option value="Piutang Retensi Termin Proyek" />
+                        <option value="Persediaan Chemical & Cleaning Supplies" />
+                        <option value="Utang Vendor Bahan Pembersih" />
+                        <option value="Beban Gaji & Upah Tenaga Kerja" />
+                        <option value="Beban Transportasi & Logistik Proyek" />
+                        <option value="Beban Listrik, Air & Utilitas Kantor" />
+                        <option value="Beban Sewa Gedung & Fasilitas" />
+                      </>
+                    ) : (
+                      <>
+                        <option value="Kas Besar Kantor Pusat (HQ)" />
+                        <option value="Bank Operasional Utama" />
+                        <option value="Piutang Usaha Jasa Cleaning & Facility" />
+                        <option value="Persediaan Bahan & Perlengkapan Kerja" />
+                        <option value="Aset Tetap Peralatan Mesin Polisher & Vacuum" />
+                        <option value="Utang Usaha & Pembelian Vendor" />
+                        <option value="Pendapatan Jasa Kontrak Kebersihan" />
+                        <option value="Beban Pokok Pendapatan (HPP)" />
+                        <option value="Beban Operasional & Administrasi Umum" />
+                      </>
+                    )}
+                  </datalist>
                 </div>
               </div>
 
