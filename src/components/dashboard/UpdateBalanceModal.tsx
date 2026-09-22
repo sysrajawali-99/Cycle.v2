@@ -321,22 +321,22 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto animate-fadeIn">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fadeIn">
+      <div className="bg-white border border-slate-200 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden my-auto">
         {/* Modal Header */}
-        <div className="px-5 sm:px-6 py-4 bg-gradient-to-r from-slate-900 via-slate-850 to-amber-950/30 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-5 sm:px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl shadow-inner">
+            <div className="p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl font-bold">
               <Landmark className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="font-extrabold text-white text-base sm:text-lg">Update Saldo Rekening Pemasukan</h3>
-                <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                <h3 className="font-black text-slate-950 text-base sm:text-lg">Update Saldo Rekening Pemasukan</h3>
+                <span className="text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full">
                   Dashboard Center
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-600 font-medium">
                 Sesuaikan saldo awal, saldo e-banking, atau catat setoran kas masuk
               </p>
             </div>
@@ -345,21 +345,21 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
             id="close-update-balance-modal"
             type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
+            className="p-2 text-slate-500 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="px-5 sm:px-6 pt-3 border-b border-slate-800/80 bg-slate-950/40 flex space-x-2 overflow-x-auto scrollbar-none">
+        <div className="px-5 sm:px-6 pt-3 border-b border-slate-200 bg-white flex space-x-2 overflow-x-auto scrollbar-none">
           <button
             type="button"
             onClick={() => setActiveMode('single')}
             className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center space-x-1.5 ${
               activeMode === 'single'
-                ? 'border-amber-500 text-amber-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-slate-950 text-slate-950 font-black'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
             }`}
           >
             <Wallet className="w-3.5 h-3.5" />
@@ -371,8 +371,8 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
             onClick={() => setActiveMode('batch')}
             className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center space-x-1.5 ${
               activeMode === 'batch'
-                ? 'border-amber-500 text-amber-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-slate-950 text-slate-950 font-black'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
             }`}
           >
             <Building2 className="w-3.5 h-3.5" />
@@ -384,8 +384,8 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
             onClick={() => setActiveMode('income_trx')}
             className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center space-x-1.5 ${
               activeMode === 'income_trx'
-                ? 'border-amber-500 text-amber-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-slate-950 text-slate-950 font-black'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
             }`}
           >
             <PlusCircle className="w-3.5 h-3.5" />
@@ -397,8 +397,8 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
             onClick={() => setActiveMode('zero_all')}
             className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all whitespace-nowrap cursor-pointer flex items-center space-x-1.5 ${
               activeMode === 'zero_all'
-                ? 'border-rose-500 text-rose-400'
-                : 'border-transparent text-slate-400 hover:text-rose-400'
+                ? 'border-rose-600 text-rose-600 font-black'
+                : 'border-transparent text-slate-500 hover:text-rose-600'
             }`}
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -410,8 +410,8 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
         <div className="p-5 sm:p-6 space-y-5 max-h-[72vh] overflow-y-auto">
           {/* Success Banner */}
           {saveSuccess && (
-            <div className="p-3.5 bg-emerald-500/20 border border-emerald-500/40 rounded-2xl text-emerald-300 text-xs font-bold flex items-center space-x-2 animate-bounce">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 text-xs font-bold flex items-center space-x-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
               <span>{successMessage}</span>
             </div>
           )}
@@ -421,7 +421,7 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
             <form onSubmit={handleSaveSingleBalance} className="space-y-4">
               {/* Account Selector */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300">Pilih Rekening Pemasukan / Kas & Bank</label>
+                <label className="text-xs font-bold text-slate-800">Pilih Rekening Pemasukan / Kas & Bank</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {cashAndBankAccounts.map((acc) => {
                     const isSelected = selectedAccountCode === acc.code;
@@ -432,23 +432,23 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
                         onClick={() => handleAccountSelectChange(acc.code)}
                         className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
                           isSelected
-                            ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20 shadow-md'
-                            : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                            ? 'bg-amber-50/60 border-amber-500 ring-2 ring-amber-500/20 shadow-sm'
+                            : 'bg-slate-50 border-slate-200 hover:border-slate-300'
                         }`}
                       >
                         <div className="min-w-0 pr-2">
                           <div className="flex items-center space-x-1.5">
-                            <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                            <span className="text-[10px] font-mono font-bold text-slate-800 bg-white border border-slate-200 px-1.5 py-0.5 rounded">
                               {acc.code}
                             </span>
-                            <span className="text-xs font-bold text-white truncate">{acc.name}</span>
+                            <span className="text-xs font-bold text-slate-950 truncate">{acc.name}</span>
                           </div>
-                          <div className="text-[11px] text-slate-400 mt-1">
-                            Saldo: <span className="font-semibold text-slate-200">{formatCurrency(acc.currentBalance || 0)}</span>
+                          <div className="text-[11px] text-slate-600 mt-1 font-medium">
+                            Saldo: <span className="font-black text-slate-950">{formatCurrency(acc.currentBalance || 0)}</span>
                           </div>
                         </div>
                         {isSelected && (
-                          <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center text-slate-950 shrink-0">
+                          <div className="w-5 h-5 rounded-full bg-slate-950 flex items-center justify-center text-white shrink-0">
                             <Check className="w-3.5 h-3.5 stroke-[3]" />
                           </div>
                         )}
@@ -459,25 +459,25 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
               </div>
 
               {/* Saldo Saat Ini vs Saldo Baru */}
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Rekening Terpilih:</span>
-                  <span className="font-bold text-white">{selectedAccount?.name}</span>
+                  <span className="text-slate-600 font-medium">Rekening Terpilih:</span>
+                  <span className="font-bold text-slate-950">{selectedAccount?.name}</span>
                 </div>
-                <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
-                  <span className="text-slate-400">Saldo Buku Saat Ini:</span>
-                  <span className="font-mono font-bold text-slate-200">{formatCurrency(currentBalanceNum)}</span>
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-200">
+                  <span className="text-slate-600 font-medium">Saldo Buku Saat Ini:</span>
+                  <span className="font-mono font-black text-slate-950">{formatCurrency(currentBalanceNum)}</span>
                 </div>
 
                 <div className="space-y-1.5 pt-1">
-                  <label className="text-xs font-bold text-amber-400 flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-900 flex items-center justify-between">
                     <span>Input Saldo Baru (Rp)</span>
-                    <span className="text-[11px] font-normal text-slate-400">
+                    <span className="text-[11px] font-normal text-slate-500">
                       Sesuai Saldo Mutasi e-Banking / Kas Fisik
                     </span>
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-amber-400 font-bold text-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-600 font-bold text-sm">
                       Rp
                     </div>
                     <input
@@ -488,61 +488,61 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
                       value={newBalanceInput}
                       onChange={(e) => setNewBalanceInput(e.target.value)}
                       placeholder="0"
-                      className="w-full pl-12 pr-4 py-3 bg-slate-900 border border-slate-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-xl text-white font-mono font-bold text-lg outline-none"
+                      className="w-full pl-12 pr-4 py-3 bg-white border border-slate-300 focus:border-slate-950 focus:ring-1 focus:ring-slate-950 rounded-xl text-slate-950 font-mono font-black text-lg outline-none"
                     />
                   </div>
                 </div>
 
                 {/* Quick Preset Buttons */}
                 <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="text-[10px] text-slate-400 mr-1">Shortcut:</span>
+                  <span className="text-[10px] text-slate-500 font-bold mr-1">Shortcut:</span>
                   <button
                     type="button"
                     onClick={() => setNewBalanceInput('0')}
-                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold rounded-lg border border-slate-700 transition-colors cursor-pointer"
+                    className="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-bold rounded-lg border border-slate-200 transition-colors cursor-pointer"
                   >
                     Reset (Rp 0)
                   </button>
                   <button
                     type="button"
                     onClick={() => setNewBalanceInput((parsedNewBalance + 5000000).toString())}
-                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 text-[11px] font-bold rounded-lg border border-slate-700 transition-colors cursor-pointer"
+                    className="px-2 py-1 bg-white hover:bg-slate-100 text-slate-900 text-[11px] font-black rounded-lg border border-slate-200 transition-colors cursor-pointer"
                   >
                     +5 Jt
                   </button>
                   <button
                     type="button"
                     onClick={() => setNewBalanceInput((parsedNewBalance + 25000000).toString())}
-                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 text-[11px] font-bold rounded-lg border border-slate-700 transition-colors cursor-pointer"
+                    className="px-2 py-1 bg-white hover:bg-slate-100 text-slate-900 text-[11px] font-black rounded-lg border border-slate-200 transition-colors cursor-pointer"
                   >
                     +25 Jt
                   </button>
                   <button
                     type="button"
                     onClick={() => setNewBalanceInput((parsedNewBalance + 50000000).toString())}
-                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 text-[11px] font-bold rounded-lg border border-slate-700 transition-colors cursor-pointer"
+                    className="px-2 py-1 bg-white hover:bg-slate-100 text-slate-900 text-[11px] font-black rounded-lg border border-slate-200 transition-colors cursor-pointer"
                   >
                     +50 Jt
                   </button>
                   <button
                     type="button"
                     onClick={() => setNewBalanceInput((parsedNewBalance + 100000000).toString())}
-                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 text-[11px] font-bold rounded-lg border border-slate-700 transition-colors cursor-pointer"
+                    className="px-2 py-1 bg-white hover:bg-slate-100 text-slate-900 text-[11px] font-black rounded-lg border border-slate-200 transition-colors cursor-pointer"
                   >
                     +100 Jt
                   </button>
                 </div>
 
                 {/* Balance Delta Preview */}
-                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Selisih Penyesuaian Saldo:</span>
+                <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
+                  <span className="text-slate-600 font-medium">Selisih Penyesuaian Saldo:</span>
                   <span
-                    className={`font-mono font-bold ${
+                    className={`font-mono font-black ${
                       balanceDiff > 0
-                        ? 'text-emerald-400'
+                        ? 'text-emerald-700'
                         : balanceDiff < 0
-                        ? 'text-rose-400'
-                        : 'text-slate-400'
+                        ? 'text-rose-700'
+                        : 'text-slate-700'
                     }`}
                   >
                     {balanceDiff > 0 ? `+${formatCurrency(balanceDiff)}` : formatCurrency(balanceDiff)}
@@ -552,13 +552,13 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
 
               {/* Notes */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Catatan / Alasan Penyesuaian</label>
+                <label className="text-xs font-bold text-slate-800">Catatan / Alasan Penyesuaian</label>
                 <input
                   type="text"
                   value={updateNotes}
                   onChange={(e) => setUpdateNotes(e.target.value)}
                   placeholder="Contoh: Rekonsiliasi saldo awal rekening koran per 1 September 2026"
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:border-amber-500 outline-none"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-950 placeholder-slate-400 focus:border-slate-950 outline-none"
                 />
               </div>
 
@@ -567,14 +567,14 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl border border-slate-700 transition-colors cursor-pointer"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   id="submit-update-single-balance"
                   type="submit"
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all cursor-pointer flex items-center space-x-1.5"
+                  className="px-5 py-2.5 bg-slate-950 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
                 >
                   <Check className="w-4 h-4" />
                   <span>Simpan Perubahan Saldo</span>
@@ -586,8 +586,8 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
           {/* MODE 2: BATCH UPDATE ALL ACCOUNTS */}
           {activeMode === 'batch' && (
             <form onSubmit={handleSaveBatchBalances} className="space-y-4">
-              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs text-amber-300 flex items-start space-x-2">
-                <Sparkles className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start space-x-2">
+                <Sparkles className="w-4 h-4 shrink-0 mt-0.5 text-amber-700" />
                 <span>
                   Update langsung seluruh rekening penerimaan kas & bank Anda dalam satu tabel. Ideal untuk input saldo awal buku baru atau rekonsiliasi bulanan.
                 </span>
@@ -599,21 +599,21 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
                   return (
                     <div
                       key={acc.code}
-                      className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                      className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
                     >
                       <div>
                         <div className="flex items-center space-x-2">
-                          <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] font-mono font-bold text-slate-800 bg-white border border-slate-200 px-1.5 py-0.5 rounded">
                             {acc.code}
                           </span>
-                          <span className="font-bold text-white text-xs">{acc.name}</span>
+                          <span className="font-bold text-slate-950 text-xs">{acc.name}</span>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">{acc.description}</p>
+                        <p className="text-[11px] text-slate-600 font-medium mt-0.5">{acc.description}</p>
                       </div>
 
                       <div className="flex items-center space-x-2 shrink-0">
                         <div className="relative w-44">
-                          <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
+                          <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-500 text-xs font-bold">
                             Rp
                           </div>
                           <input
@@ -627,7 +627,7 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
                                 [acc.code]: parseFloat(e.target.value) || 0
                               })
                             }
-                            className="w-full pl-8 pr-2.5 py-2 bg-slate-900 border border-slate-700 focus:border-amber-500 rounded-xl text-white font-mono font-bold text-xs text-right outline-none"
+                            className="w-full pl-8 pr-2.5 py-2 bg-white border border-slate-300 focus:border-slate-950 rounded-xl text-slate-950 font-mono font-black text-xs text-right outline-none"
                           />
                         </div>
                         <button
@@ -638,7 +638,7 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
                               [acc.code]: 0
                             })
                           }
-                          className="px-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded-lg border border-slate-700 transition-colors cursor-pointer"
+                          className="px-2 py-2 bg-white hover:bg-slate-100 text-slate-700 text-[10px] font-bold rounded-lg border border-slate-200 transition-colors cursor-pointer"
                           title="Nol-kan saldo akun ini"
                         >
                           Rp 0
@@ -650,9 +650,9 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
               </div>
 
               {/* Total Summary */}
-              <div className="bg-slate-950 p-4 rounded-2xl border border-amber-500/30 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-300">Total Likuiditas Seluruh Kas & Bank:</span>
-                <span className="text-base font-extrabold text-amber-400 font-mono">
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700">Total Likuiditas Seluruh Kas & Bank:</span>
+                <span className="text-base font-black text-slate-950 font-mono">
                   {formatCurrency(
                     Object.values(batchBalances)
                       .map((v) => Number(v) || 0)
@@ -665,14 +665,14 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl border border-slate-700 transition-colors cursor-pointer"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   id="submit-update-batch-balances"
                   type="submit"
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all cursor-pointer flex items-center space-x-1.5"
+                  className="px-5 py-2.5 bg-slate-950 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
                 >
                   <Check className="w-4 h-4" />
                   <span>Simpan Seluruh Saldo Kas & Bank</span>
@@ -685,11 +685,11 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
           {activeMode === 'income_trx' && (
             <form onSubmit={handleSaveIncomeTrx} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300">Rekening Tujuan Penerimaan Dana</label>
+                <label className="text-xs font-bold text-slate-800">Rekening Tujuan Penerimaan Dana</label>
                 <select
                   value={selectedAccountCode}
                   onChange={(e) => setSelectedAccountCode(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:border-amber-500 outline-none"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-950 focus:border-slate-950 outline-none"
                 >
                   {cashAndBankAccounts.map((acc) => (
                     <option key={acc.code} value={acc.code}>
@@ -701,9 +701,9 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-amber-400">Nominal Setoran Pemasukan (Rp)</label>
+                  <label className="text-xs font-bold text-slate-900">Nominal Setoran Pemasukan (Rp)</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-amber-400 font-bold text-xs">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-600 font-bold text-xs">
                       Rp
                     </div>
                     <input
@@ -712,18 +712,18 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
                       value={incomeAmount}
                       onChange={(e) => setIncomeAmount(e.target.value)}
                       placeholder="0"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono font-bold text-white focus:border-amber-500 outline-none"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-black text-slate-950 focus:border-slate-950 outline-none"
                       required
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300">Lawan Akun / Sumber Pemasukan</label>
+                  <label className="text-xs font-bold text-slate-800">Lawan Akun / Sumber Pemasukan</label>
                   <select
                     value={incomeContraAccount}
                     onChange={(e) => setIncomeContraAccount(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:border-amber-500 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-950 focus:border-slate-950 outline-none"
                   >
                     {accounts
                       .filter((a) => a.type === 'Revenue' || a.type === 'Equity' || a.category === 'Piutang Usaha')
@@ -738,25 +738,25 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">Judul / Keterangan Transaksi</label>
+                  <label className="text-xs font-bold text-slate-800">Judul / Keterangan Transaksi</label>
                   <input
                     type="text"
                     value={incomeTitle}
                     onChange={(e) => setIncomeTitle(e.target.value)}
                     placeholder="Contoh: Penerimaan Kontrak Cleaning Mall"
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:border-amber-500 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-950 focus:border-slate-950 outline-none"
                     required
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">No. Referensi / Bukti Transfer</label>
+                  <label className="text-xs font-bold text-slate-800">No. Referensi / Bukti Transfer</label>
                   <input
                     type="text"
                     value={incomeRefNo}
                     onChange={(e) => setIncomeRefNo(e.target.value)}
                     placeholder="Ref: BKM-00123"
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:border-amber-500 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-950 focus:border-slate-950 outline-none"
                   />
                 </div>
               </div>
@@ -765,14 +765,14 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl border border-slate-700 transition-colors cursor-pointer"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   id="submit-record-income-trx"
                   type="submit"
-                  className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all cursor-pointer flex items-center space-x-1.5"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
                 >
                   <PlusCircle className="w-4 h-4" />
                   <span>Catat Pemasukan & Update Saldo</span>
@@ -784,27 +784,27 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
           {/* MODE 4: ZERO ALL COA BALANCES (START CLEAN) */}
           {activeMode === 'zero_all' && (
             <div className="space-y-4">
-              <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-300 text-xs space-y-2">
-                <div className="flex items-center space-x-2 font-bold text-sm text-rose-400">
+              <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-900 text-xs space-y-2">
+                <div className="flex items-center space-x-2 font-bold text-sm text-rose-700">
                   <AlertCircle className="w-5 h-5 shrink-0" />
                   <span>Nol-kan Semua Nilai Rupiah di Chart of Accounts (COA)</span>
                 </div>
-                <p className="leading-relaxed text-slate-300">
+                <p className="leading-relaxed text-slate-800 font-medium">
                   Tindakan ini akan mereset <strong>seluruh saldo awal (*initial balance*)</strong> dan <strong>saldo terkini (*current balance*)</strong> dari semua akun (Aset, Liabilitas, Ekuitas, Pendapatan, dan Beban) menjadi <strong>Rp 0</strong>.
                 </p>
-                <p className="text-slate-400 text-[11px]">
+                <p className="text-slate-600 text-[11px] font-medium">
                   Struktur kode dan nama akun baku tetap dipertahankan, sehingga Anda dapat langsung memasukkan saldo awal riil perusahaan tanpa data dummy.
                 </p>
               </div>
 
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs space-y-2">
-                <div className="font-bold text-slate-200">Daftar Akun yang Akan Di-nolkan ({accounts.length} Akun):</div>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs space-y-2">
+                <div className="font-bold text-slate-950">Daftar Akun yang Akan Di-nolkan ({accounts.length} Akun):</div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
                   {accounts.map((a) => (
-                    <div key={a.code} className="p-2 bg-slate-900 rounded-lg text-[11px] border border-slate-800">
-                      <span className="font-mono text-amber-400 font-bold">{a.code}</span>
-                      <div className="text-slate-300 truncate">{a.name}</div>
-                      <div className="text-[10px] text-slate-500">Saldo sekarang: {formatCurrency(a.currentBalance || 0)}</div>
+                    <div key={a.code} className="p-2 bg-white rounded-lg text-[11px] border border-slate-200">
+                      <span className="font-mono text-slate-900 font-bold">{a.code}</span>
+                      <div className="text-slate-900 font-bold truncate">{a.name}</div>
+                      <div className="text-[10px] text-slate-500 font-medium">Saldo sekarang: {formatCurrency(a.currentBalance || 0)}</div>
                     </div>
                   ))}
                 </div>
@@ -814,7 +814,7 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl border border-slate-700 transition-colors cursor-pointer"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
@@ -822,7 +822,7 @@ export const UpdateBalanceModal: React.FC<UpdateBalanceModalProps> = ({
                   id="confirm-zero-all-coa-btn"
                   type="button"
                   onClick={handleResetAllCoaToZero}
-                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-rose-600/20 transition-all cursor-pointer flex items-center space-x-1.5"
+                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span>Kosongkan Semua Nilai Rupiah COA (Rp 0)</span>

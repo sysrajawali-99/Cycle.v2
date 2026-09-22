@@ -959,6 +959,7 @@ export default function App() {
                 companyProfile={companyProfile}
                 onUpdateCompanyProfile={handleUpdateCompanyProfile}
                 currentUser={currentUser}
+                accounts={accounts}
                 onResetAllData={loadAllData}
                 onNavigateView={handleNavigateView}
               />

@@ -195,38 +195,38 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
       {/* DIAGRAM 1: PERBANDINGAN PENGELUARAN GAJI (BULAN LALU VS BULAN INI) */}
       {/* ---------------------------------------------------- */}
       {showPayrollChart && (
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-5">
+      <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
         {/* Header Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 rounded-2xl shadow-lg shadow-amber-500/20 font-bold">
+            <div className="p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl font-bold">
               <CreditCard className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="text-base sm:text-lg font-extrabold text-white">
+                <h3 className="text-base sm:text-lg font-black text-slate-950">
                   Diagram Perbandingan Pengeluaran Gaji
                 </h3>
-                <span className="text-[11px] bg-amber-500/20 text-amber-300 font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                <span className="text-[11px] bg-amber-50 text-amber-800 font-bold px-2.5 py-0.5 rounded-full border border-amber-200">
                   MoM Analysis
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-600 font-medium">
                 Komparasi realisasi payroll bulan sebelumnya ({prevMonthName} {prevYear}) dengan bulan berjalan ({curMonthName} {currentYear}).
               </p>
             </div>
           </div>
 
           {/* Quick Indicator Tag */}
-          <div className="flex items-center space-x-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 self-start sm:self-auto">
+          <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 self-start sm:self-auto">
             <div className="flex items-center space-x-1.5 text-xs">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
-              <span className="text-slate-400 font-semibold">{prevMonthName}</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+              <span className="text-slate-600 font-bold">{prevMonthName}</span>
             </div>
-            <span className="text-slate-600">vs</span>
+            <span className="text-slate-400">vs</span>
             <div className="flex items-center space-x-1.5 text-xs">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-              <span className="text-amber-300 font-bold">{curMonthName} (Berjalan)</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-950"></span>
+              <span className="text-slate-950 font-black">{curMonthName} (Berjalan)</span>
             </div>
           </div>
         </div>
@@ -234,52 +234,51 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
         {/* 3 Executive Metric Highlights */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
           {/* Box 1: Bulan Sebelumnya */}
-          <div className="bg-slate-950/90 border border-slate-800/90 rounded-2xl p-4 space-y-1">
-            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-1">
+            <span className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
               Gaji Bulan Sebelumnya ({prevMonthName})
             </span>
-            <div className="text-xl sm:text-2xl font-black text-slate-200">
+            <div className="text-xl sm:text-2xl font-black text-slate-950">
               {formatCurrency(payrollComparisonData.prevOverall.totalNet)}
             </div>
-            <div className="text-[11px] text-slate-500">
+            <div className="text-[11px] text-slate-500 font-medium">
               Total {payrollComparisonData.prevOverall.totalHadir} Hari Kerja Hadir
             </div>
           </div>
 
           {/* Box 2: Bulan Berjalan */}
-          <div className="bg-slate-950/90 border border-amber-500/30 rounded-2xl p-4 space-y-1 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none" />
-            <span className="text-[11px] text-amber-400 font-semibold uppercase tracking-wider block">
+          <div className="bg-amber-50/40 border border-amber-200 rounded-2xl p-4 space-y-1">
+            <span className="text-[11px] text-amber-900 font-bold uppercase tracking-wider block">
               Gaji Bulan Berjalan ({curMonthName})
             </span>
-            <div className="text-xl sm:text-2xl font-black text-amber-400">
+            <div className="text-xl sm:text-2xl font-black text-slate-950">
               {formatCurrency(payrollComparisonData.currOverall.totalNet)}
             </div>
-            <div className="text-[11px] text-slate-400">
+            <div className="text-[11px] text-slate-600 font-medium">
               Cut-off berjalan • {payrollComparisonData.currOverall.headcount} Karyawan Aktif
             </div>
           </div>
 
           {/* Box 3: Selisih & Varians */}
-          <div className="bg-slate-950/90 border border-slate-800/90 rounded-2xl p-4 space-y-1">
-            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-1">
+            <span className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
               Selisih / Fluktuasi Pengeluaran
             </span>
             <div className="flex items-center space-x-2">
-              <span className={`text-xl sm:text-2xl font-black ${payrollComparisonData.diffPayroll >= 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+              <span className="text-xl sm:text-2xl font-black text-slate-950">
                 {payrollComparisonData.diffPayroll >= 0 ? '+' : ''}
                 {formatCurrency(payrollComparisonData.diffPayroll)}
               </span>
               <span className={`px-2 py-0.5 rounded-full text-xs font-bold flex items-center space-x-0.5 ${
                 payrollComparisonData.diffPayroll >= 0
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                  : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
               }`}>
                 {payrollComparisonData.diffPayroll >= 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
                 <span>{Math.abs(payrollComparisonData.percentChange || 0).toFixed(1)}%</span>
               </span>
             </div>
-            <div className="text-[11px] text-slate-500">
+            <div className="text-[11px] text-slate-500 font-medium">
               {payrollComparisonData.diffPayroll >= 0
                 ? 'Peningkatan beban lembur / absensi berjalan'
                 : 'Efisiensi pengeluaran payroll periode ini'}
@@ -289,7 +288,7 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
 
         {/* Visual Comparative Bars per Project */}
         <div className="space-y-4 pt-2">
-          <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
+          <div className="flex items-center justify-between text-xs text-slate-600 font-bold">
             <span>Perbandingan Payroll per Lokasi Gedung / Proyek</span>
             <span>Nilai Gaji Net (Rupiah)</span>
           </div>
@@ -300,21 +299,21 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
               const currWidthPct = Math.min(100, Math.max(8, (item.currPayroll / payrollComparisonData.maxProjectPayroll) * 100));
 
               return (
-                <div key={item.project.id} className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3.5 space-y-2 hover:border-slate-700 transition-colors">
+                <div key={item.project.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2 hover:border-slate-300 transition-colors">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center space-x-2">
-                      <Building2 className="w-4 h-4 text-amber-400" />
-                      <span className="font-bold text-white text-xs sm:text-sm">
+                      <Building2 className="w-4 h-4 text-slate-700" />
+                      <span className="font-bold text-slate-950 text-xs sm:text-sm">
                         {item.project.name}
                       </span>
-                      <span className="text-[10px] bg-slate-800 text-slate-300 font-mono px-2 py-0.5 rounded">
+                      <span className="text-[10px] bg-white text-slate-700 border border-slate-200 font-mono font-bold px-2 py-0.5 rounded">
                         {item.project.code}
                       </span>
                     </div>
 
                     <div className="flex items-center space-x-2 text-xs">
-                      <span className="text-slate-400">Selisih:</span>
-                      <span className={`font-bold ${item.diff >= 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      <span className="text-slate-600 font-medium">Selisih:</span>
+                      <span className="font-black text-slate-950">
                         {item.diff >= 0 ? '+' : ''}{formatCurrency(item.diff)} ({(item.pct ?? 0).toFixed(1)}%)
                       </span>
                     </div>
@@ -324,12 +323,12 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
                   <div className="space-y-1.5 pt-1">
                     {/* Bar Bulan Sebelumnya */}
                     <div className="flex items-center space-x-2 text-xs">
-                      <span className="w-20 text-slate-500 font-semibold text-[11px] shrink-0">
+                      <span className="w-20 text-slate-600 font-bold text-[11px] shrink-0">
                         {prevMonthName}:
                       </span>
-                      <div className="flex-1 bg-slate-900 rounded-full h-4 overflow-hidden p-0.5 flex items-center">
+                      <div className="flex-1 bg-slate-200 rounded-full h-4 overflow-hidden p-0.5 flex items-center">
                         <div
-                          className="bg-slate-600 h-full rounded-full transition-all duration-700 flex items-center justify-end px-2 text-[10px] font-bold text-white"
+                          className="bg-slate-500 h-full rounded-full transition-all duration-700 flex items-center justify-end px-2 text-[10px] font-bold text-white"
                           style={{ width: `${prevWidthPct}%` }}
                         >
                           <span className="truncate">{formatCurrency(item.prevPayroll)}</span>
@@ -339,12 +338,12 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
 
                     {/* Bar Bulan Berjalan */}
                     <div className="flex items-center space-x-2 text-xs">
-                      <span className="w-20 text-amber-400 font-bold text-[11px] shrink-0">
+                      <span className="w-20 text-slate-950 font-black text-[11px] shrink-0">
                         {curMonthName}:
                       </span>
-                      <div className="flex-1 bg-slate-900 rounded-full h-4 overflow-hidden p-0.5 flex items-center">
+                      <div className="flex-1 bg-slate-200 rounded-full h-4 overflow-hidden p-0.5 flex items-center">
                         <div
-                          className="bg-gradient-to-r from-amber-500 to-amber-600 h-full rounded-full transition-all duration-700 flex items-center justify-end px-2 text-[10px] font-black text-slate-950 shadow-md shadow-amber-500/20"
+                          className="bg-slate-900 h-full rounded-full transition-all duration-700 flex items-center justify-end px-2 text-[10px] font-black text-white"
                           style={{ width: `${currWidthPct}%` }}
                         >
                           <span className="truncate">{formatCurrency(item.currPayroll)}</span>
@@ -364,38 +363,38 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
       {/* DIAGRAM 2: PERBANDINGAN JUMLAH PERSONIL (PENGATURAN LOKASI VS AKTUAL DATA KARYAWAN) */}
       {/* ---------------------------------------------------- */}
       {showManpowerChart && (
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-5">
+      <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
         {/* Header Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 font-bold">
+            <div className="p-2.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-2xl font-bold">
               <Users className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="text-base sm:text-lg font-extrabold text-white">
+                <h3 className="text-base sm:text-lg font-black text-slate-950">
                   Diagram Perbandingan Manpower & Alokasi Personil
                 </h3>
-                <span className="text-[11px] bg-blue-500/20 text-blue-300 font-bold px-2.5 py-0.5 rounded-full border border-blue-500/30">
+                <span className="text-[11px] bg-blue-50 text-blue-700 font-bold px-2.5 py-0.5 rounded-full border border-blue-200">
                   Target vs Aktual
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-600 font-medium">
                 Membandingkan kuota target manpower dari Pengaturan Lokasi Proyek dengan jumlah personil aktual di Data Karyawan.
               </p>
             </div>
           </div>
 
           {/* Quick Indicator Tag */}
-          <div className="flex items-center space-x-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 self-start sm:self-auto">
+          <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 self-start sm:self-auto">
             <div className="flex items-center space-x-1.5 text-xs">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
-              <span className="text-slate-400 font-semibold">Target Pengaturan</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+              <span className="text-slate-600 font-bold">Target Pengaturan</span>
             </div>
-            <span className="text-slate-600">vs</span>
+            <span className="text-slate-400">vs</span>
             <div className="flex items-center space-x-1.5 text-xs">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-              <span className="text-emerald-300 font-bold">Aktual Terisi</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+              <span className="text-emerald-800 font-black">Aktual Terisi</span>
             </div>
           </div>
         </div>
@@ -403,53 +402,48 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
         {/* 3 Executive Metric Highlights */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
           {/* Box 1: Total Kuota Target */}
-          <div className="bg-slate-950/90 border border-slate-800/90 rounded-2xl p-4 space-y-1">
-            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-1">
+            <span className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
               Total Kuota Target (Pengaturan Proyek)
             </span>
-            <div className="text-xl sm:text-2xl font-black text-slate-200">
+            <div className="text-xl sm:text-2xl font-black text-slate-950">
               {manpowerComparisonData.totalTargetQuota}{' '}
-              <span className="text-xs font-normal text-slate-400">Personil</span>
+              <span className="text-xs font-bold text-slate-500">Personil</span>
             </div>
-            <div className="text-[11px] text-slate-500">
+            <div className="text-[11px] text-slate-500 font-medium">
               Akumulasi 5 Lokasi Proyek Aktif
             </div>
           </div>
 
           {/* Box 2: Total Aktual Terisi */}
-          <div className="bg-slate-950/90 border border-blue-500/30 rounded-2xl p-4 space-y-1 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl pointer-events-none" />
-            <span className="text-[11px] text-blue-400 font-semibold uppercase tracking-wider block">
+          <div className="bg-blue-50/40 border border-blue-200 rounded-2xl p-4 space-y-1">
+            <span className="text-[11px] text-blue-900 font-bold uppercase tracking-wider block">
               Total Aktual Personil (Data Karyawan)
             </span>
-            <div className="text-xl sm:text-2xl font-black text-blue-400">
+            <div className="text-xl sm:text-2xl font-black text-slate-950">
               {manpowerComparisonData.totalActualAssigned}{' '}
-              <span className="text-xs font-normal text-slate-400">Cleaner Aktif</span>
+              <span className="text-xs font-bold text-slate-500">Cleaner Aktif</span>
             </div>
-            <div className="text-[11px] text-slate-400">
+            <div className="text-[11px] text-slate-600 font-medium">
               Terverifikasi di database operasional
             </div>
           </div>
 
           {/* Box 3: Fulfillment Ratio */}
-          <div className="bg-slate-950/90 border border-slate-800/90 rounded-2xl p-4 space-y-1">
-            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-1">
+            <span className="text-[11px] text-slate-600 font-bold uppercase tracking-wider block">
               Tingkat Keterisian (Fulfillment Ratio)
             </span>
             <div className="flex items-center space-x-2">
-              <span className={`text-xl sm:text-2xl font-black ${
-                manpowerComparisonData.overallFulfillment >= 100
-                  ? 'text-emerald-400'
-                  : 'text-amber-400'
-              }`}>
+              <span className="text-xl sm:text-2xl font-black text-slate-950">
                 {manpowerComparisonData.overallFulfillment}%
               </span>
               <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                 manpowerComparisonData.totalDiff === 0
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                   : manpowerComparisonData.totalDiff > 0
-                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                  : 'bg-rose-50 text-rose-800 border border-rose-200'
               }`}>
                 {manpowerComparisonData.totalDiff === 0
                   ? 'Ideal 100%'
@@ -458,7 +452,7 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
                   : `${manpowerComparisonData.totalDiff} Kekurangan`}
               </span>
             </div>
-            <div className="text-[11px] text-slate-500">
+            <div className="text-[11px] text-slate-500 font-medium">
               {manpowerComparisonData.overallFulfillment >= 100
                 ? 'Semua pos kebersihan terpenuhi optimal'
                 : 'Perlu penambahan rekrutmen / mutasi karyawan'}
@@ -468,7 +462,7 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
 
         {/* Breakdown per Project Site */}
         <div className="space-y-4 pt-2">
-          <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
+          <div className="flex items-center justify-between text-xs text-slate-600 font-bold">
             <span>Komparasi Kuota Target vs Aktual per Gedung</span>
             <span>Rasio & Status Pos</span>
           </div>
@@ -481,20 +475,20 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
               return (
                 <div
                   key={item.project.id}
-                  className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4 space-y-3 hover:border-slate-700 transition-colors"
+                  className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 hover:border-slate-300 transition-colors"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <div className="flex items-center space-x-2">
-                        <Building2 className="w-4 h-4 text-blue-400" />
-                        <span className="font-bold text-white text-xs sm:text-sm">
+                        <Building2 className="w-4 h-4 text-slate-700" />
+                        <span className="font-bold text-slate-950 text-xs sm:text-sm">
                           {item.project.name}
                         </span>
-                        <span className="text-[10px] bg-slate-800 text-slate-300 font-mono px-2 py-0.5 rounded">
+                        <span className="text-[10px] bg-white text-slate-700 border border-slate-200 font-mono font-bold px-2 py-0.5 rounded">
                           {item.project.code}
                         </span>
-                        <span className="text-[11px] text-slate-400">
-                          • Spv: <b className="text-slate-300">{item.supervisor}</b>
+                        <span className="text-[11px] text-slate-600 font-medium">
+                          • Spv: <b className="text-slate-900 font-bold">{item.supervisor}</b>
                         </span>
                       </div>
                     </div>
@@ -502,19 +496,19 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
                     {/* Status Badge */}
                     <div>
                       {item.status === 'optimal' && (
-                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold">
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Terpenuhi ({item.actualCount}/{item.targetQuota})</span>
                         </span>
                       )}
                       {item.status === 'shortage' && (
-                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold">
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl text-xs font-bold">
                           <AlertCircle className="w-3.5 h-3.5" />
                           <span>Kurang {Math.abs(item.diff)} Orang ({item.actualCount}/{item.targetQuota})</span>
                         </span>
                       )}
                       {item.status === 'excess' && (
-                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded-xl text-xs font-bold">
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl text-xs font-bold">
                           <Users className="w-3.5 h-3.5" />
                           <span>Lebih +{item.diff} Orang ({item.actualCount}/{item.targetQuota})</span>
                         </span>
@@ -526,12 +520,12 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
                   <div className="space-y-1.5 pt-1">
                     {/* Target Bar */}
                     <div className="flex items-center space-x-2 text-xs">
-                      <span className="w-24 text-slate-400 font-semibold text-[11px] shrink-0">
+                      <span className="w-24 text-slate-600 font-bold text-[11px] shrink-0">
                         Target Kuota:
                       </span>
-                      <div className="flex-1 bg-slate-900 rounded-full h-4 overflow-hidden p-0.5 flex items-center">
+                      <div className="flex-1 bg-slate-200 rounded-full h-4 overflow-hidden p-0.5 flex items-center">
                         <div
-                          className="bg-slate-600 h-full rounded-full transition-all duration-700 flex items-center justify-end px-2 text-[10px] font-bold text-white"
+                          className="bg-slate-500 h-full rounded-full transition-all duration-700 flex items-center justify-end px-2 text-[10px] font-bold text-white"
                           style={{ width: `${targetWidthPct}%` }}
                         >
                           <span>{item.targetQuota} Petugas</span>
@@ -541,17 +535,17 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
 
                     {/* Actual Bar */}
                     <div className="flex items-center space-x-2 text-xs">
-                      <span className="w-24 text-emerald-400 font-bold text-[11px] shrink-0">
+                      <span className="w-24 text-slate-950 font-black text-[11px] shrink-0">
                         Aktual Terisi:
                       </span>
-                      <div className="flex-1 bg-slate-900 rounded-full h-4 overflow-hidden p-0.5 flex items-center">
+                      <div className="flex-1 bg-slate-200 rounded-full h-4 overflow-hidden p-0.5 flex items-center">
                         <div
-                          className={`h-full rounded-full transition-all duration-700 flex items-center justify-end px-2 text-[10px] font-black text-slate-950 shadow-md ${
+                          className={`h-full rounded-full transition-all duration-700 flex items-center justify-end px-2 text-[10px] font-black text-white ${
                             item.status === 'optimal'
-                              ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-emerald-500/20'
+                              ? 'bg-emerald-600'
                               : item.status === 'shortage'
-                              ? 'bg-gradient-to-r from-rose-500 to-amber-500 shadow-rose-500/20 text-white'
-                              : 'bg-gradient-to-r from-blue-500 to-cyan-400 shadow-blue-500/20'
+                              ? 'bg-rose-600'
+                              : 'bg-blue-600'
                           }`}
                           style={{ width: `${actualWidthPct}%` }}
                         >
@@ -562,19 +556,19 @@ export const ComparativeCharts: React.FC<ComparativeChartsProps> = ({
                   </div>
 
                   {/* Role composition tags */}
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px] text-slate-400 border-t border-slate-800/60">
-                    <span className="font-semibold text-slate-300">Komposisi:</span>
-                    <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                      Cleaner: <b className="text-white">{item.positionsCount.cleaner}</b>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px] text-slate-600 border-t border-slate-200 font-medium">
+                    <span className="font-bold text-slate-900">Komposisi:</span>
+                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200">
+                      Cleaner: <b className="text-slate-950 font-black">{item.positionsCount.cleaner}</b>
                     </span>
-                    <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                      Leader: <b className="text-white">{item.positionsCount.leader}</b>
+                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200">
+                      Leader: <b className="text-slate-950 font-black">{item.positionsCount.leader}</b>
                     </span>
-                    <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                      Floor/Gondola: <b className="text-white">{item.positionsCount.specialist}</b>
+                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200">
+                      Floor/Gondola: <b className="text-slate-950 font-black">{item.positionsCount.specialist}</b>
                     </span>
-                    <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                      Gardener: <b className="text-white">{item.positionsCount.gardener}</b>
+                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200">
+                      Gardener: <b className="text-slate-950 font-black">{item.positionsCount.gardener}</b>
                     </span>
                   </div>
                 </div>

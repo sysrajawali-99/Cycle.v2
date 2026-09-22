@@ -29,8 +29,10 @@ import {
   Employee,
   TimesheetMonthRecord,
   AttendanceStatus,
-  UserRole
+  UserRole,
+  CompanyProfile
 } from '../../types';
+import { storageService } from '../../services/storageService';
 import {
   formatCurrency,
   getDaysInMonth,
@@ -1409,6 +1411,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   };
                 });
 
+                const comp = storageService.getCompanyProfile();
+
                 return (
                   <div
                     id="printable-payroll-sheet"
@@ -1417,21 +1421,43 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   >
                     {/* Header Kop Resmi */}
                     <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-black text-lg text-slate-900 tracking-wider">
-                            PT RAJAWALI PRIMA SERVICE
-                          </span>
-                          <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300">
-                            OFFICIAL PAYROLL REPORT
-                          </span>
+                      <div className="flex items-start space-x-3.5 max-w-2xl">
+                        {comp.logoUrl ? (
+                          <div className="w-14 h-14 shrink-0 bg-white rounded-lg p-1 border border-slate-200 flex items-center justify-center">
+                            <img
+                              src={comp.logoUrl}
+                              alt={comp.name}
+                              className="max-w-full max-h-full object-contain"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 shrink-0 bg-slate-950 text-amber-400 font-black rounded-xl flex items-center justify-center text-xl shadow-sm border border-slate-900">
+                            {comp.brandName?.charAt(0) || comp.name?.charAt(0) || 'R'}
+                          </div>
+                        )}
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-black text-lg text-slate-900 tracking-wider uppercase">
+                              {comp.name}
+                            </span>
+                            <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300 uppercase">
+                              OFFICIAL PAYROLL REPORT
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 font-medium">
+                            {comp.tagline || 'Integrated Facility Management, Commercial Cleaning, & Hospitality Support Services'}
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            {comp.address}{comp.city ? `, ${comp.city}` : ''} • Telp: {comp.phone} {comp.email ? `• Email: ${comp.email}` : ''}
+                          </p>
+                          {(comp.taxId || comp.businessPermitNo) && (
+                            <p className="text-[9.5px] text-slate-500 font-mono mt-0.5">
+                              {comp.taxId && <span>NPWP: {comp.taxId} </span>}
+                              {comp.businessPermitNo && <span>• NIB: {comp.businessPermitNo}</span>}
+                            </p>
+                          )}
                         </div>
-                        <p className="text-[11px] text-slate-600 font-medium">
-                          Integrated Facility Management, Commercial Cleaning, & Hospitality Support Services
-                        </p>
-                        <p className="text-[10px] text-slate-500">
-                          Head Office: Menara Rajawali Lt. 12, Kawasan Mega Kuningan, Jakarta Selatan • Hotline: (021) 5299-8800
-                        </p>
                       </div>
                       <div className="text-right">
                         <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">
@@ -1691,25 +1717,29 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       <div className="space-y-12">
                         <div>
                           <p className="text-slate-500 font-medium">Diperiksa Oleh,</p>
-                          <p className="font-bold text-slate-800">Finance & Payroll Officer</p>
+                          <p className="font-bold text-slate-800">{comp.financeManagerTitle || 'Finance & Payroll Officer'}</p>
                         </div>
                         <div className="border-b border-slate-400 w-36 mx-auto"></div>
-                        <p className="text-[11px] text-slate-600 font-semibold">( ............................................ )</p>
+                        <p className="text-[11px] text-slate-600 font-semibold">
+                          ( {comp.financeManagerName || 'Finance & HR Dept'} )
+                        </p>
                       </div>
 
                       <div className="space-y-12">
                         <div>
                           <p className="text-slate-500 font-medium">Disetujui Oleh,</p>
-                          <p className="font-bold text-slate-800">Operations Director / Management</p>
+                          <p className="font-bold text-slate-800">{comp.directorTitle || 'Operations Director / Management'}</p>
                         </div>
                         <div className="border-b border-slate-400 w-36 mx-auto"></div>
-                        <p className="text-[11px] text-slate-600 font-semibold">( ............................................ )</p>
+                        <p className="text-[11px] text-slate-600 font-semibold">
+                          ( {comp.directorName || 'Management'} )
+                        </p>
                       </div>
                     </div>
 
                     {/* Footer Footnote */}
-                    <div className="text-[9px] text-slate-400 text-center border-t border-slate-100 pt-2 flex items-center justify-between">
-                      <span>Dokumen ini sah dan diterbitkan secara digital oleh Rajawali Cleaning Eagle Management System.</span>
+                    <div className="text-[9px] text-slate-500 text-center border-t border-slate-200 pt-2 flex items-center justify-between">
+                      <span>{comp.letterheadFooterNote || `Dokumen ini sah dan diterbitkan secara digital oleh ${comp.name}.`}</span>
                       <span>Halaman 1 dari 1</span>
                     </div>
                   </div>

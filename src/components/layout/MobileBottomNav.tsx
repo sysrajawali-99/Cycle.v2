@@ -20,13 +20,9 @@ import {
   LogOut,
   Briefcase,
   Layers,
-  Sun,
-  Moon,
-  Monitor,
   Trash2
 } from 'lucide-react';
 import { AppView, Project, UserAccount } from '../../types';
-import { themeService, ThemeMode } from '../../services/themeService';
 
 interface MobileBottomNavProps {
   currentView: AppView;
@@ -59,17 +55,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const [isHrmSheetOpen, setIsHrmSheetOpen] = useState(true);
   const [isOmSheetOpen, setIsOmSheetOpen] = useState(true);
   const [isFinanceSheetOpen, setIsFinanceSheetOpen] = useState(true);
-  const [themePref, setThemePref] = useState<ThemeMode>(() => themeService.getThemePreference());
-  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => themeService.getResolvedTheme());
-
-  React.useEffect(() => {
-    const handleThemeChange = () => {
-      setThemePref(themeService.getThemePreference());
-      setResolvedTheme(themeService.getResolvedTheme());
-    };
-    window.addEventListener('theme_changed', handleThemeChange);
-    return () => window.removeEventListener('theme_changed', handleThemeChange);
-  }, []);
 
   const currentProject = (projects || []).find((p) => p.id === selectedProjectId);
 
@@ -135,7 +120,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       label: 'Tugas',
       icon: <KanbanSquare className="w-5 h-5" />,
       badge: activeTasksCount > 0 ? activeTasksCount : undefined,
-      badgeColor: 'bg-blue-500 text-white'
+      badgeColor: 'bg-blue-600 text-white'
     }
   ];
 
@@ -149,26 +134,26 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       id: 'timesheet' as AppView,
       label: 'Eagle Timesheet',
       description: 'Matriks kehadiran 1-31 & lembur',
-      icon: <CalendarCheck2 className="w-4 h-4 text-emerald-400" />,
+      icon: <CalendarCheck2 className="w-4 h-4 text-emerald-600" />,
       badge: 31
     },
     {
       id: 'employees' as AppView,
       label: 'Data Karyawan & Lokasi',
       description: 'Database personil & riwayat mutasi',
-      icon: <Users className="w-4 h-4 text-blue-400" />
+      icon: <Users className="w-4 h-4 text-blue-600" />
     },
     {
       id: 'sops' as AppView,
       label: 'SOP & Dokumen K3',
       description: 'Standar mutu pembersihan & APD',
-      icon: <BookOpen className="w-4 h-4 text-emerald-400" />
+      icon: <BookOpen className="w-4 h-4 text-emerald-600" />
     },
     {
       id: 'reports' as AppView,
       label: 'Pusat Laporan & Payroll',
       description: 'Cetak slip gaji & ekspor rekapitulasi data',
-      icon: <FileSpreadsheet className="w-4 h-4 text-blue-400" />
+      icon: <FileSpreadsheet className="w-4 h-4 text-blue-600" />
     }
   ].filter((item) => isViewAllowed(item.id));
 
@@ -177,20 +162,20 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       id: 'project_settings' as AppView,
       label: 'Pengaturan Lokasi',
       description: 'Spesifikasi gedung, manpower, lift & lantai',
-      icon: <Building2 className="w-4 h-4 text-amber-400" />
+      icon: <Building2 className="w-4 h-4 text-amber-600" />
     },
     {
       id: 'inventory' as AppView,
       label: 'Smart Inventory',
       description: 'Update stok & chemical kritis',
-      icon: <Package className="w-4 h-4 text-purple-400" />,
+      icon: <Package className="w-4 h-4 text-purple-600" />,
       badge: lowStockCount > 0 ? lowStockCount : undefined
     },
     {
       id: 'tasks' as AppView,
       label: 'Rajawali Boards',
       description: 'Papan monitoring & QC kebersihan',
-      icon: <KanbanSquare className="w-4 h-4 text-teal-400" />,
+      icon: <KanbanSquare className="w-4 h-4 text-teal-600" />,
       badge: activeTasksCount > 0 ? activeTasksCount : undefined
     }
   ].filter((item) => isViewAllowed(item.id));
@@ -200,49 +185,49 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       id: 'finance_cash_journal' as AppView,
       label: 'Buku Kas & Jurnal Umum',
       description: 'Uang masuk/keluar, jurnal & buku besar',
-      icon: <Layers className="w-4 h-4 text-emerald-400" />
+      icon: <Layers className="w-4 h-4 text-emerald-600" />
     },
     {
       id: 'finance_debts_receivables' as AppView,
       label: 'Pencatatan Hutang & Piutang',
       description: 'Hutang vendor, piutang klien & aging',
-      icon: <FileSpreadsheet className="w-4 h-4 text-rose-400" />
+      icon: <FileSpreadsheet className="w-4 h-4 text-rose-600" />
     },
     {
       id: 'finance_investments' as AppView,
       label: 'Pencatatan Investasi & Bagi Hasil',
       description: '12 baris jadwal, investor & reminder',
-      icon: <Briefcase className="w-4 h-4 text-purple-400" />
+      icon: <Briefcase className="w-4 h-4 text-purple-600" />
     },
     {
       id: 'finance_outflow_forecast' as AppView,
       label: 'Forecast Rencana Pengeluaran',
       description: 'Gaji manpower + hutang + bagi hasil',
-      icon: <Layers className="w-4 h-4 text-amber-400" />
+      icon: <Layers className="w-4 h-4 text-amber-600" />
     },
     {
       id: 'finance_profit_loss' as AppView,
       label: 'Laba Rugi (Profit & Loss)',
       description: 'Laporan laba rugi komprehensif',
-      icon: <BookOpen className="w-4 h-4 text-emerald-400" />
+      icon: <BookOpen className="w-4 h-4 text-emerald-600" />
     },
     {
       id: 'finance_bank_reconcile' as AppView,
       label: 'Rekening Koran & Rekonsiliasi',
       description: 'Upload e-Statement & auto-matching',
-      icon: <FileSpreadsheet className="w-4 h-4 text-cyan-400" />
+      icon: <FileSpreadsheet className="w-4 h-4 text-cyan-600" />
     },
     {
       id: 'finance_statements' as AppView,
       label: 'Laporan Keuangan (SAK)',
       description: 'Neraca, arus kas & permodalan',
-      icon: <BookOpen className="w-4 h-4 text-blue-400" />
+      icon: <BookOpen className="w-4 h-4 text-blue-600" />
     },
     {
       id: 'finance_analytics_audit' as AppView,
       label: 'Analisa Biaya & Tutup Buku',
       description: 'Cost center, jejak audit & kunci periode',
-      icon: <ShieldCheck className="w-4 h-4 text-purple-400" />
+      icon: <ShieldCheck className="w-4 h-4 text-purple-600" />
     }
   ].filter((item) => isViewAllowed(item.id));
 
@@ -251,20 +236,20 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       id: 'blast' as AppView,
       label: 'Eagle Blast',
       description: 'Memo resmi manajemen & pengumuman K3',
-      icon: <Megaphone className="w-4 h-4 text-amber-400" />,
+      icon: <Megaphone className="w-4 h-4 text-amber-600" />,
       badge: unreadBlastCount > 0 ? unreadBlastCount : undefined
     },
     {
       id: 'company_settings' as AppView,
       label: 'Pengaturan Perusahaan',
       description: 'Logo, Kop Surat & Profil HQ',
-      icon: <Building2 className="w-4 h-4 text-amber-400" />
+      icon: <Building2 className="w-4 h-4 text-amber-600" />
     },
     {
       id: 'access_control' as AppView,
       label: 'Hak Akses Pengguna',
       description: 'Kelola izin menu & visibilitas user',
-      icon: <ShieldCheck className="w-4 h-4 text-amber-400" />
+      icon: <ShieldCheck className="w-4 h-4 text-amber-600" />
     }
   ].filter((item) => isViewAllowed(item.id));
 
@@ -279,7 +264,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       {/* Fixed Bottom Navigation Bar for Mobile Phones (iOS / Android) */}
       <nav
         id="mobile-bottom-nav"
-        className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/80 px-1 sm:px-2 py-1 md:hidden shadow-[0_-8px_20px_rgba(0,0,0,0.6)] pb-safe"
+        className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-200 px-1 sm:px-2 py-1 md:hidden shadow-[0_-4px_12px_rgba(0,0,0,0.06)] pb-safe"
       >
         <div className="flex items-center justify-between max-w-lg mx-auto w-full gap-0.5">
           {filteredMainItems.map((item) => {
@@ -291,20 +276,20 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 onClick={() => handleSelectNav(item.id)}
                 className={`relative flex flex-col items-center justify-center py-1 px-0.5 sm:px-1.5 rounded-xl transition-all duration-150 flex-1 min-w-0 max-w-[76px] min-h-[46px] touch-manipulation active:scale-95 cursor-pointer ${
                   isActive
-                    ? 'text-amber-400 font-bold'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'text-amber-800 font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 {/* Active Indicator Pill */}
                 {isActive && (
-                  <span className="absolute -top-1 w-6 h-1 bg-amber-400 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
+                  <span className="absolute -top-1 w-6 h-1 bg-amber-500 rounded-full shadow-xs" />
                 )}
 
                 <div className="relative">
                   {item.icon}
                   {item.badge !== undefined && (
                     <span
-                      className={`absolute -top-1.5 -right-2 text-[8px] font-black px-1.5 py-0.2 rounded-full ring-2 ring-slate-950 ${
+                      className={`absolute -top-1.5 -right-2 text-[8px] font-black px-1.5 py-0.2 rounded-full ring-2 ring-white ${
                         item.badgeColor || 'bg-amber-500 text-slate-950'
                       }`}
                     >
@@ -313,7 +298,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                   )}
                 </div>
                 <span className={`text-[9px] sm:text-[10px] mt-0.5 leading-tight tracking-tight truncate w-full text-center block ${
-                  isActive ? 'text-amber-600 dark:text-amber-400 font-extrabold' : 'text-black dark:text-slate-400 font-semibold'
+                  isActive ? 'text-[#431407] font-extrabold' : 'text-slate-600 font-semibold'
                 }`}>
                   {item.label}
                 </span>
@@ -327,20 +312,20 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             onClick={() => setIsMoreMenuOpen(true)}
             className={`relative flex flex-col items-center justify-center py-1 px-0.5 sm:px-1.5 rounded-xl transition-all duration-150 flex-1 min-w-0 max-w-[76px] min-h-[46px] touch-manipulation active:scale-95 cursor-pointer ${
               isMoreMenuOpen || ['project_settings', 'blast', 'sops', 'sop', 'reports', 'access_control'].includes(currentView)
-                ? 'text-amber-600 dark:text-amber-400 font-bold'
-                : 'text-black dark:text-slate-400 hover:text-black dark:hover:text-slate-200'
+                ? 'text-amber-800 font-bold'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <div className="relative">
               <MoreHorizontal className="w-5 h-5" />
               {unreadBlastCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full ring-2 ring-slate-950" />
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full ring-2 ring-white" />
               )}
             </div>
             <span className={`text-[9px] sm:text-[10px] mt-0.5 leading-tight tracking-tight truncate w-full text-center block ${
               isMoreMenuOpen || ['project_settings', 'blast', 'sops', 'sop', 'reports', 'access_control'].includes(currentView)
-                ? 'text-amber-600 dark:text-amber-400 font-extrabold'
-                : 'text-black dark:text-slate-400 font-semibold'
+                ? 'text-[#431407] font-extrabold'
+                : 'text-slate-600 font-semibold'
             }`}>
               Menu Lain
             </span>
@@ -350,7 +335,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
       {/* Mobile "More" Drawer Action Sheet */}
       {isMoreMenuOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 backdrop-blur-sm md:hidden animate-fade-in">
+        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/50 backdrop-blur-xs md:hidden animate-fade-in">
           {/* Backdrop Tap to close */}
           <div
             className="flex-1 w-full"
@@ -358,18 +343,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           />
 
           {/* Sheet Body */}
-          <div id="mobile-more-sheet" className="bg-white dark:bg-slate-900 border-t border-slate-300 dark:border-slate-700/80 rounded-t-3xl p-5 space-y-4 max-h-[88vh] overflow-y-auto pb-safe shadow-2xl animate-slide-up">
+          <div id="mobile-more-sheet" className="bg-white border-t border-slate-200 rounded-t-3xl p-5 space-y-4 max-h-[88vh] overflow-y-auto pb-safe shadow-2xl animate-slide-up">
             {/* Sheet Handle */}
-            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-1 opacity-75" />
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-1 opacity-75" />
 
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-500 dark:text-amber-400">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-700">
                   <Sparkles className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-black dark:text-white text-base">Struktur Menu Lengkap</h3>
-                  <p className="text-[11px] text-black dark:text-slate-400 font-medium">
+                  <h3 className="font-bold text-slate-900 text-base">Struktur Menu Lengkap</h3>
+                  <p className="text-[11px] text-slate-600 font-medium">
                     {currentUser ? `${currentUser.name} (${currentUser.role})` : 'Portal Operasional'}
                   </p>
                 </div>
@@ -377,44 +362,44 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               <button
                 id="close-more-sheet-btn"
                 onClick={() => setIsMoreMenuOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center hover:text-black dark:hover:text-white cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center hover:text-slate-900 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Site & Scope Context on Mobile */}
-            <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-black dark:text-slate-400 font-bold uppercase tracking-wider">
+                <span className="text-[11px] text-slate-600 font-bold uppercase tracking-wider">
                   Visibilitas Lokasi
                 </span>
-                <span className="text-xs font-bold text-amber-600 dark:text-amber-400 truncate max-w-[180px]">
+                <span className="text-xs font-bold text-amber-800 truncate max-w-[180px]">
                   {currentUser?.isLocationLocked ? '📍 Terkunci' : '🌐 Semua Lokasi'}
                 </span>
               </div>
 
               {currentUser?.isLocationLocked ? (
-                <div className="flex items-center space-x-2 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-500/30 rounded-xl px-3 py-2 text-xs text-black dark:text-emerald-200">
-                  <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span className="font-bold truncate text-black dark:text-emerald-200">
+                <div className="flex items-center space-x-2 bg-emerald-50 border border-emerald-300 rounded-xl px-3 py-2 text-xs text-emerald-900">
+                  <Lock className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span className="font-bold truncate text-emerald-900">
                     {currentProject ? currentProject.name : 'Lokasi Terkunci'}
                   </span>
                 </div>
               ) : (
-                <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-2.5 py-1.5">
-                  <Building2 className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <div className="flex items-center space-x-2 bg-white border border-slate-300 rounded-xl px-2.5 py-1.5">
+                  <Building2 className="w-4 h-4 text-amber-700 shrink-0" />
                   <select
                     id="mobile-sheet-project-select"
                     value={selectedProjectId}
                     onChange={(e) => onSelectProject?.(e.target.value)}
-                    className="bg-transparent text-xs text-black dark:text-white w-full focus:outline-none cursor-pointer py-1 font-semibold"
+                    className="bg-transparent text-xs text-slate-900 w-full focus:outline-none cursor-pointer py-1 font-semibold"
                   >
-                    <option value="ALL" className="bg-white dark:bg-slate-900 text-black dark:text-white">
+                    <option value="ALL" className="bg-white text-slate-900">
                       🌐 Semua Lokasi Proyek (HQ All Sites)
                     </option>
                     {(projects || []).map((proj) => (
-                      <option key={proj.id} value={proj.id} className="bg-white dark:bg-slate-900 text-black dark:text-white">
+                      <option key={proj.id} value={proj.id} className="bg-white text-slate-900">
                         📍 {proj.name} ({proj.code})
                       </option>
                     ))}
@@ -425,26 +410,26 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
             {/* Group 1: Human Resource Management (HRM) */}
             {hrmSheetItems.length > 0 && (
-              <div className="bg-white dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
                 <button
                   type="button"
                   onClick={() => setIsHrmSheetOpen(!isHrmSheetOpen)}
-                  className="w-full flex items-center justify-between p-3 bg-blue-50/50 dark:bg-blue-950/30 border-b border-slate-200 dark:border-slate-800/80 text-left cursor-pointer"
+                  className="w-full flex items-center justify-between p-3 bg-blue-50/70 border-b border-slate-200 text-left cursor-pointer"
                 >
                   <div className="flex items-center space-x-2.5">
-                    <div className="p-1.5 rounded-lg bg-blue-600/20 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                    <div className="p-1.5 rounded-lg bg-blue-600/20 text-blue-700 border border-blue-500/30">
                       <Briefcase className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-xs font-extrabold text-black dark:text-white">Human Resource Management (HRM)</div>
-                      <div className="text-[10px] text-black dark:text-slate-400 font-medium">Timesheet, Karyawan, SOP & Payroll</div>
+                      <div className="text-xs font-extrabold text-slate-900">Human Resource Management (HRM)</div>
+                      <div className="text-[10px] text-slate-600 font-medium">Timesheet, Karyawan, SOP & Payroll</div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-1.5 text-black dark:text-slate-400">
-                    <span className="text-[10px] bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.2 rounded font-bold">
+                  <div className="flex items-center space-x-1.5 text-slate-600">
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded font-bold border border-blue-200">
                       {hrmSheetItems.length} Submenu
                     </span>
-                    {isHrmSheetOpen ? <ChevronDown className="w-4 h-4 text-black dark:text-slate-400" /> : <ChevronRight className="w-4 h-4 text-black dark:text-slate-400" />}
+                    {isHrmSheetOpen ? <ChevronDown className="w-4 h-4 text-slate-600" /> : <ChevronRight className="w-4 h-4 text-slate-600" />}
                   </div>
                 </button>
 
@@ -459,32 +444,32 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                           onClick={() => handleSelectNav(item.id)}
                           className={`w-full flex items-center justify-between p-2.5 rounded-xl border transition-all text-left cursor-pointer ${
                             isActive
-                              ? 'bg-[#ffedd5] dark:bg-amber-500/20 border-[#fdba74] dark:border-amber-500/40 text-black dark:text-amber-100 shadow-sm'
-                              : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800/80 text-black dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 hover:text-black dark:hover:text-white'
+                              ? 'bg-[#ffedd5] border-[#fdba74] text-[#431407] shadow-xs font-bold'
+                              : 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 hover:text-black'
                           }`}
                         >
                           <div className="flex items-center space-x-2.5 min-w-0">
                             <div className={`p-1.5 rounded-lg shrink-0 transition-colors ${
                               isActive
-                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
-                                : 'bg-slate-200 dark:bg-slate-950 text-slate-500 dark:text-slate-400'
+                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-xs border border-amber-400/60'
+                                : 'bg-slate-200 text-slate-600'
                             }`}>
                               {item.icon}
                             </div>
                             <div className="min-w-0">
                               <div className={`text-xs truncate ${
-                                isActive ? 'text-black dark:text-amber-100 font-extrabold opacity-100' : 'text-black dark:text-white font-bold'
+                                isActive ? 'text-black font-extrabold opacity-100' : 'text-slate-900 font-bold'
                               }`}>
                                 {item.label}
                               </div>
                               <div className={`text-[10px] truncate ${
-                                isActive ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                                isActive ? 'text-[#431407] font-semibold opacity-100' : 'text-slate-500 font-medium'
                               }`}>
                                 {item.description}
                               </div>
                             </div>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-black dark:text-slate-400 shrink-0" />
+                          <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                         </button>
                       );
                     })}
@@ -495,26 +480,26 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
             {/* Group 2: Operations Management (OM) */}
             {omSheetItems.length > 0 && (
-              <div className="bg-white dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
                 <button
                   type="button"
                   onClick={() => setIsOmSheetOpen(!isOmSheetOpen)}
-                  className="w-full flex items-center justify-between p-3 bg-amber-50/50 dark:bg-amber-950/30 border-b border-slate-200 dark:border-slate-800/80 text-left cursor-pointer hover:bg-[#fff7ed] active:bg-[#fff7ed]"
+                  className="w-full flex items-center justify-between p-3 bg-amber-50/70 border-b border-slate-200 text-left cursor-pointer hover:bg-[#fff7ed] active:bg-[#fff7ed]"
                 >
                   <div className="flex items-center space-x-2.5">
-                    <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                    <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-700 border border-amber-500/30">
                       <Layers className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-xs font-extrabold text-black dark:text-white">Operations Management (OM)</div>
-                      <div className="text-[10px] text-black dark:text-slate-400 font-medium">Lokasi, Smart Inventory & Rajawali Boards</div>
+                      <div className="text-xs font-extrabold text-slate-900">Operations Management (OM)</div>
+                      <div className="text-[10px] text-slate-600 font-medium">Lokasi, Smart Inventory & Rajawali Boards</div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-1.5 text-black dark:text-slate-400">
-                    <span className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.2 rounded font-bold">
+                  <div className="flex items-center space-x-1.5 text-slate-600">
+                    <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-bold border border-amber-200">
                       {omSheetItems.length} Submenu
                     </span>
-                    {isOmSheetOpen ? <ChevronDown className="w-4 h-4 text-black dark:text-slate-400" /> : <ChevronRight className="w-4 h-4 text-black dark:text-slate-400" />}
+                    {isOmSheetOpen ? <ChevronDown className="w-4 h-4 text-slate-600" /> : <ChevronRight className="w-4 h-4 text-slate-600" />}
                   </div>
                 </button>
 
@@ -528,32 +513,32 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                           onClick={() => handleSelectNav(item.id)}
                           className={`w-full flex items-center justify-between p-2.5 rounded-xl border transition-all text-left cursor-pointer ${
                             isActive
-                              ? 'bg-[#ffedd5] dark:bg-amber-500/20 border-[#fdba74] dark:border-amber-500/40 text-black dark:text-amber-100 shadow-sm'
-                              : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800/80 text-black dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 hover:text-black dark:hover:text-white'
+                              ? 'bg-[#ffedd5] border-[#fdba74] text-[#431407] shadow-xs font-bold'
+                              : 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 hover:text-black'
                           }`}
                         >
                           <div className="flex items-center space-x-2.5 min-w-0">
                             <div className={`p-1.5 rounded-lg shrink-0 transition-colors ${
                               isActive
-                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
-                                : 'bg-slate-200 dark:bg-slate-950 text-slate-500 dark:text-slate-400'
+                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-xs border border-amber-400/60'
+                                : 'bg-slate-200 text-slate-600'
                             }`}>
                               {item.icon}
                             </div>
                             <div className="min-w-0">
                               <div className={`text-xs truncate ${
-                                isActive ? 'text-black dark:text-amber-100 font-extrabold opacity-100' : 'text-black dark:text-white font-bold'
+                                isActive ? 'text-black font-extrabold opacity-100' : 'text-slate-900 font-bold'
                               }`}>
                                 {item.label}
                               </div>
                               <div className={`text-[10px] truncate ${
-                                isActive ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                                isActive ? 'text-[#431407] font-semibold opacity-100' : 'text-slate-500 font-medium'
                               }`}>
                                 {item.description}
                               </div>
                             </div>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-black dark:text-slate-400 shrink-0" />
+                          <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                         </button>
                       );
                     })}
@@ -564,26 +549,26 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
             {/* Group 3: Divisi Finance & Accounting */}
             {financeSheetItems.length > 0 && (
-              <div className="bg-white dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
                 <button
                   type="button"
                   onClick={() => setIsFinanceSheetOpen(!isFinanceSheetOpen)}
-                  className="w-full flex items-center justify-between p-3 bg-emerald-50/50 dark:bg-emerald-950/30 border-b border-slate-200 dark:border-slate-800/80 text-left cursor-pointer hover:bg-[#fff7ed] active:bg-[#fff7ed]"
+                  className="w-full flex items-center justify-between p-3 bg-emerald-50/70 border-b border-slate-200 text-left cursor-pointer hover:bg-[#fff7ed] active:bg-[#fff7ed]"
                 >
                   <div className="flex items-center space-x-2.5">
-                    <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                    <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-700 border border-emerald-500/30">
                       <Briefcase className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-xs font-extrabold text-black dark:text-white">Divisi Finance & Accounting</div>
-                      <div className="text-[10px] text-black dark:text-slate-400 font-medium">Kas COA, Rekening Koran & Laporan SAK</div>
+                      <div className="text-xs font-extrabold text-slate-900">Divisi Finance & Accounting</div>
+                      <div className="text-[10px] text-slate-600 font-medium">Kas COA, Rekening Koran & Laporan SAK</div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-1.5 text-black dark:text-slate-400">
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.2 rounded font-bold">
+                  <div className="flex items-center space-x-1.5 text-slate-600">
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold border border-emerald-200">
                       {financeSheetItems.length} Submenu
                     </span>
-                    {isFinanceSheetOpen ? <ChevronDown className="w-4 h-4 text-black dark:text-slate-400" /> : <ChevronRight className="w-4 h-4 text-black dark:text-slate-400" />}
+                    {isFinanceSheetOpen ? <ChevronDown className="w-4 h-4 text-slate-600" /> : <ChevronRight className="w-4 h-4 text-slate-600" />}
                   </div>
                 </button>
 
@@ -597,32 +582,32 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                           onClick={() => handleSelectNav(item.id)}
                           className={`w-full flex items-center justify-between p-2.5 rounded-xl border transition-all text-left cursor-pointer ${
                             isActive
-                              ? 'bg-[#ffedd5] dark:bg-amber-500/20 border-[#fdba74] dark:border-amber-500/40 text-black dark:text-amber-100 shadow-sm'
-                              : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800/80 text-black dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 hover:text-black dark:hover:text-white'
+                              ? 'bg-[#ffedd5] border-[#fdba74] text-[#431407] shadow-xs font-bold'
+                              : 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 hover:text-black'
                           }`}
                         >
                           <div className="flex items-center space-x-2.5 min-w-0">
                             <div className={`p-1.5 rounded-lg shrink-0 transition-colors ${
                               isActive
-                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
-                                : 'bg-slate-200 dark:bg-slate-950 text-slate-500 dark:text-slate-400'
+                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-xs border border-amber-400/60'
+                                : 'bg-slate-200 text-slate-600'
                             }`}>
                               {item.icon}
                             </div>
                             <div className="min-w-0">
                               <div className={`text-xs truncate ${
-                                isActive ? 'text-black dark:text-amber-100 font-extrabold opacity-100' : 'text-black dark:text-white font-bold'
+                                isActive ? 'text-black font-extrabold opacity-100' : 'text-slate-900 font-bold'
                               }`}>
                                 {item.label}
                               </div>
                               <div className={`text-[10px] truncate ${
-                                isActive ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                                isActive ? 'text-[#431407] font-semibold opacity-100' : 'text-slate-500 font-medium'
                               }`}>
                                 {item.description}
                               </div>
                             </div>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-black dark:text-slate-400 shrink-0" />
+                          <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                         </button>
                       );
                     })}
@@ -634,7 +619,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             {/* Remaining items */}
             {otherSheetItems.length > 0 && (
               <div className="space-y-2">
-                <span className="text-[11px] font-bold text-black dark:text-slate-400 uppercase tracking-wider px-1">
+                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider px-1">
                   Menu Lainnya
                 </span>
                 {otherSheetItems.map((item) => {
@@ -645,26 +630,26 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                       onClick={() => handleSelectNav(item.id)}
                       className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all text-left cursor-pointer ${
                         isActive
-                          ? 'bg-[#ffedd5] dark:bg-amber-500/20 border-[#fdba74] dark:border-amber-500/40 text-black dark:text-amber-100 shadow-sm'
-                          : 'bg-slate-50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 text-black dark:text-slate-200 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 hover:text-black dark:hover:text-white'
+                          ? 'bg-[#ffedd5] border-[#fdba74] text-[#431407] shadow-xs font-bold'
+                          : 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 hover:text-black'
                       }`}
                     >
                       <div className="flex items-center space-x-3 min-w-0">
                         <div className={`p-2 rounded-xl border shrink-0 ${
                           isActive
-                            ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
-                            : 'bg-slate-200 dark:bg-slate-900 border-slate-300 dark:border-slate-800'
+                            ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-xs border border-amber-400/60'
+                            : 'bg-slate-200 border-slate-300'
                         }`}>
                           {item.icon}
                         </div>
                         <div className="min-w-0">
                           <div className={`text-xs truncate ${
-                            isActive ? 'text-black dark:text-amber-100 font-extrabold opacity-100' : 'text-black dark:text-white font-bold'
+                            isActive ? 'text-black font-extrabold opacity-100' : 'text-slate-900 font-bold'
                           }`}>
                             {item.label}
                           </div>
                           <div className={`text-[11px] truncate ${
-                            isActive ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                            isActive ? 'text-[#431407] font-semibold opacity-100' : 'text-slate-500 font-medium'
                           }`}>
                             {item.description}
                           </div>
@@ -676,7 +661,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                             {item.badge}
                           </span>
                         )}
-                        <ChevronRight className="w-4 h-4 text-black dark:text-slate-400" />
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
                       </div>
                     </button>
                   );
@@ -684,56 +669,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               </div>
             )}
 
-            {/* Theme Selector for Mobile */}
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-xs font-bold text-black dark:text-slate-300">Tema Tampilan</span>
-                <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold uppercase">
-                  {resolvedTheme === 'dark' ? 'Mode Gelap' : 'Mode Terang'}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-slate-950/80 rounded-2xl border border-slate-200 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => themeService.setTheme('dark')}
-                  className={`flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    themePref === 'dark'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'text-slate-700 dark:text-slate-400 hover:text-black dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <Moon className="w-4 h-4" />
-                  <span>Gelap</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => themeService.setTheme('light')}
-                  className={`flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    themePref === 'light'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'text-slate-700 dark:text-slate-400 hover:text-black dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <Sun className="w-4 h-4" />
-                  <span>Terang</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => themeService.setTheme('system')}
-                  className={`flex items-center justify-center space-x-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    themePref === 'system'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'text-slate-700 dark:text-slate-400 hover:text-black dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <Monitor className="w-4 h-4" />
-                  <span>Otomatis</span>
-                </button>
-              </div>
-            </div>
-
             {/* Logout and Reset Action */}
-            <div className="pt-1 space-y-2">
+            <div className="pt-2 border-t border-slate-200 space-y-2">
               {onLogout && (
                 <button
                   id="mobile-sheet-logout-btn"
@@ -741,7 +678,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                     setIsMoreMenuOpen(false);
                     onLogout();
                   }}
-                  className="w-full flex items-center justify-center space-x-2 py-2.5 bg-rose-50 dark:bg-rose-500/15 hover:bg-rose-100 dark:hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 font-bold text-xs rounded-xl border border-rose-300 dark:border-rose-500/30 cursor-pointer"
+                  className="w-full flex items-center justify-center space-x-2 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Keluar dari Akun (Logout)</span>
@@ -757,9 +694,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                       setIsMoreMenuOpen(false);
                     }
                   }}
-                  className="w-full flex items-center justify-center space-x-2 py-2 bg-slate-100 dark:bg-slate-950 text-slate-700 dark:text-slate-400 hover:text-black dark:hover:text-slate-200 font-semibold text-xs rounded-xl border border-slate-300 dark:border-slate-800 cursor-pointer"
+                  className="w-full flex items-center justify-center space-x-2 py-2 bg-slate-100 text-slate-700 hover:text-black font-semibold text-xs rounded-xl border border-slate-200 cursor-pointer"
                 >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                   <span>Kosongkan Data Sistem</span>
                 </button>
               )}
@@ -770,4 +707,5 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     </>
   );
 };
+
 

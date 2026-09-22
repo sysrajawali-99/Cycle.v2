@@ -283,7 +283,14 @@ export const storageService = {
     }
     try {
       const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === 'object' ? { ...INITIAL_COMPANY_PROFILE, ...parsed } : INITIAL_COMPANY_PROFILE;
+      if (parsed && typeof parsed === 'object') {
+        const merged = { ...INITIAL_COMPANY_PROFILE, ...parsed };
+        if (!Array.isArray(merged.bankAccounts) || merged.bankAccounts.length === 0) {
+          merged.bankAccounts = INITIAL_COMPANY_PROFILE.bankAccounts || [];
+        }
+        return merged;
+      }
+      return INITIAL_COMPANY_PROFILE;
     } catch {
       return INITIAL_COMPANY_PROFILE;
     }

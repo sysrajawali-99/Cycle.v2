@@ -314,6 +314,30 @@ export type AppView =
   | 'access_control'
   | 'company_settings';
 
+export type BankAccountRole =
+  | 'Rekening Penerimaan Invoice'
+  | 'Rekening Pembayaran Invoice'
+  | 'Rekening Operasional'
+  | 'Rekening Payroll'
+  | 'Rekening Simpanan';
+
+export interface CompanyBankAccount {
+  id: string;
+  bankName: string;            // e.g. "Bank Central Asia (BCA)"
+  accountNumber: string;       // e.g. "541-0988-771"
+  accountHolder: string;       // e.g. "PT RAJAWALI CYCLE INDONESIA"
+  role: BankAccountRole;       // Peran Bank
+  branch?: string;             // Kantor Cabang e.g. "KCU Mega Kuningan"
+  swiftCode?: string;          // e.g. "CENAIDJA"
+  coaAccountCode?: string;     // Kode Akun COA e.g. "1120"
+  coaAccountName?: string;     // Nama Akun / Sub-Akun COA e.g. "Bank BCA - Rek Operasional"
+  isPrimary?: boolean;         // Apakah rekening utama pada Kop Surat / Default
+  status?: 'Aktif' | 'Nonaktif';
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface CompanyProfile {
   name: string;                // e.g. "PT RAJAWALI CYCLE INDONESIA"
   brandName: string;           // e.g. "RAJAWALI CYCLE"
@@ -331,9 +355,10 @@ export interface CompanyProfile {
   financeManagerName: string;  // e.g. "Budi Santoso, M.Ak."
   financeManagerTitle: string; // e.g. "Finance & Accounting Lead"
   logoUrl?: string;            // custom base64 or logo URL
-  bankName: string;            // e.g. "Bank Central Asia (BCA)"
-  bankAccountNo: string;       // e.g. "541-0988-771"
-  bankAccountHolder: string;   // e.g. "PT RAJAWALI CYCLE INDONESIA"
+  bankName: string;            // Primary/Legacy bank e.g. "Bank Central Asia (BCA)"
+  bankAccountNo: string;       // Primary/Legacy e.g. "541-0988-771"
+  bankAccountHolder: string;   // Primary/Legacy e.g. "PT RAJAWALI CYCLE INDONESIA"
+  bankAccounts?: CompanyBankAccount[]; // Multi-bank accounts dengan peran & koneksi COA
   letterheadFooterNote: string;// e.g. "Dokumen resmi dan sah diterbitkan secara digital oleh Sistem ERP Terpadu."
   updatedAt?: string;
   updatedBy?: string;

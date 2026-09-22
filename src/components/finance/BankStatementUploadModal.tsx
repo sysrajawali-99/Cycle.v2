@@ -39,6 +39,7 @@ import {
   AuditTrailItem
 } from '../../types/finance';
 import { financeService } from '../../services/financeService';
+import { storageService } from '../../services/storageService';
 import {
   parseExcelStatement,
   parsePdfStatement,
@@ -60,16 +61,28 @@ interface BankStatementUploadModalProps {
 
 type UploadTab = 'pdf' | 'excel' | 'text';
 
-const POPULAR_BANKS = [
-  { name: 'Bank BNI', code: 'BNI', accNo: '1177888008', holder: 'JOERIZ TALENTA INDONESIA PT' },
-  { name: 'Bank BCA (Bank Central Asia)', code: 'BCA', accNo: '123-456-7890', holder: 'PT RAJAWALI SUKSES MANDIRI' },
-  { name: 'Bank Mandiri (Persero)', code: 'MANDIRI', accNo: '987-654-3210', holder: 'PT RAJAWALI SUKSES MANDIRI' },
-  { name: 'Bank BRI', code: 'BRI', accNo: '888-999-000', holder: 'PT RAJAWALI SUKSES MANDIRI' },
-  { name: 'Bank Syariah Indonesia (BSI)', code: 'BSI', accNo: '777-666-555', holder: 'PT RAJAWALI SUKSES MANDIRI' },
-  { name: 'Bank CIMB Niaga', code: 'CIMB', accNo: '555-444-333', holder: 'PT RAJAWALI SUKSES MANDIRI' },
-  { name: 'Bank Permata', code: 'PERMATA', accNo: '333-222-111', holder: 'PT RAJAWALI SUKSES MANDIRI' },
-  { name: 'Bank Danamon', code: 'DANAMON', accNo: '222-111-000', holder: 'PT RAJAWALI SUKSES MANDIRI' }
-];
+const getPopularBanks = () => {
+  const comp = storageService.getCompanyProfile();
+  const compName = comp.name || 'PT PERUSAHAAN';
+  if (comp.bankAccounts && comp.bankAccounts.length > 0) {
+    return comp.bankAccounts.map((b) => ({
+      name: `Bank ${b.bankName}${b.coaAccountName ? ` (${b.coaAccountName})` : b.branch ? ` (${b.branch})` : ''}`,
+      code: b.bankName.toUpperCase(),
+      accNo: b.accountNumber,
+      holder: b.accountHolder || compName
+    }));
+  }
+  return [
+    { name: 'Bank BNI', code: 'BNI', accNo: '1177888008', holder: compName },
+    { name: 'Bank BCA (Bank Central Asia)', code: 'BCA', accNo: '123-456-7890', holder: compName },
+    { name: 'Bank Mandiri (Persero)', code: 'MANDIRI', accNo: '987-654-3210', holder: compName },
+    { name: 'Bank BRI', code: 'BRI', accNo: '888-999-000', holder: compName },
+    { name: 'Bank Syariah Indonesia (BSI)', code: 'BSI', accNo: '777-666-555', holder: compName },
+    { name: 'Bank CIMB Niaga', code: 'CIMB', accNo: '555-444-333', holder: compName },
+    { name: 'Bank Permata', code: 'PERMATA', accNo: '333-222-111', holder: compName },
+    { name: 'Bank Danamon', code: 'DANAMON', accNo: '222-111-000', holder: compName }
+  ];
+};
 
 export const BankStatementUploadModal: React.FC<BankStatementUploadModalProps> = ({
   isOpen,
@@ -79,10 +92,12 @@ export const BankStatementUploadModal: React.FC<BankStatementUploadModalProps> =
   onImportSuccess,
   onLogAudit
 }) => {
+  const POPULAR_BANKS = useMemo(() => getPopularBanks(), []);
+  const initialBank = POPULAR_BANKS[0] || { name: 'Bank BCA', code: 'BCA', accNo: '1234567890', holder: storageService.getCompanyProfile().name };
   const [activeTab, setActiveTab] = useState<UploadTab>('pdf');
-  const [bankName, setBankName] = useState<string>('Bank BNI');
-  const [accountNumber, setAccountNumber] = useState<string>('1177888008');
-  const [accountHolder, setAccountHolder] = useState<string>('JOERIZ TALENTA INDONESIA PT');
+  const [bankName, setBankName] = useState<string>(initialBank.name);
+  const [accountNumber, setAccountNumber] = useState<string>(initialBank.accNo);
+  const [accountHolder, setAccountHolder] = useState<string>(initialBank.holder);
   const [periodMonth, setPeriodMonth] = useState<string>('2026-08');
 
   // File and Parsing State
@@ -379,7 +394,7 @@ export const BankStatementUploadModal: React.FC<BankStatementUploadModalProps> =
       id: `import-${Date.now()}`,
       bankName,
       accountNumber,
-      accountHolder: accountHolder || 'PT RAJAWALI SUKSES MANDIRI',
+      accountHolder: accountHolder || storageService.getCompanyProfile().name || 'Perusahaan',
       periodMonth,
       fileName: finalFileName,
       uploadDate: new Date().toISOString().replace('T', ' ').substring(0, 16),

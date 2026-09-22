@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Employee, Project, EmployeePosition, ShiftType, EmployeeStatus } from '../types';
+import { storageService } from '../services/storageService';
 
 export interface BulkParsedEmployee {
   raw: {
@@ -173,8 +174,9 @@ export function downloadEmployeeTemplateXLSX(projects: Project[]) {
   XLSX.utils.book_append_sheet(wb, ws, 'Data Karyawan');
 
   // Add Guide Sheet
+  const comp = storageService.getCompanyProfile();
   const guideData = [
-    ['PANDUAN PENGISIAN TEMPLATE DATA KARYAWAN PT RAJAWALI PRIMA SERVICE'],
+    [`PANDUAN PENGISIAN TEMPLATE DATA KARYAWAN ${comp.name.toUpperCase()}`],
     [''],
     ['KOLOM', 'NAMA ITEM', 'CONTOH PENGISIAN', 'KETERANGAN'],
     ['Kolom A', 'Nama Lengkap', 'Ahmad Supriyadi', 'Wajib diisi (Nama lengkap personil)'],
@@ -200,7 +202,8 @@ export function downloadEmployeeTemplateXLSX(projects: Project[]) {
   ];
   XLSX.utils.book_append_sheet(wb, guideWs, 'Petunjuk & Validasi');
 
-  XLSX.writeFile(wb, 'Template_Upload_Karyawan_PT_Rajawali.xlsx');
+  const safeCompName = comp.name.replace(/[^a-zA-Z0-9]/g, '_');
+  XLSX.writeFile(wb, `Template_Upload_Karyawan_${safeCompName}.xlsx`);
 }
 
 /**
@@ -340,7 +343,9 @@ export function exportEmployeesToXLSX(employees: Employee[], projects: Project[]
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'Roster Karyawan');
-  XLSX.writeFile(wb, `Data_Karyawan_PT_Rajawali_${new Date().toISOString().split('T')[0]}.xlsx`);
+  const comp = storageService.getCompanyProfile();
+  const safeCompName = comp.name.replace(/[^a-zA-Z0-9]/g, '_');
+  XLSX.writeFile(wb, `Data_Karyawan_${safeCompName}_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
 /**

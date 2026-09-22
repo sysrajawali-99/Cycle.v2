@@ -1888,16 +1888,38 @@ const MaterialRequestDetailSlipModal: React.FC<DetailSlipModalProps> = ({
         <div className="p-6 sm:p-8 bg-white text-slate-900 max-h-[80vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-0">
           {/* Header Kop Surat */}
           <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
-            <div>
-              <h1 className="text-lg font-black tracking-tight text-slate-950">
-                {companyProfile?.name || 'PT RAJAWALI CYCLE INDONESIA'}
-              </h1>
-              <p className="text-xs text-slate-600 font-medium">
-                {companyProfile?.tagline || 'Integrated Facility Services & Enterprise Management'}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1 max-w-md">
-                {companyProfile?.address || 'Menara Rajawali Lt. 12, Mega Kuningan, Jakarta Selatan'} • Telp: {companyProfile?.phone || '(021) 5299-8800'}
-              </p>
+            <div className="flex items-start space-x-3.5 max-w-xl">
+              {companyProfile?.logoUrl ? (
+                <div className="w-12 h-12 shrink-0 bg-white rounded-lg p-1 border border-slate-200 flex items-center justify-center">
+                  <img
+                    src={companyProfile.logoUrl}
+                    alt={companyProfile.name}
+                    className="max-w-full max-h-full object-contain"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black text-base shrink-0">
+                  {companyProfile?.brandName?.charAt(0) || companyProfile?.name?.charAt(0) || 'R'}
+                </div>
+              )}
+              <div>
+                <h1 className="text-lg font-black tracking-tight text-slate-950 uppercase">
+                  {companyProfile?.name || 'PT RAJAWALI CYCLE INDONESIA'}
+                </h1>
+                <p className="text-xs text-slate-600 font-medium">
+                  {companyProfile?.tagline || 'Integrated Facility Services & Enterprise Management'}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5 max-w-md">
+                  {companyProfile?.address || 'Menara Rajawali Lt. 12, Mega Kuningan, Jakarta Selatan'} • Telp: {companyProfile?.phone || '(021) 5299-8800'}
+                </p>
+                {(companyProfile?.taxId || companyProfile?.businessPermitNo) && (
+                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                    {companyProfile?.taxId && <span>NPWP: {companyProfile.taxId} </span>}
+                    {companyProfile?.businessPermitNo && <span>• NIB: {companyProfile.businessPermitNo}</span>}
+                  </p>
+                )}
+              </div>
             </div>
             <div className="text-right">
               <span className="text-xs font-mono font-bold text-slate-500 block uppercase">
@@ -2060,21 +2082,21 @@ const MaterialRequestDetailSlipModal: React.FC<DetailSlipModalProps> = ({
             <div>
               <p className="text-slate-500 mb-14">Supervisor / Koordinator Lokasi</p>
               <p className="font-bold text-slate-900 underline">Supervisor Operasional</p>
-              <p className="text-[10px] text-slate-500">PT Rajawali Cycle Indonesia</p>
+              <p className="text-[10px] text-slate-500">{companyProfile?.name || 'Departemen Logistik'}</p>
             </div>
             <div>
               <p className="text-slate-500 mb-14">Otorisasi Manajemen / Approver</p>
               <p className="font-bold text-slate-900 underline">
-                {request.reviewedByName || 'Super Admin (HQ)'}
+                {request.reviewedByName || companyProfile?.directorName || 'Super Admin (HQ)'}
               </p>
               <p className="text-[10px] text-slate-500">
-                {request.reviewedByRole || 'Otorisasi Super Admin'}
+                {request.reviewedByRole || companyProfile?.directorTitle || 'Otorisasi Super Admin'}
               </p>
             </div>
           </div>
 
           <div className="mt-8 pt-4 border-t border-slate-200 text-center text-[10px] text-slate-400">
-            Dokumen resmi diterbitkan melalui Sistem ERP Rajawali Cycle • Tercatat dalam Audit Trail Logistik
+            {companyProfile?.letterheadFooterNote || `Dokumen resmi diterbitkan melalui Sistem ERP ${companyProfile?.name || 'Perusahaan'} • Tercatat dalam Audit Trail Logistik`}
           </div>
         </div>
       </div>

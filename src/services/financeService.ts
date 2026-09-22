@@ -965,9 +965,11 @@ export const financeService = {
   },
 
   // 11. EXPORT TO EXCEL
-  exportProfitLossToExcel(pl: ProfitLossStatement, companyName: string = 'PT Rajawali Sukses Mandiri') {
+  exportProfitLossToExcel(pl: ProfitLossStatement, companyName?: string) {
+    const comp = storageService.getCompanyProfile();
+    const finalCompanyName = companyName || comp.name || 'PT RAJAWALI CYCLE INDONESIA';
     const data = [
-      [companyName],
+      [finalCompanyName],
       ['LAPORAN LABA RUGI (PROFIT & LOSS STATEMENT)'],
       [`Periode: ${pl.periodLabel}`],
       [''],
@@ -1001,9 +1003,11 @@ export const financeService = {
     XLSX.writeFile(wb, `Laporan_Laba_Rugi_${new Date().toISOString().split('T')[0]}.xlsx`);
   },
 
-  exportBalanceSheetToExcel(bs: BalanceSheetStatement, companyName: string = 'PT Rajawali Sukses Mandiri') {
+  exportBalanceSheetToExcel(bs: BalanceSheetStatement, companyName?: string) {
+    const comp = storageService.getCompanyProfile();
+    const finalCompanyName = companyName || comp.name || 'PT RAJAWALI CYCLE INDONESIA';
     const data = [
-      [companyName],
+      [finalCompanyName],
       ['LAPORAN POSISI KEUANGAN (NERACA / BALANCE SHEET)'],
       [`Per Tanggal: ${bs.asOfDate}`],
       [''],
@@ -1040,6 +1044,7 @@ export const financeService = {
     rows: (string | number)[][],
     summaryRows?: (string | number)[][]
   ) {
+    const comp = storageService.getCompanyProfile();
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -1053,13 +1058,13 @@ export const financeService = {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
-    doc.text('PT RAJAWALI SUKSES MANDIRI', 14, 11);
+    doc.text(comp.name, 14, 11);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(203, 213, 225);
-    doc.text('Integrated Facility Management & Cleaning Services | Finance Division', 14, 17);
-    doc.text('Gedung Cyber 2 Tower Lt. 18, Jl. HR Rasuna Said Blok X-5, Jakarta Selatan', 14, 22);
+    doc.text(`${comp.tagline || 'Integrated Facility Management & Cleaning Services'} | Finance Division`, 14, 17);
+    doc.text(`${comp.address}${comp.city ? `, ${comp.city}` : ''} • Telp: ${comp.phone}`, 14, 22);
 
     // Title section
     doc.setTextColor(30, 41, 59);
@@ -1103,10 +1108,12 @@ export const financeService = {
       doc.setFontSize(8.5);
       doc.setTextColor(71, 85, 105);
       doc.text('Disiapkan Oleh,', 20, finalY + 15);
-      doc.text('Finance & Accounting Officer', 20, finalY + 32);
+      doc.text(comp.financeManagerName ? `(${comp.financeManagerName})` : '( Finance Officer )', 20, finalY + 28);
+      doc.text(comp.financeManagerTitle || 'Finance & Accounting Officer', 20, finalY + 33);
 
       doc.text('Disetujui Oleh,', 140, finalY + 15);
-      doc.text('Direktur Keuangan / Super Admin', 140, finalY + 32);
+      doc.text(comp.directorName ? `(${comp.directorName})` : '( Direktur Utama )', 140, finalY + 28);
+      doc.text(comp.directorTitle || 'Direktur Utama', 140, finalY + 33);
     }
 
     doc.save(`${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);

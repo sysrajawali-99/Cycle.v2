@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { InventoryItem, InventoryCategory, Project, ProjectStock } from '../types';
+import { storageService } from '../services/storageService';
 
 export interface BulkParsedInventoryItem {
   raw: {
@@ -177,8 +178,9 @@ export function downloadInventoryTemplateXLSX() {
   XLSX.utils.book_append_sheet(wb, ws, 'Master Barang');
 
   // Sheet 2: Petunjuk & Standar Kategori
+  const comp = storageService.getCompanyProfile();
   const guideData = [
-    ['PANDUAN PENGISIAN TEMPLATE MASTER BARANG PT RAJAWALI PRIMA SERVICE'],
+    [`PANDUAN PENGISIAN TEMPLATE MASTER BARANG ${comp.name.toUpperCase()}`],
     [''],
     ['KOLOM', 'NAMA ITEM', 'CONTOH PENGISIAN', 'KETERANGAN VALIDASI'],
     ['Kolom A', 'Kode Barang', 'CHM-101 / EQP-201', 'Kode unik SKU barang (Boleh kosong, sistem akan auto-generate)'],
@@ -200,7 +202,8 @@ export function downloadInventoryTemplateXLSX() {
   ];
   XLSX.utils.book_append_sheet(wb, guideWs, 'Petunjuk & Validasi');
 
-  XLSX.writeFile(wb, 'Template_Upload_Master_Barang_PT_Rajawali.xlsx');
+  const safeCompName = comp.name.replace(/[^a-zA-Z0-9]/g, '_');
+  XLSX.writeFile(wb, `Template_Upload_Master_Barang_${safeCompName}.xlsx`);
 }
 
 /**
@@ -331,13 +334,16 @@ export function exportMasterInventoryToXLSX(
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'Katalog Master Barang');
-  XLSX.writeFile(wb, `Katalog_Master_Barang_PT_Rajawali_${new Date().toISOString().split('T')[0]}.xlsx`);
+  const comp = storageService.getCompanyProfile();
+  const safeCompName = comp.name.replace(/[^a-zA-Z0-9]/g, '_');
+  XLSX.writeFile(wb, `Katalog_Master_Barang_${safeCompName}_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
 /**
  * Universal Parser for Excel (.xlsx, .xls) and CSV (.csv, .txt) files for master items
  */
 export async function parseInventoryFile(file: File): Promise<BulkParsedInventoryItem[]> {
+  const comp = storageService.getCompanyProfile();
   const fileName = file.name.toLowerCase();
   let rawRows: (string | number)[][] = [];
 
@@ -453,7 +459,7 @@ export async function parseInventoryFile(file: File): Promise<BulkParsedInventor
     // 7. Column G / Description: Deskripsi & Fungsi
     let rawDesc = getVal(descIdx, 6);
     if (!rawDesc) {
-      rawDesc = `Standarisasi ${matchedCategory} untuk operasional gedung PT Rajawali`;
+      rawDesc = `Standarisasi ${matchedCategory} untuk operasional gedung ${comp.name}`;
     }
 
     // 8. Column H / Initial Stock: Stok Awal (Opsional)

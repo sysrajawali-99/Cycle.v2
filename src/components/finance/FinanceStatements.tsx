@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   FileText,
   PieChart,
@@ -29,8 +29,9 @@ import {
   CashFlowStatement,
   EquityStatement
 } from '../../types/finance';
-import { Project, UserAccount } from '../../types';
+import { Project, UserAccount, CompanyProfile } from '../../types';
 import { financeService } from '../../services/financeService';
+import { storageService } from '../../services/storageService';
 
 interface FinanceStatementsProps {
   accounts: ChartOfAccount[];
@@ -50,6 +51,15 @@ export const FinanceStatements: React.FC<FinanceStatementsProps> = ({
   const [activeTab, setActiveTab] = useState<StatementType>('PL');
   const [selectedMonth, setSelectedMonth] = useState('2026-08');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('ALL');
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(() => storageService.getCompanyProfile());
+
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      setCompanyProfile(storageService.getCompanyProfile());
+    };
+    window.addEventListener('company_profile_updated', handleProfileUpdate);
+    return () => window.removeEventListener('company_profile_updated', handleProfileUpdate);
+  }, []);
 
   // Generate date ranges for selected month
   const { startDate, endDate, periodLabel } = useMemo(() => {
@@ -671,7 +681,7 @@ export const FinanceStatements: React.FC<FinanceStatementsProps> = ({
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
             <div className="text-center border-b border-slate-800 pb-4">
               <h2 className="text-lg font-bold text-white uppercase tracking-wider">
-                PT RAJAWALI SUKSES MANDIRI
+                {companyProfile.name}
               </h2>
               <h3 className="text-base font-extrabold text-blue-400">LAPORAN LABA RUGI (INCOME STATEMENT)</h3>
               <p className="text-xs text-slate-400 mt-0.5">Periode: {periodLabel}</p>
@@ -963,7 +973,7 @@ export const FinanceStatements: React.FC<FinanceStatementsProps> = ({
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6 animate-in fade-in">
           <div className="text-center border-b border-slate-800 pb-4">
             <h2 className="text-lg font-bold text-white uppercase tracking-wider">
-              PT RAJAWALI SUKSES MANDIRI
+              {companyProfile.name}
             </h2>
             <h3 className="text-base font-extrabold text-cyan-400">LAPORAN ARUS KAS (CASH FLOW STATEMENT)</h3>
             <p className="text-xs text-slate-400 mt-0.5">Periode: {periodLabel}</p>
@@ -1060,7 +1070,7 @@ export const FinanceStatements: React.FC<FinanceStatementsProps> = ({
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6 animate-in fade-in">
           <div className="text-center border-b border-slate-800 pb-4">
             <h2 className="text-lg font-bold text-white uppercase tracking-wider">
-              PT RAJAWALI SUKSES MANDIRI
+              {companyProfile.name}
             </h2>
             <h3 className="text-base font-extrabold text-indigo-400">
               LAPORAN PERUBAHAN EKUITAS (STATEMENT OF CHANGES IN EQUITY)
@@ -1139,8 +1149,8 @@ export const FinanceStatements: React.FC<FinanceStatementsProps> = ({
                 <h2 className="text-2xl font-black text-white mt-0.5">SANGAT SEHAT & SOLVABEL</h2>
                 <p className="text-xs text-slate-400 mt-1 max-w-xl">
                   Berdasarkan kalkulasi likuiditas lancar (Current Ratio {(ratios.currentRatio ?? 0).toFixed(2)}x) dan
-                  tingkat profitabilitas (NPM {(ratios.netProfitMargin ?? 0).toFixed(1)}%), arus kas dan permodalan
-                  PT Rajawali Sukses Mandiri dalam kondisi prima untuk ekspansi.
+                  tingkat profitabilitas (NPM {(ratios.netProfitMargin ?? 0).toFixed(1)}%), arus kas dan permodalan{' '}
+                  {companyProfile.name} dalam kondisi prima untuk ekspansi.
                 </p>
               </div>
             </div>

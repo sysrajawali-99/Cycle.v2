@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { Project, FloorType, UserRole } from '../../types';
 import { ConfirmModal } from '../common/ConfirmModal';
+import { storageService } from '../../services/storageService';
 
 interface ProjectLocationSettingsProps {
   projects: Project[];
@@ -1335,39 +1336,61 @@ export const ProjectLocationSettings: React.FC<ProjectLocationSettingsProps> = (
                 className="bg-white text-slate-900 w-full max-w-3xl p-6 sm:p-8 rounded-xl shadow-xl border border-slate-300 space-y-5 print:shadow-none print:border-none print:p-0 print:m-0 font-sans text-xs"
               >
                 {/* 1. KOP SURAT / OFFICIAL HEADER */}
-                <div className="border-b-2 border-slate-900 pb-3 flex items-start justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black text-base">
-                        🦅
+                {(() => {
+                  const comp = storageService.getCompanyProfile();
+                  return (
+                    <div className="border-b-2 border-slate-900 pb-3 flex items-start justify-between gap-4">
+                      <div className="space-y-0.5 max-w-xl">
+                        <div className="flex items-start space-x-3">
+                          {comp.logoUrl ? (
+                            <div className="w-12 h-12 shrink-0 bg-white rounded-lg p-1 border border-slate-200 flex items-center justify-center">
+                              <img
+                                src={comp.logoUrl}
+                                alt={comp.name}
+                                className="max-w-full max-h-full object-contain"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black text-base shrink-0">
+                              {comp.brandName?.charAt(0) || comp.name?.charAt(0) || '🦅'}
+                            </div>
+                          )}
+                          <div>
+                            <h2 className="text-base font-black tracking-tight text-slate-950 uppercase">
+                              {comp.name}
+                            </h2>
+                            <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">
+                              {comp.tagline || 'Integrated Facility Management & Cleaning Services'}
+                            </div>
+                            <div className="text-[9px] text-slate-500 pt-0.5 leading-tight">
+                              {comp.address}{comp.city ? `, ${comp.city}` : ''}
+                              <br />
+                              Telp: {comp.phone} {comp.email ? `• Email: ${comp.email}` : ''} {comp.website ? `• Web: ${comp.website}` : ''}
+                              {(comp.taxId || comp.businessPermitNo) && (
+                                <span className="block mt-0.5 font-mono">
+                                  {comp.taxId && `NPWP: ${comp.taxId}`} {comp.businessPermitNo && `• NIB: ${comp.businessPermitNo}`}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h2 className="text-base font-black tracking-tight text-slate-950 uppercase">
-                          PT RAJAWALI PRIMA SERVICE
-                        </h2>
-                        <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">
-                          Integrated Facility Management & Cleaning Services
+
+                      <div className="text-right shrink-0">
+                        <div className="inline-block px-2.5 py-1 bg-slate-100 border border-slate-300 rounded text-[9px] font-mono font-bold text-slate-800">
+                          NO: FORM/OPS/SPEC/{printProject.code}/{new Date().getFullYear()}
+                        </div>
+                        <div className="text-[9px] text-slate-500 mt-1">
+                          Tgl Dokumen: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </div>
+                        <div className="text-[9px] font-semibold text-emerald-700 mt-0.5">
+                          STATUS: TERVERIFIKASI RESMI
                         </div>
                       </div>
                     </div>
-                    <div className="text-[9px] text-slate-500 pt-1 leading-tight">
-                      Gedung Menara Rajawali Lt. 12, Jl. Gatot Subroto Kav. 71-73, Jakarta Selatan 12870<br />
-                      Hotline: (021) 555-8989 • Email: operations@rajawaliprima.co.id • Web: www.rajawaliprima.co.id
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <div className="inline-block px-2.5 py-1 bg-slate-100 border border-slate-300 rounded text-[9px] font-mono font-bold text-slate-800">
-                      NO: FORM/OPS/SPEC/{printProject.code}/{new Date().getFullYear()}
-                    </div>
-                    <div className="text-[9px] text-slate-500 mt-1">
-                      Tgl Dokumen: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                    </div>
-                    <div className="text-[9px] font-semibold text-emerald-700 mt-0.5">
-                      STATUS: TERVERIFIKASI RESMI
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* 2. FORM TITLE (SESUAI FORM YANG DISEDIAKAN) */}
                 <div className="text-center py-2 bg-amber-500/15 border border-amber-500/30 rounded-lg">
@@ -1662,21 +1685,30 @@ export const ProjectLocationSettings: React.FC<ProjectLocationSettingsProps> = (
                     </div>
 
                     <div className="space-y-12">
-                      <div className="text-[10px] text-slate-600 font-semibold">
-                        Disetujui Oleh:<br />
-                        <strong>Operations Director (HQ)</strong>
-                      </div>
-                      <div className="border-b border-slate-900 mx-4 pt-4">
-                        <span className="font-bold text-[11px] text-slate-900">PT Rajawali Prima Service</span>
-                      </div>
-                      <div className="text-[9px] text-slate-500">Tgl: ....................................</div>
+                      {(() => {
+                        const comp = storageService.getCompanyProfile();
+                        return (
+                          <>
+                            <div className="text-[10px] text-slate-600 font-semibold">
+                              Disetujui Oleh:<br />
+                              <strong>{comp.directorTitle || 'Operations Director (HQ)'}</strong>
+                            </div>
+                            <div className="border-b border-slate-900 mx-4 pt-4">
+                              <span className="font-bold text-[11px] text-slate-900">
+                                {comp.directorName ? `(${comp.directorName})` : comp.name}
+                              </span>
+                            </div>
+                            <div className="text-[9px] text-slate-500">Tgl: ....................................</div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
 
                 {/* Document Footer Stamp */}
                 <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-[9px] text-slate-400">
-                  <span>Sistem Informasi Manajemen Terpadu Eagle Services</span>
+                  <span>{storageService.getCompanyProfile().letterheadFooterNote || `Sistem Informasi Manajemen Terpadu ${storageService.getCompanyProfile().name}`}</span>
                   <span>Dokumen Rahasia & Standar Operasional Resmi</span>
                   <span>Halaman 1 dari 1</span>
                 </div>

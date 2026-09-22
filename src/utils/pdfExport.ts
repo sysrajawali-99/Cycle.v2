@@ -3,26 +3,15 @@ import autoTable from 'jspdf-autotable';
 import { Employee, Project, TimesheetMonthRecord, InventoryItem, InventoryLog, CleaningTask, SopItem, SopDocument, MaterialRequest, CompanyProfile } from '../types';
 import { formatCurrency, getMonthName, formatDateDDMMYYYY, formatDateTimeStamp } from './formatters';
 import { storageService } from '../services/storageService';
+import { INITIAL_COMPANY_PROFILE } from '../data/initialData';
 
-const getCompany = () => {
+const getCompany = (): CompanyProfile => {
   try {
-    return storageService.getCompanyProfile();
+    const profile = storageService.getCompanyProfile();
+    if (profile && profile.name) return profile;
+    return INITIAL_COMPANY_PROFILE;
   } catch (e) {
-    return {
-      name: 'PT RAJAWALI PRIMA SERVICE',
-      brandName: 'Rajawali Cycle',
-      tagline: 'Commercial Cleaning, Facility Management, High Rise & Hospitality Support Services',
-      address: 'Menara Rajawali Lt. 12, Mega Kuningan, Jakarta Selatan',
-      city: 'Jakarta Selatan',
-      phone: '(021) 5299-8800',
-      email: 'hq@rajawaliservice.co.id',
-      website: 'www.rajawaliservice.co.id',
-      directorName: 'Bambang Soedarmono',
-      directorTitle: 'Direktur Utama',
-      financeManagerName: 'Hendra Gunawan',
-      financeManagerTitle: 'Finance & HRD Lead',
-      letterheadFooterNote: 'Dokumen ini sah dan diterbitkan secara elektronik oleh Sistem Terpadu Rajawali Cycle.'
-    };
+    return INITIAL_COMPANY_PROFILE;
   }
 };
 
@@ -395,9 +384,9 @@ export const generateTimesheetPDF = ({
 
   // 3 Signature Columns
   const sigTitles = [
-    { role: 'Dibuat & Diverifikasi Oleh:', title: 'Site Supervisor / Admin Project' },
-    { role: 'Diperiksa & Divalidasi Oleh:', title: 'Finance & Payroll Officer' },
-    { role: 'Disetujui Oleh:', title: 'Operations Director / Management' }
+    { role: 'Dibuat & Diverifikasi Oleh:', title: 'Site Supervisor / Admin Project', name: '( ............................................ )' },
+    { role: 'Diperiksa & Divalidasi Oleh:', title: comp.financeManagerTitle || 'Finance & Payroll Officer', name: comp.financeManagerName ? `( ${comp.financeManagerName} )` : '( Finance Officer )' },
+    { role: 'Disetujui Oleh:', title: comp.directorTitle || 'Operations Director / Management', name: comp.directorName ? `( ${comp.directorName} )` : '( Management )' }
   ];
 
   sigTitles.forEach((item, i) => {
@@ -420,7 +409,7 @@ export const generateTimesheetPDF = ({
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(100, 116, 139);
-    doc.text('( ............................................ )', x, effectiveSigY + 22.5, { align: 'center' });
+    doc.text(item.name, x, effectiveSigY + 22.5, { align: 'center' });
   });
 
   // Bottom Security & Authenticity Stamp
@@ -428,7 +417,7 @@ export const generateTimesheetPDF = ({
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(148, 163, 184);
   doc.text(
-    `Dokumen resmi payroll diterbitkan secara digital oleh Rajawali Cleaning Eagle Management System • Keabsahan terverifikasi secara sistem`,
+    comp.letterheadFooterNote || `Dokumen resmi payroll diterbitkan secara digital oleh ${comp.name} • Keabsahan terverifikasi secara sistem`,
     14,
     pageHeight - 6
   );
@@ -937,17 +926,17 @@ export const generateInventoryUsagePDF = ({
   doc.text('Disetujui Oleh,', 14 + sigColWidth * 2.5, sigY, { align: 'center' });
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
-  doc.text('Operations Manager', 14 + sigColWidth * 2.5, sigY + 4, { align: 'center' });
+  doc.text(comp.directorTitle || 'Operations Manager', 14 + sigColWidth * 2.5, sigY + 4, { align: 'center' });
   doc.line(14 + sigColWidth * 2.2, sigY + 18, 14 + sigColWidth * 2.8, sigY + 18);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
-  doc.text('( Head of Operations )', 14 + sigColWidth * 2.5, sigY + 21.5, { align: 'center' });
+  doc.text(comp.directorName ? `( ${comp.directorName} )` : '( Head of Operations )', 14 + sigColWidth * 2.5, sigY + 21.5, { align: 'center' });
 
   // Document Footer
   doc.setFontSize(6);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    `PT Rajawali Prima Service • Smart Inventory & Chemical Tracker System • Rekap Pemakaian Harian Resmi Ukuran A4`,
+    `${comp.name} • Smart Inventory & Chemical Tracker System • Rekap Pemakaian Harian Resmi Ukuran A4`,
     pageWidth / 2,
     pageHeight - 5,
     { align: 'center' }
@@ -1012,10 +1001,10 @@ export const generateCompletedTasksPDF = ({
   const currentTimestamp = new Date();
   const printDateDDMMYYYY = formatDateDDMMYYYY(currentTimestamp);
   const printTimestampStr = formatDateTimeStamp(currentTimestamp);
+  const comp = getCompany();
 
   // Helper: Draw Header on Page
   const drawHeader = () => {
-    const comp = getCompany();
     doc.setFillColor(15, 39, 68); // Dark Navy
     doc.rect(0, 0, pageWidth, 20, 'F');
 
@@ -1067,7 +1056,7 @@ export const generateCompletedTasksPDF = ({
     doc.setFontSize(6);
     doc.setTextColor(100, 116, 139);
     doc.text(
-      `PT Rajawali Prima Service • Dokumen Resmi Terverifikasi QC • Hal ${pageNum} dari ${totalPages}`,
+      `${comp.name} • Dokumen Resmi Terverifikasi QC • Hal ${pageNum} dari ${totalPages}`,
       pageWidth - margin,
       pageHeight - 7,
       { align: 'right' }
@@ -1407,9 +1396,9 @@ export const generateSingleSopPDF = (sop: SopItem) => {
   const currentTimestamp = new Date();
   const printDateDDMMYYYY = formatDateDDMMYYYY(currentTimestamp);
   const printTimestampStr = formatDateTimeStamp(currentTimestamp);
+  const comp = getCompany();
 
   const drawHeader = () => {
-    const comp = getCompany();
     // 1. Dark Navy Top Banner
     doc.setFillColor(15, 39, 68); // #0f2744 Dark Navy
     doc.rect(0, 0, pageWidth, 21, 'F');
@@ -1464,7 +1453,7 @@ export const generateSingleSopPDF = (sop: SopItem) => {
     doc.setFontSize(6);
     doc.setTextColor(100, 116, 139);
     doc.text(
-      `PT Rajawali Prima Service • Dokumen Terkendali Mutu SOP • Halaman ${pageNum} dari ${totalPages}`,
+      `${comp.name} • Dokumen Terkendali Mutu SOP • Halaman ${pageNum} dari ${totalPages}`,
       pageWidth - margin,
       pageHeight - 7,
       { align: 'right' }
@@ -1526,7 +1515,7 @@ export const generateSingleSopPDF = (sop: SopItem) => {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(15, 23, 42);
-  const objText = sop.objective || sop.description || 'Menjaga standar kebersihan, higienitas, dan estetika area kerja sesuai standar operasional PT Rajawali Prima Service.';
+  const objText = sop.objective || sop.description || `Menjaga standar kebersihan, higienitas, dan estetika area kerja sesuai standar operasional ${comp.name}.`;
   const splitObj = doc.splitTextToSize(objText, contentWidth - 6);
   doc.text(splitObj, margin + 3, curY + 8);
 
@@ -1808,9 +1797,9 @@ export const generateSopsCatalogPDF = (sops: SopItem[], categoryFilter: string =
   const currentTimestamp = new Date();
   const printDateDDMMYYYY = formatDateDDMMYYYY(currentTimestamp);
   const printTimestampStr = formatDateTimeStamp(currentTimestamp);
+  const comp = getCompany();
 
   const drawHeader = () => {
-    const comp = getCompany();
     doc.setFillColor(15, 39, 68);
     doc.rect(0, 0, pageWidth, 21, 'F');
     doc.setFillColor(217, 119, 6);
@@ -1859,7 +1848,7 @@ export const generateSopsCatalogPDF = (sops: SopItem[], categoryFilter: string =
     doc.setFontSize(6);
     doc.setTextColor(100, 116, 139);
     doc.text(
-      `PT Rajawali Prima Service • Buku Pedoman SOP Resmi • Hal ${pageNum} dari ${totalPages}`,
+      `${comp.name} • Buku Pedoman SOP Resmi • Hal ${pageNum} dari ${totalPages}`,
       pageWidth - margin,
       pageHeight - 7,
       { align: 'right' }
@@ -2167,14 +2156,14 @@ export const generateMaterialRequestPDF = (
   doc.setTextColor(15, 23, 42);
   doc.text(request.requesterName || '-', col1X, curY, { align: 'center' });
   doc.text('Supervisor Operasional', col2X, curY, { align: 'center' });
-  doc.text(request.reviewedByName || 'Super Admin (HQ)', col3X, curY, { align: 'center' });
+  doc.text(request.reviewedByName || comp.directorName || 'Super Admin (HQ)', col3X, curY, { align: 'center' });
 
   curY += 3.5;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(100, 116, 139);
   doc.text(request.requesterRole || 'Site Requester', col1X, curY, { align: 'center' });
-  doc.text('PT Rajawali Cycle Indonesia', col2X, curY, { align: 'center' });
+  doc.text(comp.name, col2X, curY, { align: 'center' });
   doc.text(request.reviewedByRole || 'Otorisasi Pusat', col3X, curY, { align: 'center' });
 
   // Page Numbers & Footer
@@ -2184,7 +2173,7 @@ export const generateMaterialRequestPDF = (
     doc.setFontSize(7);
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `Dokumen resmi Sistem Terpadu PT Rajawali Cycle Indonesia • Diterbitkan secara digital • Hal ${i} dari ${totalPages}`,
+      comp.letterheadFooterNote || `Dokumen resmi Sistem Terpadu ${comp.name} • Diterbitkan secara digital • Hal ${i} dari ${totalPages}`,
       pageWidth / 2,
       pageHeight - 6,
       { align: 'center' }

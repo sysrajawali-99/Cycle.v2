@@ -24,28 +24,35 @@ import {
   Database,
   Lock,
   RefreshCw,
-  Sun,
-  Moon,
-  Monitor,
   Wallet,
   Users,
   Megaphone,
   Server,
   Copy,
   Check,
-  Radio
+  Radio,
+  Plus,
+  Edit,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Landmark,
+  Link as LinkIcon,
+  Search,
+  Filter
 } from 'lucide-react';
-import { CompanyProfile, UserAccount, AppView } from '../../types';
+import { CompanyProfile, UserAccount, AppView, CompanyBankAccount, BankAccountRole } from '../../types';
+import { ChartOfAccount } from '../../types/finance';
 import { INITIAL_COMPANY_PROFILE } from '../../data/initialData';
 import { storageService } from '../../services/storageService';
-import { themeService, ThemeMode } from '../../services/themeService';
 import { BulkDeleteDivisionModal, DeletableDivision } from '../common/BulkDeleteDivisionModal';
+import { ConfirmModal } from '../common/ConfirmModal';
 import { vpsSyncService, VpsConnectionStatus } from '../../services/vpsSyncService';
 
 interface CompanySettingsProps {
   companyProfile: CompanyProfile;
   onUpdateCompanyProfile: (profile: CompanyProfile) => void;
   currentUser: UserAccount | null;
+  accounts?: ChartOfAccount[];
   onResetAllData?: () => void;
   onNavigateView?: (view: AppView) => void;
 }
@@ -54,6 +61,7 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
   companyProfile,
   onUpdateCompanyProfile,
   currentUser,
+  accounts = [],
   onResetAllData,
   onNavigateView
 }) => {
@@ -61,25 +69,17 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
   const [activeTab, setActiveTab] = useState<'profile' | 'contact' | 'signees' | 'bank' | 'preview' | 'vps' | 'danger'>('profile');
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
-  const [themePref, setThemePref] = useState<ThemeMode>(() => themeService.getThemePreference());
-  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => themeService.getResolvedTheme());
   const [vpsStatus, setVpsStatus] = useState<VpsConnectionStatus>(() => vpsSyncService.getStatus());
   const [vpsLoading, setVpsLoading] = useState(false);
   const [vpsMsg, setVpsMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [vpsSnippetCopied, setVpsSnippetCopied] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleThemeChange = () => {
-      setThemePref(themeService.getThemePreference());
-      setResolvedTheme(themeService.getResolvedTheme());
-    };
     const unsubVps = vpsSyncService.subscribeStatus((status) => {
       setVpsStatus(status);
     });
-    window.addEventListener('theme_changed', handleThemeChange);
     return () => {
       unsubVps();
-      window.removeEventListener('theme_changed', handleThemeChange);
     };
   }, []);
 
@@ -92,6 +92,303 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
   const [resetPin, setResetPin] = useState<string>('');
   const [resetError, setResetError] = useState<string>('');
   const [resetSuccessMessage, setResetSuccessMessage] = useState<string>('');
+
+  // --------------------------------------------------------------------------
+  // Bank Account Management States & Logic
+  // --------------------------------------------------------------------------
+  const [bankRoleFilter, setBankRoleFilter] = useState<'ALL' | BankAccountRole>('ALL');
+  const [bankSearchQuery, setBankSearchQuery] = useState<string>('');
+  const [isBankModalOpen, setIsBankModalOpen] = useState<boolean>(false);
+  const [editingBankId, setEditingBankId] = useState<string | null>(null);
+  const [bankToDelete, setBankToDelete] = useState<CompanyBankAccount | null>(null);
+  const [copiedBankId, setCopiedBankId] = useState<string | null>(null);
+  const [bankNotice, setBankNotice] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
+  const initialBankFormData = {
+    bankName: 'Bank Central Asia (BCA)',
+    customBankName: '',
+    accountNumber: '',
+    accountHolder: companyProfile.name || 'PT RAJAWALI CYCLE INDONESIA',
+    role: 'Rekening Penerimaan Invoice' as BankAccountRole,
+    branch: '',
+    swiftCode: '',
+    coaAccountCode: accounts.find((a) => a.category === 'Kas & Bank')?.code || '1120',
+    coaAccountName: accounts.find((a) => a.category === 'Kas & Bank')?.name || 'Bank BCA - Rek Operasional (123-456-7890)',
+    isPrimary: false,
+    status: 'Aktif' as 'Aktif' | 'Nonaktif',
+    notes: ''
+  };
+
+  const [bankFormData, setBankFormData] = useState(initialBankFormData);
+
+  // Derive current bank accounts safely
+  const currentBankAccounts: CompanyBankAccount[] = (
+    Array.isArray(formData.bankAccounts) && formData.bankAccounts.length > 0
+      ? formData.bankAccounts
+      : [
+          {
+            id: 'bank-init-1',
+            bankName: formData.bankName || 'Bank Central Asia (BCA)',
+            accountNumber: formData.bankAccountNo || '541-0988-771',
+            accountHolder: formData.bankAccountHolder || formData.name || 'PT RAJAWALI CYCLE INDONESIA',
+            role: 'Rekening Penerimaan Invoice',
+            branch: 'KCU Mega Kuningan Jakarta',
+            swiftCode: 'CENAIDJA',
+            coaAccountCode: '1120',
+            coaAccountName: 'Bank BCA - Rek Operasional (123-456-7890)',
+            isPrimary: true,
+            status: 'Aktif',
+            notes: 'Rekening penerimaan utama tagihan & invoice klien'
+          }
+        ]
+  );
+
+  const filteredBankAccounts = currentBankAccounts.filter((bank) => {
+    if (bankRoleFilter !== 'ALL' && bank.role !== bankRoleFilter) return false;
+    if (bankSearchQuery.trim()) {
+      const q = bankSearchQuery.toLowerCase();
+      const matchBank = bank.bankName.toLowerCase().includes(q);
+      const matchNo = bank.accountNumber.toLowerCase().includes(q);
+      const matchHolder = bank.accountHolder.toLowerCase().includes(q);
+      const matchRole = bank.role.toLowerCase().includes(q);
+      const matchCoa = (bank.coaAccountCode || '').toLowerCase().includes(q) || (bank.coaAccountName || '').toLowerCase().includes(q);
+      return matchBank || matchNo || matchHolder || matchRole || matchCoa;
+    }
+    return true;
+  });
+
+  const handleOpenAddBankModal = () => {
+    setEditingBankId(null);
+    const defaultCoa = accounts.find((a) => a.category === 'Kas & Bank') || accounts[0];
+    setBankFormData({
+      bankName: 'Bank Central Asia (BCA)',
+      customBankName: '',
+      accountNumber: '',
+      accountHolder: formData.name || 'PT RAJAWALI CYCLE INDONESIA',
+      role: 'Rekening Penerimaan Invoice',
+      branch: '',
+      swiftCode: '',
+      coaAccountCode: defaultCoa?.code || '1120',
+      coaAccountName: defaultCoa?.name || 'Bank BCA - Rek Operasional (123-456-7890)',
+      isPrimary: currentBankAccounts.length === 0,
+      status: 'Aktif',
+      notes: ''
+    });
+    setIsBankModalOpen(true);
+  };
+
+  const handleOpenEditBankModal = (bank: CompanyBankAccount) => {
+    setEditingBankId(bank.id);
+    const popularBanks = [
+      'Bank Central Asia (BCA)',
+      'Bank Mandiri (Persero)',
+      'Bank Negara Indonesia (BNI)',
+      'Bank Rakyat Indonesia (BRI)',
+      'Bank Syariah Indonesia (BSI)',
+      'Bank CIMB Niaga',
+      'Bank Permata',
+      'Bank Danamon',
+      'Bank Tabungan Negara (BTN)',
+      'Bank Panin',
+      'Bank Mega',
+      'Bank DKI',
+      'Bank BJB',
+      'Bank BTPN / Jenius',
+      'Bank OCBC NISP'
+    ];
+    const isCustom = !popularBanks.includes(bank.bankName);
+
+    setBankFormData({
+      bankName: isCustom ? 'Lainnya' : bank.bankName,
+      customBankName: isCustom ? bank.bankName : '',
+      accountNumber: bank.accountNumber,
+      accountHolder: bank.accountHolder,
+      role: bank.role,
+      branch: bank.branch || '',
+      swiftCode: bank.swiftCode || '',
+      coaAccountCode: bank.coaAccountCode || '1120',
+      coaAccountName: bank.coaAccountName || '',
+      isPrimary: !!bank.isPrimary,
+      status: bank.status || 'Aktif',
+      notes: bank.notes || ''
+    });
+    setIsBankModalOpen(true);
+  };
+
+  const handleSaveBankForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    const effectiveBankName =
+      bankFormData.bankName === 'Lainnya'
+        ? bankFormData.customBankName.trim()
+        : bankFormData.bankName.trim();
+
+    if (!effectiveBankName) {
+      setBankNotice({ type: 'error', message: 'Nama Bank wajib diisi atau dipilih.' });
+      return;
+    }
+    if (!bankFormData.accountNumber.trim()) {
+      setBankNotice({ type: 'error', message: 'Nomor Rekening wajib diisi.' });
+      return;
+    }
+    if (!bankFormData.accountHolder.trim()) {
+      setBankNotice({ type: 'error', message: 'Atas Nama Pemilik Rekening wajib diisi.' });
+      return;
+    }
+
+    const matchedCoa = accounts.find((a) => a.code === bankFormData.coaAccountCode);
+    const resolvedCoaName = matchedCoa
+      ? matchedCoa.name
+      : bankFormData.coaAccountName || `Akun COA ${bankFormData.coaAccountCode}`;
+
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    let updatedList: CompanyBankAccount[];
+
+    if (editingBankId) {
+      updatedList = currentBankAccounts.map((b) => {
+        if (b.id === editingBankId) {
+          return {
+            ...b,
+            bankName: effectiveBankName,
+            accountNumber: bankFormData.accountNumber.trim(),
+            accountHolder: bankFormData.accountHolder.trim(),
+            role: bankFormData.role,
+            branch: bankFormData.branch.trim(),
+            swiftCode: bankFormData.swiftCode.trim(),
+            coaAccountCode: bankFormData.coaAccountCode,
+            coaAccountName: resolvedCoaName,
+            isPrimary: bankFormData.isPrimary,
+            status: bankFormData.status,
+            notes: bankFormData.notes.trim(),
+            updatedAt: nowStr
+          };
+        }
+        if (bankFormData.isPrimary) {
+          return { ...b, isPrimary: false };
+        }
+        return b;
+      });
+    } else {
+      const newBank: CompanyBankAccount = {
+        id: `bank-${Date.now()}`,
+        bankName: effectiveBankName,
+        accountNumber: bankFormData.accountNumber.trim(),
+        accountHolder: bankFormData.accountHolder.trim(),
+        role: bankFormData.role,
+        branch: bankFormData.branch.trim(),
+        swiftCode: bankFormData.swiftCode.trim(),
+        coaAccountCode: bankFormData.coaAccountCode,
+        coaAccountName: resolvedCoaName,
+        isPrimary: bankFormData.isPrimary || currentBankAccounts.length === 0,
+        status: bankFormData.status,
+        notes: bankFormData.notes.trim(),
+        createdAt: nowStr,
+        updatedAt: nowStr
+      };
+
+      if (newBank.isPrimary) {
+        updatedList = [newBank, ...currentBankAccounts.map((b) => ({ ...b, isPrimary: false }))];
+      } else {
+        updatedList = [...currentBankAccounts, newBank];
+      }
+    }
+
+    if (!updatedList.some((b) => b.isPrimary) && updatedList.length > 0) {
+      updatedList[0].isPrimary = true;
+    }
+
+    const primaryBank = updatedList.find((b) => b.isPrimary) || updatedList[0];
+
+    const updatedProfile: CompanyProfile = {
+      ...formData,
+      bankAccounts: updatedList,
+      bankName: primaryBank.bankName,
+      bankAccountNo: primaryBank.accountNumber,
+      bankAccountHolder: primaryBank.accountHolder,
+      updatedAt: new Date().toLocaleString('id-ID'),
+      updatedBy: currentUser?.name || 'Super Admin'
+    };
+
+    setFormData(updatedProfile);
+    onUpdateCompanyProfile(updatedProfile);
+    setIsBankModalOpen(false);
+    setBankNotice({
+      type: 'success',
+      message: editingBankId
+        ? `Rekening ${effectiveBankName} (${bankFormData.accountNumber}) berhasil diperbarui.`
+        : `Rekening baru ${effectiveBankName} (${bankFormData.accountNumber}) berhasil ditambahkan sebagai ${bankFormData.role}.`
+    });
+    setTimeout(() => setBankNotice(null), 5000);
+  };
+
+  const handleSetPrimaryBank = (bankId: string) => {
+    const updatedList = currentBankAccounts.map((b) => ({
+      ...b,
+      isPrimary: b.id === bankId
+    }));
+    const primaryBank = updatedList.find((b) => b.id === bankId);
+    if (!primaryBank) return;
+
+    const updatedProfile: CompanyProfile = {
+      ...formData,
+      bankAccounts: updatedList,
+      bankName: primaryBank.bankName,
+      bankAccountNo: primaryBank.accountNumber,
+      bankAccountHolder: primaryBank.accountHolder,
+      updatedAt: new Date().toLocaleString('id-ID'),
+      updatedBy: currentUser?.name || 'Super Admin'
+    };
+
+    setFormData(updatedProfile);
+    onUpdateCompanyProfile(updatedProfile);
+    setBankNotice({
+      type: 'success',
+      message: `${primaryBank.bankName} (${primaryBank.accountNumber}) dijadikan sebagai Rekening Utama Kop Surat.`
+    });
+    setTimeout(() => setBankNotice(null), 4000);
+  };
+
+  const handleExecuteDeleteBank = () => {
+    if (!bankToDelete) return;
+    if (currentBankAccounts.length <= 1) {
+      alert('Perusahaan membutuhkan minimal satu rekening bank aktif untuk keperluan penerbitan invoice & kop surat.');
+      setBankToDelete(null);
+      return;
+    }
+
+    const updatedList = currentBankAccounts.filter((b) => b.id !== bankToDelete.id);
+    if (bankToDelete.isPrimary && updatedList.length > 0) {
+      updatedList[0].isPrimary = true;
+    }
+
+    const primaryBank = updatedList.find((b) => b.isPrimary) || updatedList[0];
+
+    const updatedProfile: CompanyProfile = {
+      ...formData,
+      bankAccounts: updatedList,
+      bankName: primaryBank.bankName,
+      bankAccountNo: primaryBank.accountNumber,
+      bankAccountHolder: primaryBank.accountHolder,
+      updatedAt: new Date().toLocaleString('id-ID'),
+      updatedBy: currentUser?.name || 'Super Admin'
+    };
+
+    setFormData(updatedProfile);
+    onUpdateCompanyProfile(updatedProfile);
+    const deletedName = bankToDelete.bankName;
+    const deletedNo = bankToDelete.accountNumber;
+    setBankToDelete(null);
+    setBankNotice({
+      type: 'success',
+      message: `Rekening ${deletedName} (${deletedNo}) berhasil dihapus.`
+    });
+    setTimeout(() => setBankNotice(null), 4000);
+  };
+
+  const handleCopyAccountNumber = (accountNumber: string, id: string) => {
+    navigator.clipboard.writeText(accountNumber);
+    setCopiedBankId(id);
+    setTimeout(() => setCopiedBankId(null), 2000);
+  };
 
   useEffect(() => {
     setFormData({ ...companyProfile });
@@ -487,102 +784,6 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
                 </div>
               </div>
             </div>
-
-            {/* Pengaturan Tema Tampilan Aplikasi (Dark / Light Theme) */}
-            <div className="space-y-3 md:col-span-2 pt-4 border-t border-slate-800">
-              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-                <span>Tema & Kontras Visual Antarmuka (PC & Ponsel)</span>
-                <span className="text-[11px] text-amber-400 font-semibold normal-case">
-                  Aktif: {resolvedTheme === 'dark' ? 'Mode Gelap (Dark)' : 'Mode Terang (Light)'}
-                </span>
-              </label>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Dark Mode Card */}
-                <button
-                  type="button"
-                  onClick={() => themeService.setTheme('dark')}
-                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
-                    themePref === 'dark'
-                      ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20 shadow-lg'
-                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-amber-400">
-                      <Moon className="w-5 h-5" />
-                    </div>
-                    {themePref === 'dark' && (
-                      <span className="text-[10px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-bold">
-                        Dipilih
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-bold text-sm text-white">Mode Gelap (Dark Mode)</div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Latar belakang gelap pekat hemat baterai OLED, kontras tinggi & nyaman di mata malam hari.
-                    </p>
-                  </div>
-                </button>
-
-                {/* Light Mode Card */}
-                <button
-                  type="button"
-                  onClick={() => themeService.setTheme('light')}
-                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
-                    themePref === 'light'
-                      ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20 shadow-lg'
-                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-amber-400">
-                      <Sun className="w-5 h-5" />
-                    </div>
-                    {themePref === 'light' && (
-                      <span className="text-[10px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-bold">
-                        Dipilih
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-bold text-sm text-white">Mode Terang (Light Mode)</div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Latar belakang putih bersih, teks tajam kontras tinggi, ideal di bawah sinar matahari/siang hari.
-                    </p>
-                  </div>
-                </button>
-
-                {/* System Mode Card */}
-                <button
-                  type="button"
-                  onClick={() => themeService.setTheme('system')}
-                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
-                    themePref === 'system'
-                      ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20 shadow-lg'
-                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-amber-400">
-                      <Monitor className="w-5 h-5" />
-                    </div>
-                    {themePref === 'system' && (
-                      <span className="text-[10px] bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full font-bold">
-                        Dipilih
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-bold text-sm text-white">Otomatis (Sesuai OS)</div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Menyesuaikan otomatis dengan pengaturan tema perangkat PC / Ponsel Android / iOS Anda.
-                    </p>
-                  </div>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -789,64 +990,470 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
 
       {/* TAB 4: REKENING BANK & FOOTER KOP SURAT */}
       {activeTab === 'bank' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-          <div className="border-b border-slate-800 pb-4">
-            <h3 className="text-lg font-extrabold text-white flex items-center space-x-2">
-              <CreditCard className="w-5 h-5 text-amber-400" />
-              <span>Rekening Bank Operasional & Catatan Dokumen</span>
-            </h3>
-            <p className="text-xs text-slate-400 mt-1">
-              Rekening resmi untuk pembayaran gaji/invoice serta kalimat klausul footer pada dokumen cetak.
-            </p>
-          </div>
+        <div className="space-y-6">
+          {/* Notification Banner */}
+          {bankNotice && (
+            <div
+              className={`p-4 rounded-2xl border flex items-center justify-between shadow-lg transition-all animate-in fade-in slide-in-from-top-2 ${
+                bankNotice.type === 'error'
+                  ? 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                  : 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                {bankNotice.type === 'error' ? (
+                  <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
+                )}
+                <span className="text-xs sm:text-sm font-semibold">{bankNotice.message}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBankNotice(null)}
+                className="text-xs opacity-70 hover:opacity-100 font-bold px-2 py-1 rounded"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                Nama Bank
-              </label>
-              <input
-                id="company-bank-name-input"
-                type="text"
-                value={formData.bankName}
-                onChange={(e) => handleChange('bankName', e.target.value)}
-                placeholder="Contoh: Bank Central Asia (BCA)"
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:border-amber-500 focus:outline-none"
-              />
+          {/* Main Card */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+            {/* Header & Main Actions */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-800">
+              <div>
+                <h3 className="text-lg font-extrabold text-white flex items-center space-x-2">
+                  <CreditCard className="w-5 h-5 text-amber-400" />
+                  <span>Rekening Bank Operasional & Catatan Dokumen</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Kelola rekening resmi perusahaan, peran transaksi (Penerimaan Invoice, Pembayaran Invoice, Operasional, Payroll, Simpanan) yang terintegrasi langsung dengan Bagan Akun Standar (PSAK) dan Buku Kas.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                {onNavigateView && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateView('finance_cash_journal')}
+                    className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-all cursor-pointer shadow-md"
+                    title="Buka Buku Kas & Bagan Akun Standar (COA)"
+                  >
+                    <LinkIcon className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Buka Buku Kas (COA)</span>
+                  </button>
+                )}
+
+                <button
+                  id="add-company-bank-btn"
+                  data-testid="add-company-bank-btn"
+                  type="button"
+                  onClick={handleOpenAddBankModal}
+                  className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-500/25 transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Tambah Rekening Bank</span>
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                Nomor Rekening
-              </label>
-              <input
-                id="company-bank-account-input"
-                type="text"
-                value={formData.bankAccountNo}
-                onChange={(e) => handleChange('bankAccountNo', e.target.value)}
-                placeholder="Contoh: 541-0988-771"
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:border-amber-500 focus:outline-none font-mono"
-              />
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-1">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Total Rekening</span>
+                <span className="text-xl font-black text-white block">{currentBankAccounts.length}</span>
+                <span className="text-[10px] text-slate-500 block">Bank Terdaftar</span>
+              </div>
+
+              <div className="bg-slate-950/80 border border-cyan-500/20 rounded-2xl p-3.5 space-y-1">
+                <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider flex items-center space-x-1">
+                  <ArrowDownLeft className="w-3.5 h-3.5" />
+                  <span>Penerimaan</span>
+                </span>
+                <span className="text-xl font-black text-cyan-300 block">
+                  {currentBankAccounts.filter((b) => b.role === 'Rekening Penerimaan Invoice').length}
+                </span>
+                <span className="text-[10px] text-slate-500 block">Invoice Klien</span>
+              </div>
+
+              <div className="bg-slate-950/80 border border-rose-500/20 rounded-2xl p-3.5 space-y-1">
+                <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider flex items-center space-x-1">
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  <span>Pembayaran</span>
+                </span>
+                <span className="text-xl font-black text-rose-300 block">
+                  {currentBankAccounts.filter((b) => b.role === 'Rekening Pembayaran Invoice').length}
+                </span>
+                <span className="text-[10px] text-slate-500 block">Vendor & Supplier</span>
+              </div>
+
+              <div className="bg-slate-950/80 border border-emerald-500/20 rounded-2xl p-3.5 space-y-1">
+                <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center space-x-1">
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Payroll</span>
+                </span>
+                <span className="text-xl font-black text-emerald-300 block">
+                  {currentBankAccounts.filter((b) => b.role === 'Rekening Payroll').length}
+                </span>
+                <span className="text-[10px] text-slate-500 block">Upah Manpower</span>
+              </div>
+
+              <div className="col-span-2 sm:col-span-1 bg-slate-950/80 border border-amber-500/20 rounded-2xl p-3.5 space-y-1">
+                <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center space-x-1">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Operasional</span>
+                </span>
+                <span className="text-xl font-black text-amber-300 block">
+                  {currentBankAccounts.filter((b) => b.role === 'Rekening Operasional' || b.role === 'Rekening Simpanan').length}
+                </span>
+                <span className="text-[10px] text-slate-500 block">Kas & Simpanan</span>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                Atas Nama Pemilik Rekening
-              </label>
-              <input
-                id="company-bank-holder-input"
-                type="text"
-                value={formData.bankAccountHolder}
-                onChange={(e) => handleChange('bankAccountHolder', e.target.value)}
-                placeholder="Contoh: PT RAJAWALI CYCLE INDONESIA"
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:border-amber-500 focus:outline-none"
-              />
+            {/* Role Filter Tabs & Search Bar */}
+            <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Role Filter Pills */}
+              <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setBankRoleFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    bankRoleFilter === 'ALL'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  Semua ({currentBankAccounts.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBankRoleFilter('Rekening Penerimaan Invoice')}
+                  className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    bankRoleFilter === 'Rekening Penerimaan Invoice'
+                      ? 'bg-cyan-500 text-slate-950 shadow-md'
+                      : 'bg-slate-900 text-slate-400 hover:text-cyan-300 border border-slate-800'
+                  }`}
+                >
+                  <ArrowDownLeft className="w-3 h-3" />
+                  <span>Penerimaan Invoice</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBankRoleFilter('Rekening Pembayaran Invoice')}
+                  className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    bankRoleFilter === 'Rekening Pembayaran Invoice'
+                      ? 'bg-rose-500 text-slate-950 shadow-md'
+                      : 'bg-slate-900 text-slate-400 hover:text-rose-300 border border-slate-800'
+                  }`}
+                >
+                  <ArrowUpRight className="w-3 h-3" />
+                  <span>Pembayaran Invoice</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBankRoleFilter('Rekening Operasional')}
+                  className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    bankRoleFilter === 'Rekening Operasional'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'bg-slate-900 text-slate-400 hover:text-amber-300 border border-slate-800'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Operasional</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBankRoleFilter('Rekening Payroll')}
+                  className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    bankRoleFilter === 'Rekening Payroll'
+                      ? 'bg-emerald-500 text-slate-950 shadow-md'
+                      : 'bg-slate-900 text-slate-400 hover:text-emerald-300 border border-slate-800'
+                  }`}
+                >
+                  <Users className="w-3 h-3" />
+                  <span>Payroll</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBankRoleFilter('Rekening Simpanan')}
+                  className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    bankRoleFilter === 'Rekening Simpanan'
+                      ? 'bg-indigo-500 text-slate-950 shadow-md'
+                      : 'bg-slate-900 text-slate-400 hover:text-indigo-300 border border-slate-800'
+                  }`}
+                >
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Simpanan</span>
+                </button>
+              </div>
+
+              {/* Search Box */}
+              <div className="relative min-w-[220px]">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Cari bank, no. rek, pemilik, COA..."
+                  value={bankSearchQuery}
+                  onChange={(e) => setBankSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-7 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                />
+                {bankSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setBankSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Bank Accounts Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {filteredBankAccounts.length === 0 ? (
+                <div className="col-span-2 bg-slate-950/60 border border-slate-800 rounded-2xl p-10 text-center space-y-3">
+                  <CreditCard className="w-10 h-10 mx-auto text-slate-600" />
+                  <p className="text-sm font-bold text-slate-400">Tidak ada rekening bank yang sesuai dengan filter.</p>
+                  <p className="text-xs text-slate-600 max-w-md mx-auto">
+                    Coba sesuaikan kata kunci pencarian atau reset filter peran bank untuk melihat semua rekening.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBankRoleFilter('ALL');
+                        setBankSearchQuery('');
+                      }}
+                      className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold rounded-xl transition"
+                    >
+                      Reset Filter
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                filteredBankAccounts.map((bank) => {
+                  const getRoleStyle = () => {
+                    switch (bank.role) {
+                      case 'Rekening Penerimaan Invoice':
+                        return {
+                          badge: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+                          border: 'border-cyan-500/20',
+                          icon: ArrowDownLeft,
+                          title: 'Penerimaan Invoice'
+                        };
+                      case 'Rekening Pembayaran Invoice':
+                        return {
+                          badge: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+                          border: 'border-rose-500/20',
+                          icon: ArrowUpRight,
+                          title: 'Pembayaran Invoice'
+                        };
+                      case 'Rekening Operasional':
+                        return {
+                          badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+                          border: 'border-amber-500/20',
+                          icon: Sparkles,
+                          title: 'Operasional'
+                        };
+                      case 'Rekening Payroll':
+                        return {
+                          badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+                          border: 'border-emerald-500/20',
+                          icon: Users,
+                          title: 'Payroll & Upah'
+                        };
+                      case 'Rekening Simpanan':
+                      default:
+                        return {
+                          badge: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+                          border: 'border-indigo-500/20',
+                          icon: ShieldCheck,
+                          title: 'Simpanan'
+                        };
+                    }
+                  };
+
+                  const roleStyle = getRoleStyle();
+                  const RoleIcon = roleStyle.icon;
+
+                  return (
+                    <div
+                      key={bank.id}
+                      className={`bg-slate-950 border rounded-2xl p-5 space-y-4 shadow-lg transition-all hover:border-slate-700 relative flex flex-col justify-between ${
+                        bank.isPrimary ? 'border-amber-500/50 bg-gradient-to-br from-slate-950 via-amber-950/10 to-slate-950' : 'border-slate-800'
+                      }`}
+                    >
+                      {/* Top Badges Row */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center space-x-2">
+                          <span
+                            className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-bold border ${roleStyle.badge}`}
+                          >
+                            <RoleIcon className="w-3.5 h-3.5" />
+                            <span>{bank.role}</span>
+                          </span>
+
+                          {bank.isPrimary && (
+                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 text-[10px] font-extrabold border border-amber-500/40">
+                              <span>★ Rekening Utama Kop Surat</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            bank.status === 'Aktif'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                              : 'bg-slate-800 text-slate-500 border-slate-700'
+                          }`}
+                        >
+                          {bank.status || 'Aktif'}
+                        </span>
+                      </div>
+
+                      {/* Bank Details */}
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2 text-white">
+                          <Landmark className="w-4 h-4 text-amber-400 shrink-0" />
+                          <h4 className="text-base font-extrabold tracking-tight truncate">{bank.bankName}</h4>
+                        </div>
+
+                        {/* Nomor Rekening Display with Copy Button */}
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+                          <div>
+                            <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">
+                              Nomor Rekening
+                            </span>
+                            <span className="text-base sm:text-lg font-mono font-black text-amber-300 tracking-wider">
+                              {bank.accountNumber}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleCopyAccountNumber(bank.accountNumber, bank.id)}
+                            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer border border-slate-700"
+                            title="Salin nomor rekening ke clipboard"
+                          >
+                            {copiedBankId === bank.id ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                <span className="text-emerald-400 text-[11px]">Tersalin!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5 text-slate-400" />
+                                <span className="text-[11px]">Salin</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                          <div>
+                            <span className="text-slate-500 text-[10px] block">Atas Nama Pemilik:</span>
+                            <span className="font-bold text-slate-200 truncate block">{bank.accountHolder}</span>
+                          </div>
+
+                          <div>
+                            <span className="text-slate-500 text-[10px] block">Kantor Cabang:</span>
+                            <span className="font-medium text-slate-300 truncate block">{bank.branch || '-'}</span>
+                          </div>
+                        </div>
+
+                        {bank.swiftCode && (
+                          <div className="text-[11px] text-slate-400">
+                            <span className="text-slate-500 text-[10px]">SWIFT / BI-FAST: </span>
+                            <span className="font-mono text-slate-300">{bank.swiftCode}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Integration with COA & Sub COA (PSAK) */}
+                      <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/90 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/90 flex items-center space-x-1">
+                            <LinkIcon className="w-3 h-3 text-amber-400" />
+                            <span>Terhubung ke Bagan Akun (COA PSAK)</span>
+                          </span>
+                          <span className="font-mono text-[10px] font-bold text-amber-300 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
+                            Akun: {bank.coaAccountCode || '1120'}
+                          </span>
+                        </div>
+                        <div className="text-xs font-bold text-slate-200 truncate">
+                          {bank.coaAccountName || `Akun Kas & Bank [${bank.coaAccountCode}]`}
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          Sinkron otomatis ke Pencatatan Kas & Jurnal Umum Double-Entry saat transaksi dicatat.
+                        </p>
+                      </div>
+
+                      {bank.notes && (
+                        <p className="text-[11px] text-slate-400 italic line-clamp-2">
+                          &ldquo;{bank.notes}&rdquo;
+                        </p>
+                      )}
+
+                      {/* Action Buttons Row */}
+                      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+                        <div>
+                          {!bank.isPrimary ? (
+                            <button
+                              type="button"
+                              onClick={() => handleSetPrimaryBank(bank.id)}
+                              className="text-[11px] text-slate-400 hover:text-amber-400 font-bold transition flex items-center space-x-1 cursor-pointer"
+                              title="Jadikan rekening default pada kop surat cetak"
+                            >
+                              <span>★ Set Jadi Rekening Utama</span>
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-amber-400/80 font-bold flex items-center space-x-1">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Rekening Utama Default</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditBankModal(bank)}
+                            className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition cursor-pointer"
+                            title="Edit rekening & nomor rekening"
+                          >
+                            <Edit className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Edit Nomor Rekening</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setBankToDelete(bank)}
+                            className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 font-bold text-xs border border-rose-800/50 transition cursor-pointer"
+                            title="Hapus rekening bank yang dipilih"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Hapus</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             {/* Footer Note */}
-            <div className="space-y-2 md:col-span-3 pt-4 border-t border-slate-800">
-              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                Catatan Kaki Resmi (Footer Dokumen & Slip Gaji)
+            <div className="space-y-2 pt-6 border-t border-slate-800">
+              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
+                <FileText className="w-4 h-4 text-amber-400" />
+                <span>Catatan Kaki Resmi (Footer Dokumen Cetak & Slip Gaji)</span>
               </label>
               <textarea
                 id="company-footer-note-input"
@@ -856,11 +1463,336 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
                 placeholder="Contoh: Dokumen ini sah dan diterbitkan secara digital oleh Sistem ERP PT Rajawali Cycle Indonesia..."
                 className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:border-amber-500 focus:outline-none leading-relaxed"
               />
-              <span className="text-[11px] text-slate-500">
-                Teks ini akan selalu dicetak di bagian paling bawah setiap lembar laporan PDF resmi.
+              <span className="text-[11px] text-slate-500 block">
+                Teks ini akan selalu dicetak di bagian paling bawah setiap lembar laporan PDF resmi dan slip gaji.
               </span>
             </div>
           </div>
+
+          {/* MODAL: TAMBAH / EDIT REKENING BANK */}
+          {isBankModalOpen && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto"
+              onClick={() => setIsBankModalOpen(false)}
+            >
+              <div
+                className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl space-y-6 relative my-8 animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-white">
+                        {editingBankId ? 'Edit Rekening Bank & Nomor Rekening' : 'Tambah Rekening Bank Operasional Baru'}
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Konfigurasi rekening dan integrasikan dengan Bagan Akun Standar (PSAK).
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsBankModalOpen(false)}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-xl transition cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleSaveBankForm} className="space-y-4">
+                  {/* Row 1: Nama Bank */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                      <span>Nama Bank Resmi *</span>
+                      <span className="text-[10px] text-slate-500 font-normal">Pilih bank terdaftar atau lainnya</span>
+                    </label>
+                    <select
+                      value={bankFormData.bankName}
+                      onChange={(e) => setBankFormData({ ...bankFormData, bankName: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:border-amber-500 focus:outline-none"
+                    >
+                      <option value="Bank Central Asia (BCA)">Bank Central Asia (BCA)</option>
+                      <option value="Bank Mandiri (Persero)">Bank Mandiri (Persero)</option>
+                      <option value="Bank Negara Indonesia (BNI)">Bank Negara Indonesia (BNI)</option>
+                      <option value="Bank Rakyat Indonesia (BRI)">Bank Rakyat Indonesia (BRI)</option>
+                      <option value="Bank Syariah Indonesia (BSI)">Bank Syariah Indonesia (BSI)</option>
+                      <option value="Bank CIMB Niaga">Bank CIMB Niaga</option>
+                      <option value="Bank Permata">Bank Permata</option>
+                      <option value="Bank Danamon">Bank Danamon</option>
+                      <option value="Bank Tabungan Negara (BTN)">Bank Tabungan Negara (BTN)</option>
+                      <option value="Bank Panin">Bank Panin</option>
+                      <option value="Bank Mega">Bank Mega</option>
+                      <option value="Bank DKI">Bank DKI</option>
+                      <option value="Bank BJB">Bank BJB</option>
+                      <option value="Bank BTPN / Jenius">Bank BTPN / Jenius</option>
+                      <option value="Bank OCBC NISP">Bank OCBC NISP</option>
+                      <option value="Lainnya">Lainnya (Tulis Sendiri)</option>
+                    </select>
+
+                    {bankFormData.bankName === 'Lainnya' && (
+                      <input
+                        type="text"
+                        placeholder="Ketik Nama Bank Lengkap..."
+                        value={bankFormData.customBankName}
+                        onChange={(e) => setBankFormData({ ...bankFormData, customBankName: e.target.value })}
+                        className="w-full mt-2 px-4 py-2.5 bg-slate-950 border border-amber-500/50 rounded-xl text-white text-sm focus:border-amber-500 focus:outline-none"
+                      />
+                    )}
+                  </div>
+
+                  {/* Row 2: Nomor Rekening & Pemilik Rekening */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        Nomor Rekening *
+                      </label>
+                      <input
+                        type="text"
+                        value={bankFormData.accountNumber}
+                        onChange={(e) => setBankFormData({ ...bankFormData, accountNumber: e.target.value })}
+                        placeholder="Contoh: 541-0988-771"
+                        required
+                        className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm font-mono focus:border-amber-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        Atas Nama Pemilik Rekening *
+                      </label>
+                      <input
+                        type="text"
+                        value={bankFormData.accountHolder}
+                        onChange={(e) => setBankFormData({ ...bankFormData, accountHolder: e.target.value })}
+                        placeholder="Contoh: PT RAJAWALI CYCLE INDONESIA"
+                        required
+                        className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-sm focus:border-amber-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3: Peran Rekening Bank (Radio Cards) */}
+                  <div className="space-y-2 pt-1">
+                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                      Peran & Fungsi Rekening Bank *
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        {
+                          role: 'Rekening Penerimaan Invoice' as BankAccountRole,
+                          title: 'Penerimaan Invoice',
+                          desc: 'Penerimaan pelunasan invoice & tagihan dari klien',
+                          color: 'border-cyan-500/40 text-cyan-300 bg-cyan-950/20'
+                        },
+                        {
+                          role: 'Rekening Pembayaran Invoice' as BankAccountRole,
+                          title: 'Pembayaran Invoice',
+                          desc: 'Pembayaran tagihan invoice vendor & logistik',
+                          color: 'border-rose-500/40 text-rose-300 bg-rose-950/20'
+                        },
+                        {
+                          role: 'Rekening Operasional' as BankAccountRole,
+                          title: 'Rekening Operasional',
+                          desc: 'Kas operasional rutin site, transport & petty cash',
+                          color: 'border-amber-500/40 text-amber-300 bg-amber-950/20'
+                        },
+                        {
+                          role: 'Rekening Payroll' as BankAccountRole,
+                          title: 'Rekening Payroll',
+                          desc: 'Penggajian karyawan, transfer upah manpower & BPJS',
+                          color: 'border-emerald-500/40 text-emerald-300 bg-emerald-950/20'
+                        },
+                        {
+                          role: 'Rekening Simpanan' as BankAccountRole,
+                          title: 'Rekening Simpanan',
+                          desc: 'Simpanan cadangan likuiditas, deposito & kas darurat',
+                          color: 'border-indigo-500/40 text-indigo-300 bg-indigo-950/20'
+                        }
+                      ].map((item) => (
+                        <div
+                          key={item.role}
+                          onClick={() => setBankFormData({ ...bankFormData, role: item.role })}
+                          className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                            bankFormData.role === item.role
+                              ? `${item.color} shadow-md`
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs text-white">{item.title}</span>
+                            <input
+                              type="radio"
+                              name="bank_role"
+                              checked={bankFormData.role === item.role}
+                              onChange={() => setBankFormData({ ...bankFormData, role: item.role })}
+                              className="text-amber-500 focus:ring-amber-500"
+                            />
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-1">{item.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Row 4: Terhubung ke Bagan Akun Standar (COA - PSAK) */}
+                  <div className="space-y-1.5 pt-2 border-t border-slate-800">
+                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                      <span className="flex items-center space-x-1.5">
+                        <LinkIcon className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Hubungkan ke Bagan Akun Standar (COA & Sub COA - PSAK) *</span>
+                      </span>
+                      <span className="text-[10px] text-amber-400 font-bold">Sinkron Jurnal Otomatis</span>
+                    </label>
+
+                    <select
+                      value={bankFormData.coaAccountCode}
+                      onChange={(e) => {
+                        const code = e.target.value;
+                        const found = accounts.find((a) => a.code === code);
+                        setBankFormData({
+                          ...bankFormData,
+                          coaAccountCode: code,
+                          coaAccountName: found ? found.name : `Akun ${code}`
+                        });
+                      }}
+                      className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-amber-500 focus:outline-none"
+                    >
+                      {accounts && accounts.length > 0 ? (
+                        <>
+                          <optgroup label="Akun Kas & Setara Kas (Likuiditas)">
+                            {accounts
+                              .filter((a) => a.category === 'Kas & Bank' || a.code.startsWith('11'))
+                              .map((acc) => (
+                                <option key={acc.code} value={acc.code}>
+                                  [{acc.code}] {acc.name} ({acc.category})
+                                </option>
+                              ))}
+                          </optgroup>
+                          <optgroup label="Akun Lainnya">
+                            {accounts
+                              .filter((a) => a.category !== 'Kas & Bank' && !a.code.startsWith('11'))
+                              .map((acc) => (
+                                <option key={acc.code} value={acc.code}>
+                                  [{acc.code}] {acc.name} ({acc.category})
+                                </option>
+                              ))}
+                          </optgroup>
+                        </>
+                      ) : (
+                        <>
+                          <option value="1120">[1120] Bank BCA - Rek Operasional (123-456-7890)</option>
+                          <option value="1121">[1121] Bank Mandiri - Rek Payroll (987-654-3210)</option>
+                          <option value="1122">[1122] Bank BNI - Rek Penerimaan Invoice (1177888008)</option>
+                          <option value="1130">[1130] Bank Syariah Indonesia - Rek Operasional (777-666-555)</option>
+                          <option value="1110">[1110] Kas Operasional Kantor Pusat (Petty Cash)</option>
+                        </>
+                      )}
+                    </select>
+
+                    <p className="text-[10px] text-slate-500">
+                      Setiap kali transaksi penerimaan/pembayaran dilakukan melalui rekening ini, jurnal umum akan otomatis didebit/dikreditkan ke akun COA di atas.
+                    </p>
+                  </div>
+
+                  {/* Row 5: Kantor Cabang & SWIFT Code */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        Kantor Cabang (KCU / KCP)
+                      </label>
+                      <input
+                        type="text"
+                        value={bankFormData.branch}
+                        onChange={(e) => setBankFormData({ ...bankFormData, branch: e.target.value })}
+                        placeholder="Contoh: KCU Mega Kuningan Jakarta"
+                        className="w-full px-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-amber-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        Kode SWIFT / BI-FAST (Opsional)
+                      </label>
+                      <input
+                        type="text"
+                        value={bankFormData.swiftCode}
+                        onChange={(e) => setBankFormData({ ...bankFormData, swiftCode: e.target.value })}
+                        placeholder="Contoh: CENAIDJA"
+                        className="w-full px-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs font-mono focus:border-amber-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 6: Catatan & Checkbox Primary */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                      Catatan / Keterangan Tambahan
+                    </label>
+                    <input
+                      type="text"
+                      value={bankFormData.notes}
+                      onChange={(e) => setBankFormData({ ...bankFormData, notes: e.target.value })}
+                      placeholder="Contoh: Khusus pembayaran termin kontrak project gedung"
+                      className="w-full px-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:border-amber-500 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Checkbox Jadikan Rekening Utama */}
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center space-x-3">
+                    <input
+                      id="checkbox-is-primary-bank"
+                      type="checkbox"
+                      checked={bankFormData.isPrimary}
+                      onChange={(e) => setBankFormData({ ...bankFormData, isPrimary: e.target.checked })}
+                      className="rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                    />
+                    <label htmlFor="checkbox-is-primary-bank" className="text-xs font-bold text-white cursor-pointer">
+                      Jadikan sebagai Rekening Utama untuk Kop Surat Resmi & Dokumen Faktur
+                    </label>
+                  </div>
+
+                  {/* Modal Action Buttons */}
+                  <div className="pt-3 border-t border-slate-800 flex items-center justify-end space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsBankModalOpen(false)}
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold shadow-lg shadow-amber-500/25 transition cursor-pointer"
+                    >
+                      {editingBankId ? 'Simpan Perubahan Rekening' : 'Tambahkan Rekening Bank'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* CONFIRM MODAL: HAPUS REKENING BANK */}
+          <ConfirmModal
+            isOpen={!!bankToDelete}
+            title="Hapus Rekening Bank Terpilih?"
+            message={
+              bankToDelete
+                ? `Apakah Anda yakin ingin menghapus rekening bank "${bankToDelete.bankName}" dengan nomor rekening "${bankToDelete.accountNumber}" (Peran: ${bankToDelete.role})? Rekening ini terhubung dengan COA [${bankToDelete.coaAccountCode}]. Tindakan ini tidak dapat dibatalkan.`
+                : ''
+            }
+            confirmText="Ya, Hapus Rekening"
+            cancelText="Batal"
+            confirmVariant="danger"
+            onConfirm={handleExecuteDeleteBank}
+            onCancel={() => setBankToDelete(null)}
+          />
         </div>
       )}
 
@@ -944,12 +1876,37 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
                   Dengan ini diterangkan bahwa data operasional, ketenagakerjaan, persediaan logistik, dan laporan keuangan yang tercantum pada sistem <b>{formData.name}</b> telah diverifikasi dan disetujui secara digital sesuai standar operasional prosedur perusahaan.
                 </p>
 
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 text-xs">
-                  <div className="font-bold text-slate-900">Rekening Resmi Pembayaran / Payroll:</div>
-                  <div className="text-slate-700 grid grid-cols-2 gap-2 text-[11px]">
-                    <div>Bank: <b>{formData.bankName}</b></div>
-                    <div>No. Rek: <b className="font-mono">{formData.bankAccountNo}</b></div>
-                    <div className="col-span-2">Atas Nama: <b>{formData.bankAccountHolder}</b></div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <span className="font-bold text-slate-900">Rekening Resmi Perusahaan (Bagan Akun PSAK & Operasional):</span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {currentBankAccounts.length} Rekening Terdaftar
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {currentBankAccounts.map((b) => (
+                      <div
+                        key={b.id}
+                        className={`p-2.5 rounded-lg border text-[11px] ${
+                          b.isPrimary
+                            ? 'bg-amber-50/60 border-amber-300 text-slate-900'
+                            : 'bg-white border-slate-200 text-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between font-bold">
+                          <span>{b.bankName}</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                            {b.role.replace('Rekening ', '')}
+                          </span>
+                        </div>
+                        <div className="font-mono font-bold text-slate-900 pt-0.5">{b.accountNumber}</div>
+                        <div className="text-[10px] text-slate-500 truncate">a/n {b.accountHolder}</div>
+                        <div className="text-[9px] text-amber-700 font-semibold pt-1">
+                          COA: [{b.coaAccountCode}] {b.coaAccountName}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

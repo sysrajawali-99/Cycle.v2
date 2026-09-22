@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="id" class="dark">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
@@ -9,9 +9,9 @@
     <meta property="og:description" content="Portal Manajemen Operasional Terpadu & Sistem Hak Akses Multi-Role PT Rajawali Cycle Indonesia" />
     
     <!-- Apple & Android Mobile Web App Meta Tags -->
-    <meta name="theme-color" content="#020617" />
+    <meta name="theme-color" content="#f8fafc" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Rajawali Cycle" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="format-detection" content="telephone=no" />
@@ -21,24 +21,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <!-- Google Identity Services for Google Drive Integration -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <!-- Instant Theme Initializer -->
-    <script>
-      (function() {
-        try {
-          var mode = localStorage.getItem('rajawali_theme_mode');
-          var isDark = mode === 'dark' || (!mode && true) || (mode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          if (mode === 'light' || (!isDark && mode)) {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.classList.add('light');
-          } else {
-            document.documentElement.classList.add('dark');
-            document.documentElement.classList.remove('light');
-          }
-        } catch (e) {}
-      })();
-    </script>
   </head>
-  <body class="bg-slate-950 text-slate-100 antialiased font-['Plus_Jakarta_Sans',sans-serif] selection:bg-amber-500 selection:text-slate-950 min-h-screen">
+  <body class="bg-slate-50 text-slate-900 antialiased font-['Plus_Jakarta_Sans',sans-serif] selection:bg-amber-500 selection:text-slate-950 min-h-screen">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

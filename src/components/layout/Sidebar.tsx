@@ -287,20 +287,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar Drawer Container */}
       <aside
         id="app-sidebar"
-        className={`fixed lg:sticky top-0 lg:top-14 z-40 lg:z-20 w-72 lg:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 h-screen lg:h-[calc(100vh-3.5rem)] transition-transform duration-300 ease-in-out overflow-y-auto ${
+        className={`fixed lg:sticky top-0 lg:top-14 z-40 lg:z-20 w-72 lg:w-64 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 h-screen lg:h-[calc(100vh-3.5rem)] transition-transform duration-300 ease-in-out overflow-y-auto ${
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
         {/* Mobile & Tablet Header Inside Drawer */}
-        <div className="p-3 border-b border-slate-800 lg:hidden flex items-center justify-between">
+        <div className="p-3 border-b border-slate-200 lg:hidden flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span className="text-xl">🦅</span>
-            <span className="font-extrabold text-white text-sm">RAJAWALI CYCLE</span>
+            <span className="font-extrabold text-slate-900 text-sm">RAJAWALI CYCLE</span>
           </div>
           <button
             id="close-sidebar-mobile-btn"
             onClick={onCloseMobile}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-800 cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 bg-slate-100 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -308,18 +308,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* User Info Capsule inside sidebar */}
         {currentUser && (
-          <div className="p-3 m-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+          <div className="p-3 m-3 bg-slate-50 border border-slate-200 rounded-xl">
             <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-base shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-base shrink-0">
                 {currentUser.avatar || '👤'}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="font-bold text-white text-xs truncate">{currentUser.name}</div>
-                <div className="text-[10px] text-amber-400 truncate font-semibold">{currentUser.role}</div>
+                <div className="font-bold text-slate-900 text-xs truncate">{currentUser.name}</div>
+                <div className="text-[10px] text-amber-700 truncate font-semibold">{currentUser.role}</div>
               </div>
             </div>
             {currentUser.isLocationLocked && (
-              <div className="mt-2 pt-2 border-t border-slate-800 flex items-center space-x-1.5 text-[10px] text-emerald-400 font-medium">
+              <div className="mt-2 pt-2 border-t border-slate-200 flex items-center space-x-1.5 text-[10px] text-emerald-700 font-medium">
                 <Lock className="w-3 h-3 shrink-0" />
                 <span className="truncate">Visibilitas Terkunci per Lokasi</span>
               </div>
@@ -329,9 +329,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation Items */}
         <div className="p-3 space-y-1.5 flex-1">
-          <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+          <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
             <span>Menu Sistem</span>
-            <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.2 rounded font-semibold">
+            <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-semibold border border-slate-200">
               {totalAccessibleCount} Menu
             </span>
           </div>
@@ -346,28 +346,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all group min-h-[44px] cursor-pointer ${
                 currentView === 'dashboard'
-                  ? 'bg-[#ffedd5] dark:bg-amber-500/20 text-[#431407] dark:text-amber-100 font-extrabold border border-[#fdba74] dark:border-amber-500/40 shadow-sm'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-[#431407] dark:hover:text-white'
+                  ? 'bg-[#ffedd5] text-[#431407] font-extrabold border border-[#fdba74] shadow-xs'
+                  : 'text-slate-700 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-[#431407]'
               }`}
             >
               <div className="flex items-center space-x-3 min-w-0">
                 <div
                   className={`p-1.5 rounded-lg transition-colors shrink-0 ${
                     currentView === 'dashboard'
-                      ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
-                      : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60 dark:group-hover:bg-slate-800'
+                      ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-xs border border-amber-400/60'
+                      : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60'
                   }`}
                 >
                   {dashboardItem.icon}
                 </div>
                 <div className="truncate">
                   <div className={`text-sm font-extrabold leading-tight truncate ${
-                    currentView === 'dashboard' ? 'text-black dark:text-amber-100 opacity-100' : 'text-black dark:text-white font-bold'
+                    currentView === 'dashboard' ? 'text-black opacity-100' : 'text-slate-900 font-bold'
                   }`}>
                     {dashboardItem.label}
                   </div>
                   <div className={`text-[11px] truncate ${
-                    currentView === 'dashboard' ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                    currentView === 'dashboard' ? 'text-[#431407] font-semibold opacity-100' : 'text-slate-500 font-medium'
                   }`}>
                     {dashboardItem.description}
                   </div>
@@ -386,45 +386,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setIsHrmOpen(!isHrmOpen)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer group ${
                   isCurrentInHrm
-                    ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30'
-                    : 'bg-slate-50 dark:bg-slate-950/40 text-slate-700 dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] dark:hover:bg-slate-800/70 hover:text-[#431407] dark:hover:text-white border border-slate-200 dark:border-slate-800/60'
+                    ? 'bg-blue-50 text-blue-950 border border-blue-200'
+                    : 'bg-slate-50 text-slate-700 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:text-[#431407] border border-slate-200'
                 }`}
               >
                 <div className="flex items-center space-x-2.5 min-w-0">
                   <div
                     className={`p-1.5 rounded-lg shrink-0 transition-colors ${
                       isCurrentInHrm
-                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                        : 'bg-slate-200 dark:bg-slate-800 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600/20'
+                        ? 'bg-blue-600 text-white shadow-xs shadow-blue-600/30'
+                        : 'bg-slate-200 text-blue-700 group-hover:bg-blue-100'
                     }`}
                   >
                     <Briefcase className="w-4 h-4" />
                   </div>
                   <div className="truncate">
-                    <div className="text-xs font-bold tracking-tight text-black dark:text-white flex items-center space-x-1.5">
+                    <div className="text-xs font-bold tracking-tight text-slate-900 flex items-center space-x-1.5">
                       <span>Human Resource Management (HRM)</span>
                     </div>
-                    <div className="text-[10px] text-black dark:text-slate-400 truncate font-medium">
+                    <div className="text-[10px] text-slate-500 truncate font-medium">
                       Timesheet, Karyawan, SOP & Payroll
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-1.5 shrink-0 ml-1">
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-300 border border-blue-500/30">
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
                     {visibleHrmItems.length}
                   </span>
                   {isHrmOpen ? (
-                    <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform" />
+                    <ChevronDown className="w-4 h-4 text-slate-500 group-hover:text-slate-800 transition-transform" />
                   ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform" />
+                    <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-800 transition-transform" />
                   )}
                 </div>
               </button>
 
               {/* Sub-menu items for HRM */}
               {isHrmOpen && (
-                <div className="pl-3 pr-1 py-1 space-y-1 border-l-2 border-blue-500/30 ml-3.5 space-y-0.5 animate-in fade-in duration-200">
+                <div className="pl-3 pr-1 py-1 space-y-1 border-l-2 border-blue-400 ml-3.5 space-y-0.5 animate-in fade-in duration-200">
                   {visibleHrmItems.map((item) => {
                     const isActive =
                       currentView === item.id || (item.id === 'sops' && currentView === 'sop');
@@ -438,28 +438,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         }}
                         className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-all group min-h-[38px] cursor-pointer ${
                           isActive
-                            ? 'bg-[#ffedd5] dark:bg-amber-500/20 text-[#431407] dark:text-amber-100 font-extrabold border border-[#fdba74] dark:border-amber-500/40 shadow-sm'
-                            : 'text-black dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-black dark:hover:text-white'
+                            ? 'bg-[#ffedd5] text-[#431407] font-extrabold border border-[#fdba74] shadow-xs'
+                            : 'text-slate-700 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-black'
                         }`}
                       >
                         <div className="flex items-center space-x-2.5 min-w-0">
                           <div
                             className={`p-1 rounded-md shrink-0 transition-colors ${
                               isActive
-                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
-                                : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60 dark:group-hover:bg-slate-800'
+                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-xs border border-amber-400/60'
+                                : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60'
                             }`}
                           >
                             {item.icon}
                           </div>
                           <div className="truncate">
                             <div className={`text-xs leading-tight truncate ${
-                              isActive ? 'text-black dark:text-amber-100 font-extrabold opacity-100' : 'text-black dark:text-slate-200 font-bold'
+                              isActive ? 'text-black font-extrabold opacity-100' : 'text-slate-900 font-bold'
                             }`}>
                               {item.label}
                             </div>
                             <div className={`text-[10px] truncate ${
-                              isActive ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                              isActive ? 'text-[#431407] font-semibold opacity-100' : 'text-slate-500 font-medium'
                             }`}>
                               {item.description}
                             </div>
@@ -491,45 +491,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setIsOmOpen(!isOmOpen)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer group ${
                   isCurrentInOm
-                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30'
-                    : 'bg-slate-50 dark:bg-slate-950/40 text-slate-700 dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] dark:hover:bg-slate-800/70 hover:text-[#431407] dark:hover:text-white border border-slate-200 dark:border-slate-800/60'
+                    ? 'bg-amber-50 text-amber-950 border border-amber-200'
+                    : 'bg-slate-50 text-slate-700 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:text-[#431407] border border-slate-200'
                 }`}
               >
                 <div className="flex items-center space-x-2.5 min-w-0">
                   <div
                     className={`p-1.5 rounded-lg shrink-0 transition-colors ${
                       isCurrentInOm
-                        ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30'
-                        : 'bg-slate-200 dark:bg-slate-800 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500/20'
+                        ? 'bg-amber-500 text-slate-950 shadow-xs shadow-amber-500/30'
+                        : 'bg-slate-200 text-amber-700 group-hover:bg-amber-100'
                     }`}
                   >
                     <Layers className="w-4 h-4" />
                   </div>
                   <div className="truncate">
-                    <div className="text-xs font-bold tracking-tight text-black dark:text-white flex items-center space-x-1.5">
+                    <div className="text-xs font-bold tracking-tight text-slate-900 flex items-center space-x-1.5">
                       <span>Operations Management (OM)</span>
                     </div>
-                    <div className="text-[10px] text-black dark:text-slate-400 truncate font-medium">
+                    <div className="text-[10px] text-slate-500 truncate font-medium">
                       Lokasi, Inventory & Monitoring Board
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-1.5 shrink-0 ml-1">
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30">
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
                     {visibleOmItems.length}
                   </span>
                   {isOmOpen ? (
-                    <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform" />
+                    <ChevronDown className="w-4 h-4 text-slate-500 group-hover:text-slate-800 transition-transform" />
                   ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform" />
+                    <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-800 transition-transform" />
                   )}
                 </div>
               </button>
 
               {/* Sub-menu items for OM */}
               {isOmOpen && (
-                <div className="pl-3 pr-1 py-1 space-y-1 border-l-2 border-amber-500/30 ml-3.5 space-y-0.5 animate-in fade-in duration-200">
+                <div className="pl-3 pr-1 py-1 space-y-1 border-l-2 border-amber-400 ml-3.5 space-y-0.5 animate-in fade-in duration-200">
                   {visibleOmItems.map((item) => {
                     const isActive = currentView === item.id;
                     return (
@@ -542,28 +542,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         }}
                         className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-all group min-h-[38px] cursor-pointer ${
                           isActive
-                            ? 'bg-[#ffedd5] dark:bg-amber-500/20 text-[#431407] dark:text-amber-100 font-extrabold border border-[#fdba74] dark:border-amber-500/40 shadow-sm'
-                            : 'text-black dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-black dark:hover:text-white'
+                            ? 'bg-[#ffedd5] text-[#431407] font-extrabold border border-[#fdba74] shadow-xs'
+                            : 'text-slate-700 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-black'
                         }`}
                       >
                         <div className="flex items-center space-x-2.5 min-w-0">
                           <div
                             className={`p-1 rounded-md shrink-0 transition-colors ${
                               isActive
-                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
-                                : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60 dark:group-hover:bg-slate-800'
+                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-xs border border-amber-400/60'
+                                : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60'
                             }`}
                           >
                             {item.icon}
                           </div>
                           <div className="truncate">
                             <div className={`text-xs leading-tight truncate ${
-                              isActive ? 'text-black dark:text-amber-100 font-extrabold opacity-100' : 'text-black dark:text-slate-200 font-bold'
+                              isActive ? 'text-black font-extrabold opacity-100' : 'text-slate-900 font-bold'
                             }`}>
                               {item.label}
                             </div>
                             <div className={`text-[10px] truncate ${
-                              isActive ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                              isActive ? 'text-[#431407] font-semibold opacity-100' : 'text-slate-500 font-medium'
                             }`}>
                               {item.description}
                             </div>
@@ -595,45 +595,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setIsFinanceOpen(!isFinanceOpen)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer group ${
                   isCurrentInFinance
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30'
-                    : 'bg-slate-50 dark:bg-slate-950/40 text-slate-700 dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] dark:hover:bg-slate-800/70 hover:text-[#431407] dark:hover:text-white border border-slate-200 dark:border-slate-800/60'
+                    ? 'bg-emerald-50 text-emerald-950 border border-emerald-200'
+                    : 'bg-slate-50 text-slate-700 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:text-[#431407] border border-slate-200'
                 }`}
               >
                 <div className="flex items-center space-x-2.5 min-w-0">
                   <div
                     className={`p-1.5 rounded-lg shrink-0 transition-colors ${
                       isCurrentInFinance
-                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                        : 'bg-slate-200 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600/20'
+                        ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30'
+                        : 'bg-slate-200 text-emerald-700 group-hover:bg-emerald-100'
                     }`}
                   >
                     <Wallet className="w-4 h-4" />
                   </div>
                   <div className="truncate">
-                    <div className="text-xs font-bold tracking-tight text-black dark:text-white flex items-center space-x-1.5">
+                    <div className="text-xs font-bold tracking-tight text-slate-900 flex items-center space-x-1.5">
                       <span>Divisi Finance & Accounting</span>
                     </div>
-                    <div className="text-[10px] text-black dark:text-slate-400 truncate font-medium">
+                    <div className="text-[10px] text-slate-500 truncate font-medium">
                       Kas COA, Rekening Koran & Laporan SAK
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-1.5 shrink-0 ml-1">
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                     {visibleFinanceItems.length}
                   </span>
                   {isFinanceOpen ? (
-                    <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform" />
+                    <ChevronDown className="w-4 h-4 text-slate-500 group-hover:text-slate-800 transition-transform" />
                   ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform" />
+                    <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-800 transition-transform" />
                   )}
                 </div>
               </button>
 
               {/* Sub-menu items for Finance */}
               {isFinanceOpen && (
-                <div className="pl-3 pr-1 py-1 space-y-1 border-l-2 border-emerald-500/30 ml-3.5 space-y-0.5 animate-in fade-in duration-200">
+                <div className="pl-3 pr-1 py-1 space-y-1 border-l-2 border-emerald-400 ml-3.5 space-y-0.5 animate-in fade-in duration-200">
                   {visibleFinanceItems.map((item) => {
                     const isActive = currentView === item.id;
                     return (
@@ -646,28 +646,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         }}
                         className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-all group min-h-[38px] cursor-pointer ${
                           isActive
-                            ? 'bg-[#ffedd5] dark:bg-amber-500/20 text-[#431407] dark:text-amber-100 font-extrabold border border-[#fdba74] dark:border-amber-500/40 shadow-sm'
-                            : 'text-black dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-black dark:hover:text-white'
+                            ? 'bg-[#ffedd5] text-[#431407] font-extrabold border border-[#fdba74] shadow-xs'
+                            : 'text-slate-700 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-black'
                         }`}
                       >
                         <div className="flex items-center space-x-2.5 min-w-0">
                           <div
                             className={`p-1 rounded-md shrink-0 transition-colors ${
                               isActive
-                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
-                                : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60 dark:group-hover:bg-slate-800'
+                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-xs border border-amber-400/60'
+                                : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60'
                             }`}
                           >
                             {item.icon}
                           </div>
                           <div className="truncate">
                             <div className={`text-xs leading-tight truncate ${
-                              isActive ? 'text-black dark:text-amber-100 font-extrabold opacity-100' : 'text-black dark:text-slate-200 font-bold'
+                              isActive ? 'text-black font-extrabold opacity-100' : 'text-slate-900 font-bold'
                             }`}>
                               {item.label}
                             </div>
                             <div className={`text-[10px] truncate ${
-                              isActive ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                              isActive ? 'text-[#431407] font-semibold opacity-100' : 'text-slate-500 font-medium'
                             }`}>
                               {item.description}
                             </div>
@@ -691,8 +691,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* 4. Other Remaining Menus (Eagle Blast, Hak Akses Pengguna) */}
           {visibleOtherItems.length > 0 && (
-            <div className="space-y-1 pt-1.5 border-t border-slate-200 dark:border-slate-800/80">
-              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-black dark:text-slate-400">
+            <div className="space-y-1 pt-1.5 border-t border-slate-200">
+              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 Lainnya & Administrasi
               </div>
               {visibleOtherItems.map((item) => {
@@ -707,28 +707,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all group min-h-[44px] cursor-pointer ${
                       isActive
-                        ? 'bg-[#ffedd5] dark:bg-amber-500/20 text-[#431407] dark:text-amber-100 font-extrabold border border-[#fdba74] dark:border-amber-500/40 shadow-sm'
-                        : 'text-black dark:text-slate-300 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-black dark:hover:text-white'
+                        ? 'bg-[#ffedd5] text-[#431407] font-extrabold border border-[#fdba74] shadow-xs'
+                        : 'text-slate-700 hover:bg-[#fff7ed] active:bg-[#fff7ed] hover:border-orange-200/80 border border-transparent hover:text-black'
                     }`}
                   >
                     <div className="flex items-center space-x-3 min-w-0">
                       <div
                         className={`p-1.5 rounded-lg transition-colors shrink-0 ${
                           isActive
-                            ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-sm border border-amber-400/60'
-                            : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60 dark:group-hover:bg-slate-800'
+                            ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 [&>svg]:text-slate-950 [&>svg]:stroke-[2.5px] shadow-xs border border-amber-400/60'
+                            : 'text-slate-400 group-hover:text-amber-600 group-hover:bg-[#ffedd5]/60'
                         }`}
                       >
                         {item.icon}
                       </div>
                       <div className="truncate">
                         <div className={`text-sm leading-tight truncate ${
-                          isActive ? 'text-black dark:text-amber-100 font-extrabold opacity-100' : 'text-black dark:text-slate-200 font-bold'
+                          isActive ? 'text-black font-extrabold opacity-100' : 'text-slate-900 font-bold'
                         }`}>
                           {item.label}
                         </div>
                         <div className={`text-[11px] truncate ${
-                          isActive ? 'text-black dark:text-amber-300 font-semibold opacity-100' : 'text-black dark:text-slate-400 font-medium'
+                          isActive ? 'text-[#431407] font-semibold opacity-100' : 'text-slate-500 font-medium'
                         }`}>
                           {item.description}
                         </div>
@@ -750,12 +750,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Footer Info Box */}
-        <div className="p-3 border-t border-slate-800 bg-slate-950/50 m-2 rounded-xl space-y-2">
-          <div className="flex items-center space-x-2 text-xs text-amber-400 font-semibold">
+        <div className="p-3 border-t border-slate-200 bg-slate-50 m-2 rounded-xl space-y-2">
+          <div className="flex items-center space-x-2 text-xs text-amber-700 font-semibold">
             <Sparkles className="w-3.5 h-3.5 shrink-0" />
             <span>Sistem Terintegrasi Lapangan</span>
           </div>
-          <p className="text-[11px] text-slate-400 leading-relaxed">
+          <p className="text-[11px] text-slate-500 leading-relaxed">
             Role-Based Access Control aktif. Hak akses dikelola oleh Super Admin HQ.
           </p>
 
@@ -767,9 +767,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onOpenDriveSync();
                 onCloseMobile();
               }}
-              className="w-full flex items-center justify-center space-x-1.5 py-2 px-3 bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 hover:text-white text-xs font-bold rounded-xl border border-blue-500/40 cursor-pointer shadow-sm transition-all group"
+              className="w-full flex items-center justify-center space-x-1.5 py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 cursor-pointer shadow-xs transition-all group"
             >
-              <Cloud className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
+              <Cloud className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform" />
               <span>Google Drive Cloud Sync</span>
             </button>
           )}
@@ -783,10 +783,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onCloseMobile();
                 }
               }}
-              className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-3 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-[11px] rounded-lg border border-slate-800 cursor-pointer"
+              className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 text-[11px] rounded-lg border border-slate-200 cursor-pointer"
               title="Kosongkan seluruh data operasional sistem"
             >
-              <Trash2 className="w-3 h-3 text-rose-400" />
+              <Trash2 className="w-3 h-3 text-rose-500" />
               <span>Kosongkan Data Sistem</span>
             </button>
           )}
