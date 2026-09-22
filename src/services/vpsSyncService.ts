@@ -4,7 +4,7 @@ import { UserAccount } from '../types';
 
 export interface VpsConnectionStatus {
   connected: boolean;
-  engine: 'postgresql' | 'local_file';
+  engine: 'postgresql' | 'remote_vps' | 'local_file';
   databaseUrlConfigured: boolean;
   socketConnected: boolean;
   host?: string;

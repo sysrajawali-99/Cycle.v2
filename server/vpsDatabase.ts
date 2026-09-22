@@ -4,7 +4,7 @@ import path from 'path';
 
 export interface VpsDbStatus {
   connected: boolean;
-  engine: 'postgresql' | 'local_file';
+  engine: 'postgresql' | 'remote_vps' | 'local_file';
   databaseUrlConfigured: boolean;
   host?: string;
   database?: string;
@@ -13,7 +13,10 @@ export interface VpsDbStatus {
 }
 
 let pgPool: Pool | null = null;
-let dbEngine: 'postgresql' | 'local_file' = 'local_file';
+let remoteVpsUrl: string | null = null;
+let remoteHost: string | undefined;
+let remoteDatabase: string | undefined;
+let dbEngine: 'postgresql' | 'remote_vps' | 'local_file' = 'local_file';
 let lastSyncTimestamp: string = new Date().toISOString();
 let lastError: string | undefined;
 
@@ -55,20 +58,90 @@ function writeLocalStore(store: Record<string, any>) {
 }
 
 /**
- * Initialize PostgreSQL connection if DATABASE_URL is set in environment.
- * Gracefully falls back to local file store if DATABASE_URL is absent or unreachable.
+ * Fetch and synchronize states from remote VPS into local cache
+ */
+async function syncFromRemoteVps(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${url}/api/vps/states`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success && json.states && typeof json.states === 'object') {
+        const local = readLocalStore();
+        const merged = { ...local, ...json.states };
+        writeLocalStore(merged);
+        console.log(`[VPS] Successfully synced ${Object.keys(json.states).length} entities from remote VPS.`);
+        return true;
+      }
+    }
+  } catch (err: any) {
+    console.info('[VPS] Initial state fetch from remote VPS skipped/failed:', err?.message || err);
+  }
+  return false;
+}
+
+/**
+ * Initialize VPS Database or Remote Sync based on DATABASE_URL.
+ * Supports:
+ * 1. Direct PostgreSQL connection strings (postgres://, postgresql://)
+ * 2. Remote VPS HTTP/HTTPS endpoints (https://vps.domain.com)
+ * 3. Graceful fallback to local file store
  */
 export async function initVpsDatabase(): Promise<VpsDbStatus> {
-  const databaseUrl = process.env.DATABASE_URL;
+  const rawUrl = process.env.DATABASE_URL;
 
-  if (!databaseUrl || databaseUrl.trim() === '') {
+  if (!rawUrl || rawUrl.trim() === '') {
     dbEngine = 'local_file';
     ensureLocalStore();
     return getVpsDbStatus();
   }
 
+  const databaseUrl = rawUrl.trim();
+
+  // Mode 1: Remote VPS HTTP/HTTPS endpoint
+  if (databaseUrl.startsWith('http://') || databaseUrl.startsWith('https://')) {
+    const cleanedUrl = databaseUrl.replace(/\/+$/, '');
+    remoteVpsUrl = cleanedUrl;
+    try {
+      const parsedUrl = new URL(cleanedUrl);
+      remoteHost = parsedUrl.host;
+    } catch {
+      remoteHost = cleanedUrl;
+    }
+
+    try {
+      const res = await fetch(`${cleanedUrl}/api/vps/status`, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(6000)
+      });
+
+      if (res.ok) {
+        const statusJson = await res.json();
+        dbEngine = 'remote_vps';
+        remoteDatabase = statusJson.database || 'rajawali_cycle';
+        lastError = undefined;
+        lastSyncTimestamp = new Date().toISOString();
+        console.log(`[VPS] Connected to Remote VPS API at ${cleanedUrl} (Host: ${remoteHost})`);
+
+        // Synchronize remote data to local store in background
+        syncFromRemoteVps(cleanedUrl).catch(() => {});
+        return getVpsDbStatus();
+      } else {
+        throw new Error(`Remote VPS responded with status ${res.status}`);
+      }
+    } catch (err: any) {
+      console.info(`[VPS] Remote VPS ${cleanedUrl} not reachable (${err?.message || 'offline'}). Using local storage fallback.`);
+      dbEngine = 'local_file';
+      lastError = err?.message || 'Remote VPS tidak dapat dijangkau';
+      ensureLocalStore();
+      return getVpsDbStatus();
+    }
+  }
+
+  // Mode 2: Direct PostgreSQL connection
   try {
-    // Attempt connecting to PostgreSQL
     pgPool = new Pool({
       connectionString: databaseUrl,
       ssl: databaseUrl.includes('sslmode=require') || databaseUrl.includes('supabase.co')
@@ -77,6 +150,9 @@ export async function initVpsDatabase(): Promise<VpsDbStatus> {
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
       max: 10
+    });
+    pgPool.on('error', (err) => {
+      console.warn('[VPS] Unexpected error on idle pgPool client:', err?.message || err);
     });
 
     const client = await pgPool.connect();
@@ -104,12 +180,12 @@ export async function initVpsDatabase(): Promise<VpsDbStatus> {
       dbEngine = 'postgresql';
       lastError = undefined;
       lastSyncTimestamp = new Date().toISOString();
-      console.log('Successfully connected to VPS PostgreSQL Database');
+      console.log('[VPS] Successfully connected to VPS PostgreSQL Database');
     } finally {
       client.release();
     }
   } catch (err: any) {
-    console.warn('PostgreSQL connection attempt failed. Using local storage fallback:', err?.message || err);
+    console.info(`[VPS] PostgreSQL connection could not be established (${err?.message || 'offline'}). Using local storage fallback.`);
     dbEngine = 'local_file';
     lastError = err?.message || 'Gagal terhubung ke PostgreSQL';
     ensureLocalStore();
@@ -126,7 +202,10 @@ export function getVpsDbStatus(): VpsDbStatus {
   let host = undefined;
   let database = undefined;
 
-  if (databaseUrl) {
+  if (dbEngine === 'remote_vps') {
+    host = remoteHost;
+    database = remoteDatabase || 'rajawali_cycle';
+  } else if (databaseUrl) {
     try {
       const urlObj = new URL(databaseUrl.replace('postgresql://', 'http://'));
       host = urlObj.host;
@@ -137,7 +216,7 @@ export function getVpsDbStatus(): VpsDbStatus {
   }
 
   return {
-    connected: dbEngine === 'postgresql',
+    connected: dbEngine === 'postgresql' || dbEngine === 'remote_vps',
     engine: dbEngine,
     databaseUrlConfigured: Boolean(databaseUrl && databaseUrl.trim().length > 0),
     host,
@@ -157,6 +236,12 @@ export async function saveVpsState(
 ): Promise<boolean> {
   lastSyncTimestamp = new Date().toISOString();
 
+  // 1. Always update local store immediately for instant response
+  const store = readLocalStore();
+  store[key] = data;
+  writeLocalStore(store);
+
+  // 2. If connected to PostgreSQL directly
   if (dbEngine === 'postgresql' && pgPool) {
     try {
       await pgPool.query(
@@ -179,19 +264,28 @@ export async function saveVpsState(
       }
       return true;
     } catch (err: any) {
-      console.error(`PostgreSQL save error for key ${key}:`, err?.message || err);
-      // Fallback save to local file
-      const store = readLocalStore();
-      store[key] = data;
-      writeLocalStore(store);
+      console.warn(`[VPS] PostgreSQL save error for key ${key}:`, err?.message || err);
       return false;
     }
   }
 
-  // Local fallback
-  const store = readLocalStore();
-  store[key] = data;
-  writeLocalStore(store);
+  // 3. If connected to Remote VPS via HTTP API
+  if (dbEngine === 'remote_vps' && remoteVpsUrl) {
+    try {
+      fetch(`${remoteVpsUrl}/api/vps/state/${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, meta }),
+        signal: AbortSignal.timeout(5000)
+      }).catch((err) => {
+        console.warn(`[VPS] Remote VPS sync failed for key ${key}:`, err?.message || err);
+      });
+      return true;
+    } catch {
+      return true;
+    }
+  }
+
   return true;
 }
 
@@ -207,7 +301,7 @@ export async function getVpsState(key: string): Promise<any | null> {
       }
       return null;
     } catch (err: any) {
-      console.error(`PostgreSQL get error for key ${key}:`, err?.message || err);
+      console.warn(`[VPS] PostgreSQL get error for key ${key}:`, err?.message || err);
     }
   }
 
@@ -219,17 +313,36 @@ export async function getVpsState(key: string): Promise<any | null> {
  * Get all states from database
  */
 export async function getAllVpsStates(): Promise<Record<string, any>> {
-  const result: Record<string, any> = {};
-
   if (dbEngine === 'postgresql' && pgPool) {
     try {
       const res = await pgPool.query('SELECT key, data FROM rajawali_app_state');
+      const result: Record<string, any> = {};
       for (const row of res.rows) {
         result[row.key] = row.data;
       }
       return result;
     } catch (err: any) {
-      console.error('PostgreSQL getAll error:', err?.message || err);
+      console.warn('[VPS] PostgreSQL getAll error:', err?.message || err);
+    }
+  }
+
+  if (dbEngine === 'remote_vps' && remoteVpsUrl) {
+    try {
+      const res = await fetch(`${remoteVpsUrl}/api/vps/states`, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(4000)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.states && typeof json.states === 'object') {
+          const local = readLocalStore();
+          const merged = { ...local, ...json.states };
+          writeLocalStore(merged);
+          return merged;
+        }
+      }
+    } catch (err: any) {
+      console.info('[VPS] Remote states fetch error, using local cache:', err?.message || err);
     }
   }
 
@@ -241,11 +354,40 @@ export async function getAllVpsStates(): Promise<Record<string, any>> {
  */
 export async function bulkSaveVpsStates(states: Record<string, any>): Promise<number> {
   let count = 0;
+
+  // 1. Save to local store
+  const store = readLocalStore();
   for (const [key, data] of Object.entries(states)) {
     if (data !== undefined && data !== null) {
-      await saveVpsState(key, data);
+      store[key] = data;
       count++;
     }
   }
+  writeLocalStore(store);
+
+  // 2. If PostgreSQL
+  if (dbEngine === 'postgresql' && pgPool) {
+    for (const [key, data] of Object.entries(states)) {
+      if (data !== undefined && data !== null) {
+        await saveVpsState(key, data);
+      }
+    }
+    return count;
+  }
+
+  // 3. If Remote VPS
+  if (dbEngine === 'remote_vps' && remoteVpsUrl) {
+    try {
+      fetch(`${remoteVpsUrl}/api/vps/bulk-sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ states }),
+        signal: AbortSignal.timeout(8000)
+      }).catch((err) => {
+        console.warn('[VPS] Remote VPS bulk-sync failed:', err?.message || err);
+      });
+    } catch {}
+  }
+
   return count;
 }

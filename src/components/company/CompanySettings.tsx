@@ -1065,11 +1065,19 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({
                     }`}
                   />
                   <span className="font-bold text-sm text-white">
-                    {vpsStatus.connected ? 'PostgreSQL Aktif' : 'Local File Store'}
+                    {vpsStatus.connected
+                      ? vpsStatus.engine === 'remote_vps'
+                        ? 'VPS Remote Aktif'
+                        : 'PostgreSQL Aktif'
+                      : 'Local File Store'}
                   </span>
                 </div>
                 <span className="text-[10px] text-slate-400 block">
-                  {vpsStatus.connected ? 'Terhubung ke PostgreSQL VPS' : 'Fallback aman lokal'}
+                  {vpsStatus.connected
+                    ? vpsStatus.engine === 'remote_vps'
+                      ? 'Terhubung ke VPS Remote API & Real-time'
+                      : 'Terhubung ke PostgreSQL VPS'
+                    : 'Fallback aman lokal'}
                 </span>
               </div>
 
