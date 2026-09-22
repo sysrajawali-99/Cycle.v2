@@ -24,6 +24,8 @@ let lastError: string | undefined;
 const LOCAL_DATA_DIR = path.join(process.cwd(), 'data');
 const LOCAL_DB_FILE = path.join(LOCAL_DATA_DIR, 'vps_local_store.json');
 
+const inMemoryCache: Record<string, any> = {};
+
 function ensureLocalStore() {
   try {
     if (!fs.existsSync(LOCAL_DATA_DIR)) {
@@ -41,13 +43,15 @@ function readLocalStore(): Record<string, any> {
   ensureLocalStore();
   try {
     const raw = fs.readFileSync(LOCAL_DB_FILE, 'utf8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return { ...inMemoryCache, ...parsed };
   } catch {
-    return {};
+    return { ...inMemoryCache };
   }
 }
 
 function writeLocalStore(store: Record<string, any>) {
+  Object.assign(inMemoryCache, store);
   ensureLocalStore();
   try {
     fs.writeFileSync(LOCAL_DB_FILE, JSON.stringify(store, null, 2), 'utf8');
