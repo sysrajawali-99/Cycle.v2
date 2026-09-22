@@ -110,6 +110,24 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
   const [isDepreciationModalOpen, setIsDepreciationModalOpen] = useState(false);
   const [isCoaModalOpen, setIsCoaModalOpen] = useState(false);
   const [viewTransactionDetail, setViewTransactionDetail] = useState<FinanceTransaction | null>(null);
+  const [transactionToEdit, setTransactionToEdit] = useState<FinanceTransaction | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    date: '',
+    title: '',
+    description: '',
+    amount: '',
+    paymentMethod: 'Bank BCA (123-456-7890)' as PaymentMethod,
+    primaryAccountCode: '1120',
+    contraAccountCode: '4110',
+    projectId: 'ALL',
+    division: 'Cleaning Service' as DivisionType,
+    referenceNumber: '',
+    payeeOrPayer: ''
+  });
+  const [editJournalLines, setEditJournalLines] = useState<
+    { id: string; accountCode: string; debit: number; credit: number; notes: string }[]
+  >([]);
 
   // COA / Sub COA Management States
   const [coaModalMode, setCoaModalMode] = useState<'create' | 'edit'>('create');
@@ -231,6 +249,213 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
   const trialBalance = useMemo(() => {
     return financeService.generateTrialBalance(accounts, transactions, endDate || undefined);
   }, [accounts, transactions, endDate]);
+
+  // Open Edit Modal for a Transaction
+  const handleOpenEditTransaction = (trx: FinanceTransaction) => {
+    setTransactionToEdit(trx);
+    setEditFormData({
+      date: trx.date,
+      title: trx.title,
+      description: trx.description || '',
+      amount: String(trx.amount),
+      paymentMethod: trx.paymentMethod,
+      primaryAccountCode: trx.primaryAccountCode,
+      contraAccountCode: trx.contraAccountCode,
+      projectId: trx.projectId,
+      division: trx.division,
+      referenceNumber: trx.referenceNumber || '',
+      payeeOrPayer: trx.payeeOrPayer || ''
+    });
+
+    if (trx.journalEntries && trx.journalEntries.length > 0) {
+      setEditJournalLines(
+        trx.journalEntries.map((j) => ({
+          id: j.id,
+          accountCode: j.accountCode,
+          debit: j.debit,
+          credit: j.credit,
+          notes: j.notes || ''
+        }))
+      );
+    } else {
+      setEditJournalLines([
+        { id: '1', accountCode: trx.primaryAccountCode || '1120', debit: trx.amount, credit: 0, notes: '' },
+        { id: '2', accountCode: trx.contraAccountCode || '4110', debit: 0, credit: trx.amount, notes: '' }
+      ]);
+    }
+
+    setIsEditModalOpen(true);
+  };
+
+  // Save changes to edited transaction
+  const handleSaveEditedTransaction = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!transactionToEdit) return;
+
+    if (financeService.isDateInClosedPeriod(editFormData.date, periodClosings)) {
+      alert('Periode tanggal ini telah DITUTUP (Closed Period). Transaksi tidak dapat diubah.');
+      return;
+    }
+
+    const selectedProj = projects.find((p) => p.id === editFormData.projectId);
+    const primaryAcc = accounts.find((a) => a.code === editFormData.primaryAccountCode);
+    const contraAcc = accounts.find((a) => a.code === editFormData.contraAccountCode);
+
+    let updatedTrx: FinanceTransaction;
+
+    if (transactionToEdit.type === 'IN') {
+      const amountNum = parseFloat(String(editFormData.amount).replace(/[^\d.-]/g, '')) || 0;
+      if (amountNum <= 0) {
+        alert('Nominal uang masuk harus lebih besar dari 0.');
+        return;
+      }
+
+      updatedTrx = {
+        ...transactionToEdit,
+        date: editFormData.date,
+        title: editFormData.title || `Penerimaan Kas/Bank - ${contraAcc?.name || 'Pendapatan'}`,
+        description: editFormData.description,
+        amount: amountNum,
+        paymentMethod: editFormData.paymentMethod,
+        primaryAccountCode: editFormData.primaryAccountCode,
+        contraAccountCode: editFormData.contraAccountCode,
+        journalEntries: [
+          {
+            id: transactionToEdit.journalEntries?.[0]?.id || `j-${Date.now()}-1`,
+            accountCode: editFormData.primaryAccountCode,
+            accountName: primaryAcc?.name || 'Kas & Bank',
+            debit: amountNum,
+            credit: 0,
+            notes: `Penerimaan kas ${editFormData.paymentMethod}`
+          },
+          {
+            id: transactionToEdit.journalEntries?.[1]?.id || `j-${Date.now()}-2`,
+            accountCode: editFormData.contraAccountCode,
+            accountName: contraAcc?.name || 'Pendapatan',
+            debit: 0,
+            credit: amountNum,
+            notes: editFormData.title
+          }
+        ],
+        projectId: editFormData.projectId,
+        projectName: selectedProj ? selectedProj.name : 'Seluruh Lokasi (HQ)',
+        division: editFormData.division,
+        referenceNumber: editFormData.referenceNumber,
+        payeeOrPayer: editFormData.payeeOrPayer,
+        updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 19)
+      };
+    } else if (transactionToEdit.type === 'OUT') {
+      const amountNum = parseFloat(String(editFormData.amount).replace(/[^\d.-]/g, '')) || 0;
+      if (amountNum <= 0) {
+        alert('Nominal uang keluar harus lebih besar dari 0.');
+        return;
+      }
+
+      updatedTrx = {
+        ...transactionToEdit,
+        date: editFormData.date,
+        title: editFormData.title || `Pengeluaran Kas/Bank - ${contraAcc?.name || 'Beban Operasional'}`,
+        description: editFormData.description,
+        amount: amountNum,
+        paymentMethod: editFormData.paymentMethod,
+        primaryAccountCode: editFormData.primaryAccountCode,
+        contraAccountCode: editFormData.contraAccountCode,
+        journalEntries: [
+          {
+            id: transactionToEdit.journalEntries?.[0]?.id || `j-${Date.now()}-1`,
+            accountCode: editFormData.contraAccountCode,
+            accountName: contraAcc?.name || 'Beban Operasional',
+            debit: amountNum,
+            credit: 0,
+            notes: editFormData.title
+          },
+          {
+            id: transactionToEdit.journalEntries?.[1]?.id || `j-${Date.now()}-2`,
+            accountCode: editFormData.primaryAccountCode,
+            accountName: primaryAcc?.name || 'Kas & Bank',
+            debit: 0,
+            credit: amountNum,
+            notes: `Pembayaran via ${editFormData.paymentMethod}`
+          }
+        ],
+        projectId: editFormData.projectId,
+        projectName: selectedProj ? selectedProj.name : 'Seluruh Lokasi (HQ)',
+        division: editFormData.division,
+        referenceNumber: editFormData.referenceNumber,
+        payeeOrPayer: editFormData.payeeOrPayer,
+        updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 19)
+      };
+    } else {
+      // General Journal / Adjustment
+      const totalDebit = editJournalLines.reduce((s, l) => s + (Number(l.debit) || 0), 0);
+      const totalCredit = editJournalLines.reduce((s, l) => s + (Number(l.credit) || 0), 0);
+
+      if (totalDebit <= 0 || totalCredit <= 0) {
+        alert('Total nominal jurnal debit dan kredit harus lebih besar dari 0.');
+        return;
+      }
+
+      if (Math.abs(totalDebit - totalCredit) > 1) {
+        alert(
+          `Jurnal tidak seimbang! Total Debit: ${financeService.formatRupiah(
+            totalDebit
+          )}, Total Kredit: ${financeService.formatRupiah(
+            totalCredit
+          )}. Selisih: ${financeService.formatRupiah(Math.abs(totalDebit - totalCredit))}`
+        );
+        return;
+      }
+
+      updatedTrx = {
+        ...transactionToEdit,
+        date: editFormData.date,
+        title: editFormData.title || 'Jurnal Umum Transaksi',
+        description: editFormData.description,
+        amount: totalDebit,
+        primaryAccountCode: editJournalLines[0]?.accountCode || '1110',
+        contraAccountCode: editJournalLines[1]?.accountCode || '4110',
+        journalEntries: editJournalLines.map((l, idx) => {
+          const acc = accounts.find((a) => a.code === l.accountCode);
+          return {
+            id: l.id || `j-${Date.now()}-${idx}`,
+            accountCode: l.accountCode,
+            accountName: acc?.name || 'Akun Jurnal',
+            debit: Number(l.debit) || 0,
+            credit: Number(l.credit) || 0,
+            notes: l.notes || editFormData.title
+          };
+        }),
+        projectId: editFormData.projectId,
+        projectName: selectedProj ? selectedProj.name : 'Seluruh Lokasi (HQ)',
+        division: editFormData.division,
+        referenceNumber: editFormData.referenceNumber,
+        payeeOrPayer: editFormData.payeeOrPayer || 'Internal Accounting',
+        updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 19)
+      };
+    }
+
+    if (onUpdateTransaction) {
+      onUpdateTransaction(updatedTrx);
+    }
+
+    if (onLogAudit) {
+      onLogAudit({
+        id: `aud-${Date.now()}`,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        userName: currentUser?.name || 'Staff Keuangan',
+        userRole: currentUser?.role || 'Admin Operasional',
+        actionType: 'UPDATE',
+        module: updatedTrx.type === 'IN' ? 'Uang Masuk' : updatedTrx.type === 'OUT' ? 'Uang Keluar' : 'Jurnal Umum',
+        recordId: updatedTrx.id,
+        recordCode: updatedTrx.code,
+        description: `Memperbarui transaksi ${updatedTrx.code}: "${updatedTrx.title}" senilai ${financeService.formatRupiah(updatedTrx.amount)}`,
+        amount: updatedTrx.amount
+      });
+    }
+
+    setIsEditModalOpen(false);
+    setTransactionToEdit(null);
+  };
 
   // Handle Form Submission: Cash In (Uang Masuk / BKM)
   const handleCreateCashIn = (e: React.FormEvent) => {
@@ -1752,22 +1977,33 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                           </td>
 
                           <td className="p-3.5 text-center" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => setViewTransactionDetail(trx)}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all mr-1"
-                              title="Lihat Detail Jurnal"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                            </button>
-                            {onDeleteTransaction && (
+                            <div className="flex items-center justify-center space-x-1">
                               <button
-                                onClick={() => setTransactionToDelete(trx)}
-                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-all cursor-pointer"
-                                title="Hapus Transaksi (Memerlukan PIN Keamanan)"
+                                onClick={() => setViewTransactionDetail(trx)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all"
+                                title="Lihat Detail Jurnal"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Eye className="w-3.5 h-3.5" />
                               </button>
-                            )}
+                              {onUpdateTransaction && (
+                                <button
+                                  onClick={() => handleOpenEditTransaction(trx)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-400 transition-all cursor-pointer"
+                                  title="Edit & Perbaiki Transaksi"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {onDeleteTransaction && (
+                                <button
+                                  onClick={() => setTransactionToDelete(trx)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-all cursor-pointer"
+                                  title="Hapus Transaksi (Memerlukan PIN Keamanan)"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -2073,6 +2309,16 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
+                              {onUpdateTransaction && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditTransaction(trx)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-400 transition-colors cursor-pointer"
+                                  title="Edit & Perbaiki Voucher Jurnal"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                               {onDeleteTransaction && (
                                 <button
                                   type="button"
@@ -3615,12 +3861,28 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
 
             <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[11px] text-slate-500">
               <span>Dibuat oleh: {viewTransactionDetail.createdBy}</span>
-              <button
-                onClick={() => setViewTransactionDetail(null)}
-                className="px-4 py-1.5 rounded-xl bg-slate-800 text-slate-200 text-xs font-semibold"
-              >
-                Tutup
-              </button>
+              <div className="flex items-center space-x-2">
+                {onUpdateTransaction && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trx = viewTransactionDetail;
+                      setViewTransactionDetail(null);
+                      handleOpenEditTransaction(trx);
+                    }}
+                    className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 text-xs font-semibold transition-colors cursor-pointer border border-amber-500/30"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    <span>Edit Transaksi</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setViewTransactionDetail(null)}
+                  className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -4095,6 +4357,422 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                 >
                   <Check className="w-4 h-4" />
                   <span>{coaModalMode === 'create' ? 'Simpan Akun COA' : 'Simpan Perubahan'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: EDIT TRANSAKSI / VOUCHER JURNAL */}
+      {/* ------------------------------------------------------------- */}
+      {isEditModalOpen && transactionToEdit && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-2xl w-full space-y-4 shadow-2xl animate-in zoom-in-95 my-8 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
+              <div className="flex items-center space-x-2.5">
+                <div
+                  className={`p-2 rounded-xl border ${
+                    transactionToEdit.type === 'IN'
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                      : transactionToEdit.type === 'OUT'
+                      ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                      : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                  }`}
+                >
+                  <Edit className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="font-bold text-white text-base">
+                      Edit Transaksi [{transactionToEdit.code}]
+                    </h3>
+                    <span
+                      className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase ${
+                        transactionToEdit.type === 'IN'
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          : transactionToEdit.type === 'OUT'
+                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                      }`}
+                    >
+                      {transactionToEdit.type === 'IN'
+                        ? 'Uang Masuk (BKM)'
+                        : transactionToEdit.type === 'OUT'
+                        ? 'Uang Keluar (BKK)'
+                        : 'Jurnal Umum'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Perbaiki dan perbarui data yang telah terlanjur diinput, lalu simpan perubahan
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setTransactionToEdit(null);
+                }}
+                className="text-slate-400 hover:text-white p-1.5 rounded-lg bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body Form */}
+            <form onSubmit={handleSaveEditedTransaction} className="space-y-4 overflow-y-auto pr-1 flex-1">
+              {/* Common Fields: Date & Title */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                    Tanggal Transaksi *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editFormData.date}
+                    onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                {(transactionToEdit.type === 'IN' || transactionToEdit.type === 'OUT') && (
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                      Nominal Transaksi (Rp) *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={editFormData.amount}
+                      onChange={(e) => setEditFormData({ ...editFormData, amount: e.target.value })}
+                      className={`w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none ${
+                        transactionToEdit.type === 'IN'
+                          ? 'text-emerald-400 focus:border-emerald-500'
+                          : 'text-rose-400 focus:border-rose-500'
+                      }`}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Judul / Keterangan Transaksi *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFormData.title}
+                  onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* Specific for Cash IN / OUT: Primary Account and Contra Account */}
+              {(transactionToEdit.type === 'IN' || transactionToEdit.type === 'OUT') && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        {transactionToEdit.type === 'IN'
+                          ? 'Masuk Ke Rekening / Kas (Debit) *'
+                          : 'Sumber Rekening Kas/Bank (Kredit) *'}
+                      </label>
+                      <select
+                        value={editFormData.primaryAccountCode}
+                        onChange={(e) => setEditFormData({ ...editFormData, primaryAccountCode: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      >
+                        {accounts
+                          .filter((a) => a.category === 'Kas & Bank')
+                          .map((a) => (
+                            <option key={a.code} value={a.code}>
+                              {a.code} - {a.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        {transactionToEdit.type === 'IN'
+                          ? 'Akun Sumber / Pendapatan (Kredit) *'
+                          : 'Alokasi Akun Beban / Utang (Debit) *'}
+                      </label>
+                      <select
+                        value={editFormData.contraAccountCode}
+                        onChange={(e) => setEditFormData({ ...editFormData, contraAccountCode: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      >
+                        {accounts.map((a) => (
+                          <option key={a.code} value={a.code}>
+                            {a.code} - {a.name} ({a.category})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        Metode Pembayaran
+                      </label>
+                      <select
+                        value={editFormData.paymentMethod}
+                        onChange={(e) =>
+                          setEditFormData({ ...editFormData, paymentMethod: e.target.value as PaymentMethod })
+                        }
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="Bank BCA (123-456-7890)">Bank BCA (123-456-7890)</option>
+                        <option value="Bank Mandiri (987-654-3210)">Bank Mandiri (987-654-3210)</option>
+                        <option value="Bank BNI (555-444-333)">Bank BNI (555-444-333)</option>
+                        <option value="Bank BRI (888-999-000)">Bank BRI (888-999-000)</option>
+                        <option value="Kas Tunai / Petty Cash HQ">Kas Tunai / Petty Cash HQ</option>
+                        <option value="Kas Operasional Lapangan">Kas Operasional Lapangan</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                        {transactionToEdit.type === 'IN'
+                          ? 'Diterima Dari (Klien / Pihak Ketiga)'
+                          : 'Dibayarkan Kepada (Vendor / Personil)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.payeeOrPayer}
+                        onChange={(e) => setEditFormData({ ...editFormData, payeeOrPayer: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Multi-line editor for General Journal */}
+              {(transactionToEdit.type === 'JOURNAL' || transactionToEdit.type === 'ADJUSTMENT') && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-300">
+                      Rincian Baris Debit & Kredit Jurnal:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditJournalLines([
+                          ...editJournalLines,
+                          {
+                            id: String(Date.now()),
+                            accountCode: accounts[0]?.code || '1110',
+                            debit: 0,
+                            credit: 0,
+                            notes: ''
+                          }
+                        ])
+                      }
+                      className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold px-2 py-1 rounded bg-slate-800 cursor-pointer"
+                    >
+                      + Tambah Baris Akun
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {editJournalLines.map((line, idx) => (
+                      <div
+                        key={line.id || idx}
+                        className="grid grid-cols-12 gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800 items-center"
+                      >
+                        <div className="col-span-5">
+                          <select
+                            value={line.accountCode}
+                            onChange={(e) => {
+                              const next = [...editJournalLines];
+                              next[idx].accountCode = e.target.value;
+                              setEditJournalLines(next);
+                            }}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white"
+                          >
+                            {accounts.map((a) => (
+                              <option key={a.code} value={a.code}>
+                                {a.code} - {a.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="col-span-3">
+                          <input
+                            type="number"
+                            placeholder="Debit (Rp)"
+                            value={line.debit || ''}
+                            onChange={(e) => {
+                              const next = [...editJournalLines];
+                              next[idx].debit = Number(e.target.value) || 0;
+                              if (next[idx].debit > 0) next[idx].credit = 0;
+                              setEditJournalLines(next);
+                            }}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-emerald-400 font-mono font-bold"
+                          />
+                        </div>
+
+                        <div className="col-span-3">
+                          <input
+                            type="number"
+                            placeholder="Kredit (Rp)"
+                            value={line.credit || ''}
+                            onChange={(e) => {
+                              const next = [...editJournalLines];
+                              next[idx].credit = Number(e.target.value) || 0;
+                              if (next[idx].credit > 0) next[idx].debit = 0;
+                              setEditJournalLines(next);
+                            }}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-rose-400 font-mono font-bold"
+                          />
+                        </div>
+
+                        <div className="col-span-1 text-center">
+                          {editJournalLines.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditJournalLines(editJournalLines.filter((_, i) => i !== idx));
+                              }}
+                              className="text-slate-500 hover:text-rose-400 p-1 cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Balance checker */}
+                  {(() => {
+                    const totalDebit = editJournalLines.reduce((s, l) => s + (Number(l.debit) || 0), 0);
+                    const totalCredit = editJournalLines.reduce((s, l) => s + (Number(l.credit) || 0), 0);
+                    const isBal = Math.abs(totalDebit - totalCredit) < 1 && totalDebit > 0;
+
+                    return (
+                      <div
+                        className={`p-3 rounded-xl border flex items-center justify-between text-xs ${
+                          isBal
+                            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                            : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          {isBal ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-400" />
+                          )}
+                          <span>
+                            Total Debit: <strong>{financeService.formatRupiah(totalDebit)}</strong> | Total Kredit:{' '}
+                            <strong>{financeService.formatRupiah(totalCredit)}</strong>
+                          </span>
+                        </div>
+                        <span className="font-bold">
+                          {isBal
+                            ? 'SEIMBANG'
+                            : `Selisih: ${financeService.formatRupiah(Math.abs(totalDebit - totalCredit))}`}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Project & Division & Reference */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                    Cost Center (Site / Lokasi)
+                  </label>
+                  <select
+                    value={editFormData.projectId}
+                    onChange={(e) => setEditFormData({ ...editFormData, projectId: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="ALL">Seluruh Lokasi (Kantor Pusat HQ)</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                    Divisi Operasional
+                  </label>
+                  <select
+                    value={editFormData.division}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, division: e.target.value as DivisionType })
+                    }
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="Cleaning Service">Cleaning Service</option>
+                    <option value="Logistik & Chemical">Logistik & Chemical</option>
+                    <option value="Gondola & Facade">Gondola & Facade</option>
+                    <option value="Gardening & Landscape">Gardening & Landscape</option>
+                    <option value="Sanitation & Pest Control">Sanitation & Pest Control</option>
+                    <option value="HQ Management & Operasional">HQ Management & Operasional</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                    No Referensi / Invoice / Memo
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.referenceNumber}
+                    onChange={(e) => setEditFormData({ ...editFormData, referenceNumber: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Catatan Tambahan & Keterangan Rinci
+                </label>
+                <textarea
+                  rows={2}
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-800 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setTransactionToEdit(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center space-x-1.5 px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-lg shadow-amber-900/40 cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Simpan Perubahan</span>
                 </button>
               </div>
             </form>
