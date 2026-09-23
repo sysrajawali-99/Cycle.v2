@@ -16,8 +16,19 @@ import {
   ChevronRight,
   ChevronDown,
   TrendingDown,
-  Layers
+  Layers,
+  BarChart2
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend
+} from 'recharts';
 import {
   ChartOfAccount,
   FinanceTransaction,
@@ -222,6 +233,95 @@ export const FinanceProfitLoss: React.FC<FinanceProfitLossProps> = ({
   );
   const overallBreakdownMargin =
     totalBreakdownRevenue > 0 ? (totalBreakdownNetProfit / totalBreakdownRevenue) * 100 : 0;
+
+  // Visual Chart State & Data (Recharts)
+  const [chartFilter, setChartFilter] = useState<'ACTIVE_ONLY' | 'ALL'>('ACTIVE_ONLY');
+  const [chartType, setChartType] = useState<'GROUPED' | 'STACKED'>('GROUPED');
+
+  const chartData = useMemo(() => {
+    const raw = projectBreakdown.map((item) => ({
+      id: item.project.id,
+      name: item.project.name,
+      code: item.project.code || '',
+      displayName:
+        item.project.name.length > 20
+          ? `${item.project.name.slice(0, 18)}...`
+          : item.project.name,
+      revenue: item.revenue,
+      cogs: item.cogs,
+      grossProfit: Math.max(0, item.grossProfit),
+      margin: item.margin,
+      hasActivity: item.revenue > 0 || item.cogs > 0 || item.transactionCount > 0
+    }));
+
+    if (chartFilter === 'ACTIVE_ONLY') {
+      const active = raw.filter((d) => d.hasActivity);
+      return active.length > 0 ? active : raw;
+    }
+    return raw;
+  }, [projectBreakdown, chartFilter]);
+
+  const activeProjectsCount = useMemo(() => {
+    return projectBreakdown.filter(
+      (p) => p.revenue > 0 || p.cogs > 0 || p.transactionCount > 0
+    ).length;
+  }, [projectBreakdown]);
+
+  const formatCompactIDR = (val: number) => {
+    if (Math.abs(val) >= 1_000_000_000) {
+      return `Rp ${(val / 1_000_000_000).toFixed(1)}M`;
+    }
+    if (Math.abs(val) >= 1_000_000) {
+      return `Rp ${(val / 1_000_000).toFixed(0)}Jt`;
+    }
+    if (Math.abs(val) >= 1_000) {
+      return `Rp ${(val / 1_000).toFixed(0)}Rb`;
+    }
+    return `Rp ${val}`;
+  };
+
+  const CustomChartTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-slate-950/95 border border-slate-700 p-3.5 rounded-xl shadow-2xl text-xs space-y-2.5 min-w-[240px]">
+          <div className="border-b border-slate-800 pb-2">
+            <div className="font-bold text-white text-sm">{data.name}</div>
+            {data.code && (
+              <div className="text-[10px] text-slate-400 font-mono">Kode Site: {data.code}</div>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center text-cyan-300">
+              <span className="flex items-center gap-1.5 font-medium">
+                <span className="w-2.5 h-2.5 rounded-sm bg-cyan-400 inline-block"></span>
+                Pendapatan Kontrak:
+              </span>
+              <span className="font-mono font-bold">{formatCurrency(data.revenue)}</span>
+            </div>
+            <div className="flex justify-between items-center text-rose-300">
+              <span className="flex items-center gap-1.5 font-medium">
+                <span className="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block"></span>
+                Beban Langsung (HPP):
+              </span>
+              <span className="font-mono font-bold">{formatCurrency(data.cogs)}</span>
+            </div>
+            <div className="flex justify-between items-center text-slate-200 border-t border-slate-800/80 pt-1.5">
+              <span className="font-semibold">Laba Kotor:</span>
+              <span className="font-mono font-bold text-emerald-400">{formatCurrency(data.grossProfit)}</span>
+            </div>
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Net Profit Margin:</span>
+              <span className={`font-mono font-bold ${data.margin >= 20 ? 'text-emerald-400' : data.margin > 0 ? 'text-amber-400' : 'text-rose-400'}`}>
+                {data.margin.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   // Export CSV
   const handleExportCSV = () => {
@@ -653,6 +753,185 @@ export const FinanceProfitLoss: React.FC<FinanceProfitLossProps> = ({
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* VISUALIZATION SECTION: REVENUE VS HPP COMPARISON (RECHARTS) */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                Visual Analytics
+              </span>
+              <span className="text-xs text-slate-400">Komparasi Performa Site Proyek</span>
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-white mt-1 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-cyan-400" />
+              Komparasi Pendapatan Kontrak vs Beban Langsung (HPP) per Proyek
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Grafik komparatif realisasi Pendapatan Kontrak (Uang Masuk) dan Beban Langsung HPP (Uang Keluar) per site proyek untuk analisa visual margin keuntungan.
+            </p>
+          </div>
+
+          {/* Controls */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Chart Type Toggle */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-1 flex items-center space-x-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setChartType('GROUPED')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                  chartType === 'GROUPED'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Side-by-Side
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartType('STACKED')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                  chartType === 'STACKED'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Struktur Laba
+              </button>
+            </div>
+
+            {/* Filter Toggle */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-1 flex items-center space-x-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setChartFilter('ACTIVE_ONLY')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                  chartFilter === 'ACTIVE_ONLY'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Site Aktif ({activeProjectsCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartFilter('ALL')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                  chartFilter === 'ALL'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Semua Site ({projects.length})
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick KPI Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+            <div className="text-[11px] text-slate-400 font-medium">Total Pendapatan Terpilih</div>
+            <div className="text-sm sm:text-base font-bold text-cyan-400 font-mono mt-0.5">
+              {formatCurrency(chartData.reduce((s, d) => s + d.revenue, 0))}
+            </div>
+          </div>
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+            <div className="text-[11px] text-slate-400 font-medium">Total HPP Terpilih</div>
+            <div className="text-sm sm:text-base font-bold text-rose-400 font-mono mt-0.5">
+              {formatCurrency(chartData.reduce((s, d) => s + d.cogs, 0))}
+            </div>
+          </div>
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+            <div className="text-[11px] text-slate-400 font-medium">Total Laba Kotor Terpilih</div>
+            <div className="text-sm sm:text-base font-bold text-emerald-400 font-mono mt-0.5">
+              {formatCurrency(chartData.reduce((s, d) => s + (d.revenue - d.cogs), 0))}
+            </div>
+          </div>
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+            <div className="text-[11px] text-slate-400 font-medium">Rata-rata Margin Site</div>
+            <div className="text-sm sm:text-base font-bold text-amber-400 font-mono mt-0.5">
+              {(() => {
+                const totRev = chartData.reduce((s, d) => s + d.revenue, 0);
+                const totNet = chartData.reduce((s, d) => s + (d.revenue - d.cogs), 0);
+                return totRev > 0 ? `${((totNet / totRev) * 100).toFixed(1)}%` : '0.0%';
+              })()}
+            </div>
+          </div>
+        </div>
+
+        {/* Recharts BarChart */}
+        <div className="w-full h-80 sm:h-96 pt-2">
+          {chartData.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-slate-500 text-sm">
+              Tidak ada data proyek untuk periode yang dipilih
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 20, right: 20, left: 10, bottom: 45 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.35} vertical={false} />
+                <XAxis
+                  dataKey="displayName"
+                  stroke="#64748b"
+                  tick={{ fill: '#94a3b8', fontSize: 11 }}
+                  interval={0}
+                  angle={-18}
+                  textAnchor="end"
+                  height={50}
+                />
+                <YAxis
+                  stroke="#64748b"
+                  tick={{ fill: '#94a3b8', fontSize: 11 }}
+                  tickFormatter={formatCompactIDR}
+                />
+                <Tooltip content={<CustomChartTooltip />} cursor={{ fill: 'rgba(51, 65, 85, 0.25)' }} />
+                <Legend
+                  verticalAlign="top"
+                  align="right"
+                  wrapperStyle={{ paddingBottom: 12, fontSize: 12 }}
+                />
+                {chartType === 'GROUPED' ? (
+                  <>
+                    <Bar
+                      dataKey="revenue"
+                      name="Pendapatan Kontrak (Revenue)"
+                      fill="#06b6d4"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={44}
+                    />
+                    <Bar
+                      dataKey="cogs"
+                      name="Beban Langsung (HPP)"
+                      fill="#f43f5e"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={44}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Bar
+                      dataKey="cogs"
+                      name="Beban Langsung (HPP)"
+                      stackId="profitStack"
+                      fill="#f43f5e"
+                      maxBarSize={44}
+                    />
+                    <Bar
+                      dataKey="grossProfit"
+                      name="Laba Kotor (Gross Profit)"
+                      stackId="profitStack"
+                      fill="#10b981"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={44}
+                    />
+                  </>
+                )}
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
