@@ -58,31 +58,15 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
   const currentProject = (projects || []).find((p) => p.id === selectedProjectId);
 
-  const allowedViews = currentUser?.allowedViews || [
-    'dashboard',
-    'project_settings',
-    'timesheet',
-    'employees',
-    'inventory',
-    'tasks',
-    'blast',
-    'sops',
-    'reports',
-    'finance_cash_journal',
-    'finance_debts_receivables',
-    'finance_investments',
-    'finance_outflow_forecast',
-    'finance_profit_loss',
-    'finance_bank_reconcile',
-    'finance_statements',
-    'finance_analytics_audit'
-  ];
-
   const isViewAllowed = (viewId: AppView) => {
-    if (viewId === 'company_settings' || viewId === 'access_control') {
-      return currentUser?.role === 'Super Admin (HQ)' || allowedViews.includes(viewId as any);
+    if (currentUser?.role === 'Super Admin (HQ)') {
+      return true;
     }
-    return allowedViews.includes(viewId) || (viewId === 'sops' && allowedViews.includes('sop' as any));
+    const allowed = currentUser?.allowedViews ?? [];
+    if (viewId === 'sops' || viewId === 'sop') {
+      return allowed.includes('sops') || allowed.includes('sop' as any);
+    }
+    return allowed.includes(viewId);
   };
 
   // Quick bottom bar candidate items
@@ -125,7 +109,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   ];
 
   const filteredMainItems = candidateMainItems.filter((item) =>
-    allowedViews.includes(item.id)
+    isViewAllowed(item.id)
   );
 
   // Grouped Menu Lists for the "More" Action Sheet

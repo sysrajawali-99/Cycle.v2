@@ -35,7 +35,15 @@ import {
   MapPin,
   Mail,
   Eye,
-  Key
+  Key,
+  Wallet,
+  ArrowDownUp,
+  Briefcase,
+  TrendingDown,
+  TrendingUp,
+  Receipt,
+  Scale,
+  PieChart
 } from 'lucide-react';
 import { UserAccount, AppView, Project, UserRole } from '../../types';
 import { ConfirmModal } from '../common/ConfirmModal';
@@ -48,48 +56,58 @@ interface AccessControlProps {
   onResetUsersToDefault: () => void;
 }
 
+export type MenuCategory = 
+  | 'Dashboard & Umum'
+  | 'Human Resource Management (HRM)'
+  | 'Operations Management (OM)'
+  | 'Divisi Finance & Accounting'
+  | 'Pengaturan Sistem & HQ';
+
 const AVAILABLE_MENUS: {
   id: AppView;
   label: string;
-  category: 'Dashboard & Umum' | 'Human Resource Management (HRM)' | 'Operations Management (OM)' | 'Divisi Finance & Accounting' | 'Lainnya';
+  category: MenuCategory;
   description: string;
   icon: React.ReactNode;
 }[] = [
+  // 1. Dashboard & Umum
   {
     id: 'dashboard',
     label: 'Dashboard Utama',
     category: 'Dashboard & Umum',
-    description: 'Ringkasan KPI, absensi harian, dan ringkasan stok',
+    description: 'Ringkasan KPI, absensi harian, dan ringkasan stok operasional',
     icon: <LayoutDashboard className="w-4 h-4 text-amber-400" />
   },
+  // 2. Human Resource Management (HRM)
   {
     id: 'timesheet',
     label: 'Eagle Timesheet',
     category: 'Human Resource Management (HRM)',
-    description: 'Matriks kehadiran 1-31, lembur, dan potongan absen',
+    description: 'Matriks kehadiran 1-31 hari, lembur, dan potongan absen',
     icon: <CalendarCheck2 className="w-4 h-4 text-emerald-400" />
   },
   {
     id: 'employees',
     label: 'Data Karyawan & Lokasi',
     category: 'Human Resource Management (HRM)',
-    description: 'Database personil cleaner, shift, dan riwayat mutasi',
+    description: 'Database personil cleaner, penempatan shift, dan riwayat mutasi',
     icon: <UserCheck className="w-4 h-4 text-blue-400" />
   },
   {
     id: 'sops',
     label: 'SOP & Dokumen K3',
     category: 'Human Resource Management (HRM)',
-    description: 'Standar Operasional Prosedur dan panduan MSDS',
+    description: 'Standar Operasional Prosedur, MSDS chemical, dan panduan K3',
     icon: <BookOpen className="w-4 h-4 text-indigo-400" />
   },
   {
     id: 'reports',
     label: 'Pusat Laporan & Payroll',
     category: 'Human Resource Management (HRM)',
-    description: 'Rekapitulasi payroll bulanan dan cetak slip gaji',
+    description: 'Rekapitulasi payroll bulanan, ekspor Excel, dan cetak slip gaji',
     icon: <FileSpreadsheet className="w-4 h-4 text-amber-500" />
   },
+  // 3. Operations Management (OM)
   {
     id: 'project_settings',
     label: 'Pengaturan Lokasi',
@@ -101,65 +119,103 @@ const AVAILABLE_MENUS: {
     id: 'inventory',
     label: 'Smart Inventory',
     category: 'Operations Management (OM)',
-    description: 'Monitoring stok chemical, log pemakaian harian & restock',
+    description: 'Monitoring stok chemical, material request, log pemakaian & restock',
     icon: <PackageCheck className="w-4 h-4 text-purple-400" />
   },
   {
     id: 'tasks',
     label: 'Rajawali Boards',
     category: 'Operations Management (OM)',
-    description: 'Kanban tugas harian, checklist area, dan inspeksi',
+    description: 'Kanban tugas harian, checklist area foto bukti, dan audit QC',
     icon: <KanbanSquare className="w-4 h-4 text-teal-400" />
   },
+  // 4. Divisi Finance & Accounting
   {
     id: 'finance_cash_journal',
     label: 'Buku Kas & Jurnal Umum',
     category: 'Divisi Finance & Accounting',
-    description: 'Pencatatan Uang Masuk/Keluar COA, Jurnal Umum, dan Buku Besar',
-    icon: <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+    description: 'Pencatatan Uang Masuk/Keluar COA, Jurnal Umum & Buku Besar',
+    icon: <Wallet className="w-4 h-4 text-emerald-400" />
+  },
+  {
+    id: 'finance_debts_receivables',
+    label: 'Pencatatan Hutang & Piutang',
+    category: 'Divisi Finance & Accounting',
+    description: 'Hutang vendor, piutang tagihan invoice klien & analisa aging',
+    icon: <ArrowDownUp className="w-4 h-4 text-rose-400" />
+  },
+  {
+    id: 'finance_investments',
+    label: 'Pencatatan Investasi & Bagi Hasil',
+    category: 'Divisi Finance & Accounting',
+    description: '12 baris jadwal dividen investor, pengembalian pokok & reminder',
+    icon: <Briefcase className="w-4 h-4 text-purple-400" />
+  },
+  {
+    id: 'finance_outflow_forecast',
+    label: 'Forecast Rencana Pengeluaran',
+    category: 'Divisi Finance & Accounting',
+    description: 'Proyeksi arus kas keluar (Gaji Manpower + Hutang + Bagi Hasil)',
+    icon: <TrendingDown className="w-4 h-4 text-amber-400" />
+  },
+  {
+    id: 'finance_profit_loss',
+    label: 'Laba Rugi (Profit & Loss)',
+    category: 'Divisi Finance & Accounting',
+    description: 'Laporan Laba Rugi komprehensif & analisa profitabilitas margin per site',
+    icon: <TrendingUp className="w-4 h-4 text-emerald-400" />
   },
   {
     id: 'finance_bank_reconcile',
     label: 'Rekening Koran & Rekonsiliasi',
     category: 'Divisi Finance & Accounting',
-    description: 'Upload e-Statement bank, auto-matching dan verifikasi mutasi',
-    icon: <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+    description: 'Upload e-Statement bank, auto-matching dan verifikasi mutasi rekening',
+    icon: <Receipt className="w-4 h-4 text-cyan-400" />
   },
   {
     id: 'finance_statements',
     label: 'Laporan Keuangan (SAK)',
     category: 'Divisi Finance & Accounting',
-    description: 'Laba Rugi, Posisi Keuangan (Neraca), Arus Kas & Ekuitas',
-    icon: <BookOpen className="w-4 h-4 text-blue-400" />
+    description: 'Neraca Keuangan, Arus Kas & Perubahan Modal Standar Akuntansi',
+    icon: <Scale className="w-4 h-4 text-blue-400" />
   },
   {
     id: 'finance_analytics_audit',
     label: 'Analisa Biaya & Tutup Buku',
     category: 'Divisi Finance & Accounting',
-    description: 'Breakdown Cost Center, Jejak Audit, dan Form Kunci Periode',
-    icon: <ShieldCheck className="w-4 h-4 text-purple-400" />
+    description: 'Breakdown Cost Center, Jejak Audit Sistem, dan Kunci Periode Akuntansi',
+    icon: <PieChart className="w-4 h-4 text-purple-400" />
   },
+  // 5. Pengaturan Sistem & HQ
   {
     id: 'blast',
     label: 'Eagle Blast',
-    category: 'Lainnya',
-    description: 'Pemberitahuan resmi, memo K3, dan briefing operasional',
+    category: 'Pengaturan Sistem & HQ',
+    description: 'Pemberitahuan resmi manajemen, memo K3, dan briefing operasional',
     icon: <Megaphone className="w-4 h-4 text-rose-400" />
   },
   {
     id: 'company_settings',
     label: 'Pengaturan Perusahaan',
-    category: 'Lainnya',
-    description: 'Identitas HQ, logo, legalitas NIB/NPWP, rekening bank & kop surat',
+    category: 'Pengaturan Sistem & HQ',
+    description: 'Identitas HQ, logo perusahaan, legalitas NIB/NPWP & kop surat resmi',
     icon: <Building2 className="w-4 h-4 text-amber-400" />
   },
   {
     id: 'access_control',
     label: 'Hak Akses Pengguna',
-    category: 'Lainnya',
-    description: 'Kelola peran pengguna, PIN keamanan, dan matriks izin menu',
+    category: 'Pengaturan Sistem & HQ',
+    description: 'Kelola otorisasi user, PIN keamanan, dan matriks izin menu & sub-menu',
     icon: <ShieldCheck className="w-4 h-4 text-amber-400" />
   }
+];
+
+const MENU_CATEGORIES: MenuCategory[] = [
+  'Dashboard & Umum',
+  'Human Resource Management (HRM)',
+  'Operations Management (OM)',
+  'Divisi Finance & Accounting',
+  'Pengaturan Sistem & HQ'
 ];
 
 export const AccessControl: React.FC<AccessControlProps> = ({
@@ -326,21 +382,12 @@ export const AccessControl: React.FC<AccessControlProps> = ({
 
   // Grant All Menus for a user
   const handleGrantAllMenus = (userId: string) => {
-    const allViews: AppView[] = [
-      'dashboard',
-      'timesheet',
-      'employees',
-      'inventory',
-      'tasks',
-      'blast',
-      'sops',
-      'reports'
-    ];
-
     const targetUser = users.find((u) => u.id === userId);
-    if (targetUser?.role === 'Super Admin (HQ)') {
-      allViews.push('access_control');
-    }
+    const isTargetSuperAdmin = targetUser?.role === 'Super Admin (HQ)' || targetUser?.id === 'user-superadmin';
+
+    const allViews: AppView[] = AVAILABLE_MENUS
+      .filter((m) => m.id !== 'access_control' || isTargetSuperAdmin)
+      .map((m) => m.id);
 
     const updated = users.map((u) => {
       if (u.id !== userId) return u;
@@ -348,7 +395,7 @@ export const AccessControl: React.FC<AccessControlProps> = ({
     });
 
     onUpdateUsers(updated);
-    showToast(`Semua menu telah diberikan kepada pengguna.`);
+    showToast(`Semua ${allViews.length} menu dan sub-menu telah diberikan kepada ${targetUser?.name || 'pengguna'}.`);
   };
 
   // Revoke optional menus (leave dashboard)
@@ -1765,41 +1812,103 @@ export const AccessControl: React.FC<AccessControlProps> = ({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {AVAILABLE_MENUS.map((menu) => {
-                          const isChecked = selectedUserForEdit.allowedViews.includes(menu.id);
+                      <div className="space-y-3">
+                        {MENU_CATEGORIES.map((cat) => {
+                          const categoryMenus = AVAILABLE_MENUS.filter((m) => m.category === cat);
+                          const selectedCount = categoryMenus.filter((m) => selectedUserForEdit.allowedViews.includes(m.id)).length;
 
                           return (
-                            <label
-                              key={menu.id}
-                              className={`flex items-center space-x-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                                isChecked
-                                  ? 'bg-amber-500/10 border-amber-500/40 text-white'
-                                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/40'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  let next = [...selectedUserForEdit.allowedViews];
-                                  if (e.target.checked) {
-                                    next.push(menu.id);
-                                  } else {
-                                    next = next.filter((v) => v !== menu.id);
-                                  }
-                                  setSelectedUserForEdit({
-                                    ...selectedUserForEdit,
-                                    allowedViews: next
-                                  });
-                                }}
-                                className="rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-400"
-                              />
-                              <div className="flex items-center space-x-2 min-w-0">
-                                {menu.icon}
-                                <span className="font-semibold break-words">{menu.label}</span>
+                            <div key={cat} className="space-y-2 bg-slate-950/60 border border-slate-800 p-3 rounded-xl">
+                              <div className="flex items-center justify-between flex-wrap gap-1 pb-2 border-b border-slate-800/80">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs font-bold text-slate-200">{cat}</span>
+                                  <span
+                                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                                      selectedCount > 0
+                                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                        : 'bg-slate-800 text-slate-500 border-slate-700'
+                                    }`}
+                                  >
+                                    {selectedCount}/{categoryMenus.length} Terpilih
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-2 text-[10px]">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const catIds = categoryMenus.map((m) => m.id);
+                                      const merged = Array.from(new Set([...selectedUserForEdit.allowedViews, ...catIds]));
+                                      setSelectedUserForEdit({
+                                        ...selectedUserForEdit,
+                                        allowedViews: merged
+                                      });
+                                    }}
+                                    className="text-amber-400 hover:underline cursor-pointer font-semibold"
+                                  >
+                                    Pilih Kategori Ini
+                                  </button>
+                                  <span className="text-slate-600">•</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const catIdSet = new Set(categoryMenus.map((m) => m.id));
+                                      const filtered = selectedUserForEdit.allowedViews.filter((v) => !catIdSet.has(v));
+                                      setSelectedUserForEdit({
+                                        ...selectedUserForEdit,
+                                        allowedViews: filtered
+                                      });
+                                    }}
+                                    className="text-slate-400 hover:underline cursor-pointer"
+                                  >
+                                    Batalkan Kategori
+                                  </button>
+                                </div>
                               </div>
-                            </label>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                {categoryMenus.map((menu) => {
+                                  const isChecked = selectedUserForEdit.allowedViews.includes(menu.id);
+
+                                  return (
+                                    <label
+                                      key={menu.id}
+                                      className={`flex items-start space-x-2.5 p-2 rounded-xl border text-xs cursor-pointer transition-all ${
+                                        isChecked
+                                          ? 'bg-amber-500/10 border-amber-500/40 text-white'
+                                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:bg-slate-800/40'
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                          let next = [...selectedUserForEdit.allowedViews];
+                                          if (e.target.checked) {
+                                            next.push(menu.id);
+                                          } else {
+                                            next = next.filter((v) => v !== menu.id);
+                                          }
+                                          setSelectedUserForEdit({
+                                            ...selectedUserForEdit,
+                                            allowedViews: next
+                                          });
+                                        }}
+                                        className="mt-0.5 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-400 shrink-0"
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center space-x-1.5">
+                                          {menu.icon}
+                                          <span className="font-bold text-slate-200">{menu.label}</span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5 leading-snug">
+                                          {menu.description}
+                                        </p>
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           );
                         })}
                       </div>
@@ -2271,41 +2380,103 @@ export const AccessControl: React.FC<AccessControlProps> = ({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {AVAILABLE_MENUS.map((menu) => {
-                          const isChecked = newUserForm.allowedViews.includes(menu.id);
+                      <div className="space-y-3">
+                        {MENU_CATEGORIES.map((cat) => {
+                          const categoryMenus = AVAILABLE_MENUS.filter((m) => m.category === cat);
+                          const selectedCount = categoryMenus.filter((m) => newUserForm.allowedViews.includes(m.id)).length;
 
                           return (
-                            <label
-                              key={menu.id}
-                              className={`flex items-center space-x-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                                isChecked
-                                  ? 'bg-amber-500/10 border-amber-500/40 text-white'
-                                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/40'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  let next = [...newUserForm.allowedViews];
-                                  if (e.target.checked) {
-                                    next.push(menu.id);
-                                  } else {
-                                    next = next.filter((v) => v !== menu.id);
-                                  }
-                                  setNewUserForm({
-                                    ...newUserForm,
-                                    allowedViews: next
-                                  });
-                                }}
-                                className="rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-400"
-                              />
-                              <div className="flex items-center space-x-2 min-w-0">
-                                {menu.icon}
-                                <span className="font-semibold break-words">{menu.label}</span>
+                            <div key={cat} className="space-y-2 bg-slate-950/60 border border-slate-800 p-3 rounded-xl">
+                              <div className="flex items-center justify-between flex-wrap gap-1 pb-2 border-b border-slate-800/80">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs font-bold text-slate-200">{cat}</span>
+                                  <span
+                                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                                      selectedCount > 0
+                                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                        : 'bg-slate-800 text-slate-500 border-slate-700'
+                                    }`}
+                                  >
+                                    {selectedCount}/{categoryMenus.length} Terpilih
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-2 text-[10px]">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const catIds = categoryMenus.map((m) => m.id);
+                                      const merged = Array.from(new Set([...newUserForm.allowedViews, ...catIds]));
+                                      setNewUserForm({
+                                        ...newUserForm,
+                                        allowedViews: merged
+                                      });
+                                    }}
+                                    className="text-amber-400 hover:underline cursor-pointer font-semibold"
+                                  >
+                                    Pilih Kategori Ini
+                                  </button>
+                                  <span className="text-slate-600">•</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const catIdSet = new Set(categoryMenus.map((m) => m.id));
+                                      const filtered = newUserForm.allowedViews.filter((v) => !catIdSet.has(v));
+                                      setNewUserForm({
+                                        ...newUserForm,
+                                        allowedViews: filtered
+                                      });
+                                    }}
+                                    className="text-slate-400 hover:underline cursor-pointer"
+                                  >
+                                    Batalkan Kategori
+                                  </button>
+                                </div>
                               </div>
-                            </label>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                {categoryMenus.map((menu) => {
+                                  const isChecked = newUserForm.allowedViews.includes(menu.id);
+
+                                  return (
+                                    <label
+                                      key={menu.id}
+                                      className={`flex items-start space-x-2.5 p-2 rounded-xl border text-xs cursor-pointer transition-all ${
+                                        isChecked
+                                          ? 'bg-amber-500/10 border-amber-500/40 text-white'
+                                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:bg-slate-800/40'
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                          let next = [...newUserForm.allowedViews];
+                                          if (e.target.checked) {
+                                            next.push(menu.id);
+                                          } else {
+                                            next = next.filter((v) => v !== menu.id);
+                                          }
+                                          setNewUserForm({
+                                            ...newUserForm,
+                                            allowedViews: next
+                                          });
+                                        }}
+                                        className="mt-0.5 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-400 shrink-0"
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center space-x-1.5">
+                                          {menu.icon}
+                                          <span className="font-bold text-slate-200">{menu.label}</span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5 leading-snug">
+                                          {menu.description}
+                                        </p>
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           );
                         })}
                       </div>

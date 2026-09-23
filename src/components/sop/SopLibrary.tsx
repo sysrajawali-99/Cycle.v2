@@ -345,23 +345,17 @@ export const SopLibrary: React.FC<SopLibraryProps> = ({
                     <span>Edit SOP</span>
                   </button>
 
-                  <button
-                    id="delete-sop-btn"
-                    type="button"
-                    onClick={() => handleDeleteSop(selectedSop.id)}
-                    className={`p-2 rounded-xl border transition cursor-pointer ${
-                      canDeleteSop
-                        ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30'
-                        : 'bg-slate-800/40 text-slate-600 border-slate-800 hover:border-slate-700 hover:text-slate-500'
-                    }`}
-                    title={
-                      canDeleteSop
-                        ? 'Hapus Dokumen SOP'
-                        : 'Akses Terbatas: Hanya Super Admin (HQ) atau pengguna berizin yang dapat menghapus SOP'
-                    }
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {canDeleteSop && (
+                    <button
+                      id="delete-sop-btn"
+                      type="button"
+                      onClick={() => handleDeleteSop(selectedSop.id)}
+                      className="p-2 rounded-xl border bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30 transition cursor-pointer"
+                      title="Hapus Dokumen SOP"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 

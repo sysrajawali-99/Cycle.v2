@@ -648,21 +648,13 @@ export const RajawaliBoard: React.FC<RajawaliBoardProps> = ({
               <span>+ Berikan Tugas Tambahan Harian</span>
             </button>
 
-            {/* Clear All Tasks Button (if tasks exist) */}
-            {tasks.length > 0 && (
+            {/* Clear All Tasks Button (strictly visible only if permitted by Super Admin) */}
+            {tasks.length > 0 && canDeleteTasks && (
               <button
                 id="clear-all-tasks-btn"
                 onClick={handleClearAllTasks}
-                className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl border font-semibold text-xs transition cursor-pointer ${
-                  canDeleteTasks
-                    ? 'bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400'
-                    : 'bg-slate-900 border-slate-800 text-slate-600 hover:text-slate-500'
-                }`}
-                title={
-                  canDeleteTasks
-                    ? 'Hapus semua data tugas kebersihan di board'
-                    : 'Akses Terbatas: Hanya Super Admin (HQ) atau akun yang diizinkan Super Admin yang dapat mengosongkan board'
-                }
+                className="flex items-center space-x-1.5 px-3 py-2 rounded-xl border font-semibold text-xs transition cursor-pointer bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400"
+                title="Hapus semua data tugas kebersihan di board"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Kosongkan Board</span>
@@ -787,26 +779,20 @@ export const RajawaliBoard: React.FC<RajawaliBoardProps> = ({
                         </span>
                       )}
 
-                      {/* Delete Task Button - Restricted to Super Admin or Authorized User */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteTask(task.id);
-                        }}
-                        className={`p-1 rounded-lg transition cursor-pointer ${
-                          canDeleteTasks
-                            ? 'text-slate-500 hover:text-rose-400 hover:bg-rose-500/20'
-                            : 'text-slate-700 hover:text-slate-500 hover:bg-slate-800'
-                        }`}
-                        title={
-                          canDeleteTasks
-                            ? `Hapus Tugas: ${task.areaName}`
-                            : 'Akses Terbatas: Hanya Super Admin (HQ) atau pengguna berizin yang dapat menghapus tugas ini'
-                        }
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Delete Task Button - strictly visible only if permitted by Super Admin */}
+                      {canDeleteTasks && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTask(task.id);
+                          }}
+                          className="p-1 rounded-lg transition cursor-pointer text-slate-500 hover:text-rose-400 hover:bg-rose-500/20"
+                          title={`Hapus Tugas: ${task.areaName}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
 

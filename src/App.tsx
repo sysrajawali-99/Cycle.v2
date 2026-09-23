@@ -507,9 +507,9 @@ export default function App() {
           setSelectedProjectId(activeUpdated.assignedProjectId);
         }
 
-        // If active view is no longer allowed, fall back to dashboard
-        if (!activeUpdated.allowedViews.includes(currentView) && currentView !== 'dashboard') {
-          setCurrentView('dashboard');
+        // If active view is no longer allowed, switch to first allowed view
+        if (!isViewAllowed(currentView, activeUpdated)) {
+          setCurrentView(getFirstAllowedView(activeUpdated));
         }
       }
     }
@@ -523,6 +523,29 @@ export default function App() {
       setCurrentUser(refreshed);
       storageService.saveActiveUser(refreshed);
     }
+  };
+
+  // Helper: Strict permission check for any view
+  const isViewAllowed = (view: AppView, user: UserAccount | null = currentUser): boolean => {
+    if (!user) return false;
+    if (user.role === 'Super Admin (HQ)' || user.id === 'user-superadmin') return true;
+    const allowed = user.allowedViews || [];
+    if (view === 'sops' || view === 'sop') {
+      return allowed.includes('sops') || allowed.includes('sop' as any);
+    }
+    return allowed.includes(view);
+  };
+
+  // Helper: Determine first accessible view for user
+  const getFirstAllowedView = (user: UserAccount): AppView => {
+    if (user.role === 'Super Admin (HQ)' || user.id === 'user-superadmin') return 'dashboard';
+    const allowed = user.allowedViews || [];
+    if (allowed.includes('dashboard')) return 'dashboard';
+    if (allowed.length > 0) {
+      const first = allowed[0];
+      return (first === 'sop' ? 'sops' : first) as AppView;
+    }
+    return 'dashboard';
   };
 
   // Auth Handlers
@@ -542,7 +565,8 @@ export default function App() {
       setSelectedProjectId('ALL');
     }
 
-    setCurrentView('dashboard');
+    // Direct user to their permitted entry view
+    setCurrentView(getFirstAllowedView(user));
   };
 
   const handleLogout = () => {
@@ -561,9 +585,8 @@ export default function App() {
       setSelectedProjectId('ALL');
     }
     // Check if current view is allowed for this user
-    const allowed = targetUser.allowedViews || [];
-    if (currentView !== 'dashboard' && !allowed.includes(currentView)) {
-      setCurrentView('dashboard');
+    if (!isViewAllowed(currentView, targetUser)) {
+      setCurrentView(getFirstAllowedView(targetUser));
     }
   };
 
@@ -576,39 +599,19 @@ export default function App() {
     setSelectedProjectId(projectId);
   };
 
-  // Safe navigation view changer that verifies user permissions
+  // Safe navigation view changer that strictly verifies user permissions
   const handleNavigateView = (view: AppView) => {
     if (!currentUser) {
       setCurrentView('dashboard');
       return;
     }
 
-    // Access control view is restricted to Super Admin or users with access_control
-    if (view === 'access_control' && currentUser.role !== 'Super Admin (HQ)' && !currentUser.allowedViews?.includes('access_control')) {
-      alert('Akses Ditolak: Modul Hak Akses Pengguna hanya dapat diakses oleh Super Admin HQ.');
-      return;
+    if (isViewAllowed(view, currentUser)) {
+      setCurrentView(view);
+    } else {
+      // Direct unauthorized attempt to the user's first allowed view
+      setCurrentView(getFirstAllowedView(currentUser));
     }
-
-    // Company settings is restricted to Super Admin or users with company_settings
-    if (view === 'company_settings' && currentUser.role !== 'Super Admin (HQ)' && !currentUser.allowedViews?.includes('company_settings')) {
-      alert('Akses Ditolak: Modul Pengaturan Perusahaan hanya dapat diakses oleh Super Admin HQ.');
-      return;
-    }
-
-    // Check if view is allowed
-    const isAllowed =
-      (currentUser.allowedViews && currentUser.allowedViews.includes(view)) ||
-      (view === 'sop' && currentUser.allowedViews?.includes('sops')) ||
-      (view === 'sops' && currentUser.allowedViews?.includes('sop' as any)) ||
-      (view === 'access_control' && currentUser.role === 'Super Admin (HQ)') ||
-      (view === 'company_settings' && currentUser.role === 'Super Admin (HQ)');
-
-    if (!isAllowed) {
-      alert(`Akses Ditolak: Anda tidak memiliki izin untuk membuka menu ${view}. Hubungi Super Admin.`);
-      return;
-    }
-
-    setCurrentView(view);
   };
 
   // Reset / Kosongkan Seluruh Data Operasional (Super Admin Quick Reset)
@@ -698,26 +701,52 @@ export default function App() {
           }`}
         >
           <div className="max-w-7xl mx-auto space-y-4">
-            {/* Dashboard Overview */}
-            {currentView === 'dashboard' && (
-              <DashboardOverview
-                projects={projects}
-                employees={employees}
-                timesheets={timesheets}
-                projectStocks={projectStocks}
-                inventoryItems={inventoryItems}
-                tasks={tasks}
-                blasts={blasts}
-                selectedProjectId={selectedProjectId}
-                onNavigate={handleNavigateView}
-                userRole={currentUser.role}
-                accounts={accounts}
-                onUpdateAccounts={handleUpdateAccounts}
-                onAddFinanceTransaction={handleAddFinanceTransaction}
-                currentUser={currentUser}
-                materialRequests={materialRequests}
-              />
-            )}
+            {/* Security Guard: If Super Admin has not granted access to this view */}
+            {!isViewAllowed(currentView, currentUser) ? (
+              <div className="p-8 max-w-lg mx-auto my-12 bg-slate-900 border border-slate-800 rounded-3xl text-center space-y-4 shadow-2xl">
+                <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-3xl mx-auto">
+                  🛡️
+                </div>
+                <div className="space-y-1.5">
+                  <h2 className="text-xl font-black text-white">Menu Belum Diberikan Akses</h2>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Akun Anda ({currentUser.name}) belum diberikan izin oleh Super Admin untuk melihat modul ini.
+                  </p>
+                </div>
+                {currentUser?.allowedViews && currentUser.allowedViews.length > 0 && (
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleNavigateView(getFirstAllowedView(currentUser))}
+                      className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl transition-all cursor-pointer shadow-lg shadow-amber-500/20"
+                    >
+                      Buka Menu yang Diizinkan
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Dashboard Overview */}
+                {currentView === 'dashboard' && (
+                  <DashboardOverview
+                    projects={projects}
+                    employees={employees}
+                    timesheets={timesheets}
+                    projectStocks={projectStocks}
+                    inventoryItems={inventoryItems}
+                    tasks={tasks}
+                    blasts={blasts}
+                    selectedProjectId={selectedProjectId}
+                    onNavigate={handleNavigateView}
+                    userRole={currentUser.role}
+                    accounts={accounts}
+                    onUpdateAccounts={handleUpdateAccounts}
+                    onAddFinanceTransaction={handleAddFinanceTransaction}
+                    currentUser={currentUser}
+                    materialRequests={materialRequests}
+                  />
+                )}
 
             {/* Pengaturan Lokasi Project (Spesifikasi Gedung & Fasilitas) */}
             {currentView === 'project_settings' && (
@@ -981,6 +1010,8 @@ export default function App() {
                 onResetAllData={loadAllData}
                 onNavigateView={handleNavigateView}
               />
+            )}
+              </>
             )}
           </div>
         </main>

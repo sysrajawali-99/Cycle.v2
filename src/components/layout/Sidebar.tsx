@@ -68,28 +68,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   unreadBlastCount = 0,
   onOpenDriveSync
 }) => {
-  // Allowed views check
-  const allowedViews = currentUser?.allowedViews || [
-    'dashboard',
-    'project_settings',
-    'timesheet',
-    'employees',
-    'inventory',
-    'tasks',
-    'blast',
-    'sops',
-    'reports',
-    'finance_cash_journal',
-    'finance_bank_reconcile',
-    'finance_statements',
-    'finance_analytics_audit'
-  ];
-
+  // Strict allowed views check: Super Admin gets full access; other users strictly get only selected menus
   const isViewAllowed = (viewId: AppView) => {
-    if (viewId === 'company_settings' || viewId === 'access_control') {
-      return currentUser?.role === 'Super Admin (HQ)' || allowedViews.includes(viewId as any);
+    if (currentUser?.role === 'Super Admin (HQ)') {
+      return true;
     }
-    return allowedViews.includes(viewId) || (viewId === 'sops' && allowedViews.includes('sop' as any));
+    const allowed = currentUser?.allowedViews ?? [];
+    if (viewId === 'sops' || viewId === 'sop') {
+      return allowed.includes('sops') || allowed.includes('sop' as any);
+    }
+    return allowed.includes(viewId);
   };
 
   // HRM submenus
@@ -745,6 +733,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </button>
                 );
               })}
+            </div>
+          )}
+
+          {/* Empty state when no menu is permitted by Super Admin */}
+          {totalAccessibleCount === 0 && (
+            <div className="p-4 text-center space-y-2.5 bg-amber-50/60 border border-amber-200/80 rounded-2xl my-4 mx-2">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-700 mx-auto">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div className="text-xs font-bold text-slate-800">Akses Menu Dibatasi</div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Super Admin belum memberikan hak akses menu untuk akun Anda. Silakan hubungi Super Admin untuk mengaktifkan menu yang diperlukan.
+              </p>
             </div>
           )}
         </div>
