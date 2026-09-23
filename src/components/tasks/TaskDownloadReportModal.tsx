@@ -17,6 +17,7 @@ import { CleaningTask, Project } from '../../types';
 import { formatDateDDMMYYYY, formatDateTimeStamp } from '../../utils/formatters';
 import { generateCompletedTasksPDF } from '../../utils/pdfExport';
 import { storageService } from '../../services/storageService';
+import { OfficialLetterhead } from '../common/OfficialLetterhead';
 
 interface TaskDownloadReportModalProps {
   isOpen: boolean;
@@ -242,55 +243,34 @@ export const TaskDownloadReportModal: React.FC<TaskDownloadReportModalProps> = (
               id="printable-cleaning-report"
               className="bg-white text-slate-900 p-6 sm:p-8 rounded-2xl shadow-xl space-y-6 border border-slate-200"
             >
-              {/* Document Header */}
+              {/* Document Header Kop Surat Sesuai Master Identitas & Legalitas */}
               {(() => {
                 const comp = storageService.getCompanyProfile();
                 return (
-                  <div className="border-b-2 border-slate-900 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div className="flex items-start space-x-3.5 max-w-2xl">
-                      {comp.logoUrl ? (
-                        <div className="w-14 h-14 shrink-0 bg-white rounded-lg p-1 border border-slate-200 flex items-center justify-center">
-                          <img
-                            src={comp.logoUrl}
-                            alt={comp.name}
-                            className="max-w-full max-h-full object-contain"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-14 h-14 shrink-0 bg-slate-950 text-amber-400 font-black rounded-xl flex items-center justify-center text-xl shadow-sm border border-slate-900">
-                          {comp.brandName?.charAt(0) || comp.name?.charAt(0) || 'R'}
-                        </div>
-                      )}
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-extrabold text-lg sm:text-xl tracking-tight text-slate-900 uppercase">
-                            {comp.name}
-                          </span>
-                          <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded border border-amber-300 uppercase">
-                            OFFICIAL CLEANING REPORT
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 font-medium">
-                          {comp.tagline || 'Commercial Cleaning & Facility Management • Sistem Rajawali Boards'}
-                        </p>
-                        <p className="text-[11px] text-slate-500">
-                          {comp.address}{comp.city ? `, ${comp.city}` : ''} • Telp: {comp.phone}
-                        </p>
-                        {comp.taxId && (
-                          <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                            NPWP: {comp.taxId} {comp.businessPermitNo ? `• NIB: ${comp.businessPermitNo}` : ''}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                  <div className="space-y-3">
+                    <OfficialLetterhead
+                      company={comp}
+                      departmentSubtitle="Divisi Operasional & Quality Control Facility Services"
+                      showLegal={true}
+                      className="border-b-2 border-slate-900 pb-4"
+                    />
 
-                    <div className="text-left sm:text-right text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                      <div className="font-bold text-slate-900">
-                        LAPORAN PENYELESAIAN TUGAS
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                      <div>
+                        <div className="font-bold text-slate-900 uppercase tracking-wide">
+                          LAPORAN PENYELESAIAN TUGAS (QC CHECKLIST)
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          Lokasi Proyek: <span className="font-semibold text-slate-800">{currentProjectName}</span>
+                          {selectedShift !== 'ALL' && <span> • Shift: {selectedShift}</span>}
+                          {selectedDate && <span> • Tanggal: {selectedDate}</span>}
+                        </div>
                       </div>
-                      <div>Lokasi: <span className="font-semibold text-slate-800">{currentProjectName}</span></div>
-                      <div>Total Selesai: <span className="font-bold text-emerald-600">{filteredCompletedTasks.length} Tugas (100% QC)</span></div>
+                      <div className="mt-2 sm:mt-0 text-right">
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-1 rounded border border-emerald-300 uppercase">
+                          Total Selesai: {filteredCompletedTasks.length} Tugas (100% QC)
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );

@@ -33,6 +33,7 @@ import {
   generateIndividualPayslipPDF
 } from '../../utils/pdfExport';
 import { storageService } from '../../services/storageService';
+import { OfficialLetterhead } from '../common/OfficialLetterhead';
 
 interface ReportingCenterProps {
   projects: Project[];
@@ -452,36 +453,31 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
                 id="printable-payslip-sheet"
                 className="bg-white text-slate-950 w-full p-6 rounded-2xl shadow-xl space-y-4 border border-slate-200 text-xs font-sans"
               >
-                {/* Kop Slip */}
+                {/* Kop Slip Resmi Sesuai Master Identitas & Legalitas */}
                 {(() => {
                   const comp = storageService.getCompanyProfile();
                   return (
-                    <>
-                      <div className="border-b-2 border-slate-900 pb-3 flex items-start justify-between">
-                        <div className="flex items-start space-x-3">
-                          {comp.logoUrl && (
-                            <img
-                              src={comp.logoUrl}
-                              alt={comp.name}
-                              className="w-10 h-10 object-contain rounded p-0.5 border border-slate-300"
-                            />
-                          )}
-                          <div>
-                            <h3 className="font-black text-base text-slate-900 tracking-wider uppercase">{comp.name}</h3>
-                            <p className="text-[10px] text-slate-600 font-medium">{comp.tagline || 'Facility Management & Cleaning Services'}</p>
-                            <p className="text-[9px] text-slate-500">{comp.address} {comp.phone ? `• Telp: ${comp.phone}` : ''}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="bg-amber-100 text-amber-900 text-[9px] font-bold px-2 py-0.5 rounded border border-amber-300 uppercase block">
+                    <div className="space-y-3 border-b-2 border-slate-900 pb-3">
+                      <OfficialLetterhead
+                        company={comp}
+                        departmentSubtitle="Divisi Operasional & Manajemen Keuangan Personil (Payroll)"
+                        showLegal={true}
+                        showBankInfo={false}
+                      />
+                      <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                        <span className="font-mono text-[10.5px] font-semibold">
+                          DOKUMEN RESMI PENGGAJIAN • KODE: <strong className="text-slate-800">{slipEmployee.employee.nik}</strong>
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          <span className="bg-amber-100 text-amber-900 text-[9px] font-bold px-2 py-0.5 rounded border border-amber-300 uppercase">
                             SLIP GAJI RESMI
                           </span>
-                          <span className="text-[10px] font-bold text-slate-800 font-mono mt-1 block">
+                          <span className="text-[10px] font-bold text-slate-800 font-mono">
                             {getMonthName(reportMonth).toUpperCase()} {reportYear}
                           </span>
                         </div>
                       </div>
-                    </>
+                    </div>
                   );
                 })()}
 
@@ -585,25 +581,36 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
                   </div>
                 </div>
 
-                {/* Signatures */}
-                <div className="grid grid-cols-2 gap-4 pt-3 text-center text-slate-600 text-[10px]">
-                  <div className="space-y-8">
-                    <div>
-                      <p>Penerima,</p>
-                      <p className="font-bold text-slate-900">{slipEmployee.employee.name}</p>
-                    </div>
-                    <div className="border-b border-slate-400 w-28 mx-auto"></div>
-                    <p>( Karyawan Bersangkutan )</p>
-                  </div>
-                  <div className="space-y-8">
-                    <div>
-                      <p>Petugas Payroll / HRD,</p>
-                      <p className="font-bold text-slate-900">{storageService.getCompanyProfile().name}</p>
-                    </div>
-                    <div className="border-b border-slate-400 w-28 mx-auto"></div>
-                    <p>( Finance & HR Dept )</p>
-                  </div>
-                </div>
+                {/* Signatures & Footer Note */}
+                {(() => {
+                  const comp = storageService.getCompanyProfile();
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-4 pt-3 text-center text-slate-600 text-[10px]">
+                        <div className="space-y-8">
+                          <div>
+                            <p>Penerima,</p>
+                            <p className="font-bold text-slate-900">{slipEmployee.employee.name}</p>
+                          </div>
+                          <div className="border-b border-slate-400 w-28 mx-auto"></div>
+                          <p>( Karyawan Bersangkutan )</p>
+                        </div>
+                        <div className="space-y-8">
+                          <div>
+                            <p>{comp.financeManagerTitle || 'Petugas Payroll / HRD,'}</p>
+                            <p className="font-bold text-slate-900">{comp.name}</p>
+                          </div>
+                          <div className="border-b border-slate-400 w-28 mx-auto"></div>
+                          <p>( {comp.financeManagerName || 'Finance & HR Dept'} )</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-200 text-center text-[9px] text-slate-400">
+                        {comp.letterheadFooterNote || `Dokumen ini sah dan diterbitkan secara digital oleh Sistem Payroll ${comp.name}.`}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
 

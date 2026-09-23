@@ -15,6 +15,103 @@ const getCompany = (): CompanyProfile => {
   }
 };
 
+interface PDFHeaderOptions {
+  doc: jsPDF;
+  pageWidth: number;
+  comp: CompanyProfile;
+  badgeText: string;
+  docCode: string;
+  docDate?: string;
+  headerHeight?: number;
+  subtitleOverride?: string;
+}
+
+export const drawOfficialPDFLetterhead = ({
+  doc,
+  pageWidth,
+  comp,
+  badgeText,
+  docCode,
+  docDate,
+  headerHeight = 22,
+  subtitleOverride
+}: PDFHeaderOptions) => {
+  // Top Banner Dark Navy
+  doc.setFillColor(15, 39, 68);
+  doc.rect(0, 0, pageWidth, headerHeight, 'F');
+
+  // Gold accent line under header
+  doc.setFillColor(217, 119, 6);
+  doc.rect(0, headerHeight, pageWidth, 1.5, 'F');
+
+  // Logo (if available in base64 data URI)
+  let textX = 14;
+  if (comp.logoUrl && comp.logoUrl.startsWith('data:image')) {
+    try {
+      const fmt = comp.logoUrl.includes('png') ? 'PNG' : comp.logoUrl.includes('webp') ? 'WEBP' : 'JPEG';
+      doc.addImage(comp.logoUrl, fmt, 12, 3, 16, 16);
+      textX = 32;
+    } catch {
+      textX = 14;
+    }
+  }
+
+  // Company Name
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text(comp.name || 'PT RAJAWALI CYCLE INDONESIA', textX, 8);
+
+  // Tagline / Subtitle
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.8);
+  doc.setTextColor(203, 213, 225);
+  const taglineStr = subtitleOverride || comp.tagline || 'Integrated Facility Services & Enterprise Management';
+  doc.text(taglineStr, textX, 12.2);
+
+  // Address & Contacts
+  const fullAddress = `${comp.address || ''}${comp.city ? `, ${comp.city}` : ''}`;
+  const contacts = [
+    fullAddress,
+    comp.phone ? `Telp: ${comp.phone}` : '',
+    comp.email ? `Email: ${comp.email}` : ''
+  ].filter(Boolean).join(' • ');
+  doc.text(contacts, textX, 16);
+
+  // Legalities (NPWP, NIB)
+  const legalStr = [
+    comp.taxId ? `NPWP: ${comp.taxId}` : '',
+    comp.businessPermitNo ? `NIB: ${comp.businessPermitNo}` : ''
+  ].filter(Boolean).join('  •  ');
+  if (legalStr && headerHeight >= 21) {
+    doc.setFontSize(6);
+    doc.setTextColor(148, 163, 184);
+    doc.text(legalStr, textX, 19.5);
+  }
+
+  // Right Badges
+  const badgeWidth = Math.min(58, pageWidth * 0.28);
+  const badgeX = pageWidth - 14 - badgeWidth;
+  doc.setFillColor(217, 119, 6);
+  doc.roundedRect(badgeX, 3.5, badgeWidth, 5.2, 1, 1, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6);
+  doc.setTextColor(15, 23, 42);
+  doc.text(badgeText, badgeX + badgeWidth / 2, 7.2, { align: 'center' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text(docCode, badgeX + badgeWidth, 13, { align: 'right' });
+
+  if (docDate) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(203, 213, 225);
+    doc.text(docDate, badgeX + badgeWidth, 17, { align: 'right' });
+  }
+};
+
 interface ExportTimesheetPDFParams {
   projects: Project[];
   employees: Employee[];
@@ -63,49 +160,22 @@ export const generateTimesheetPDF = ({
   const pageWidth = doc.internal.pageSize.getWidth(); // ~297mm
   const pageHeight = doc.internal.pageSize.getHeight(); // ~210mm
 
-  // 1. TOP HEADER - Corporate Dark Navy & Gold Accents
-  doc.setFillColor(15, 39, 68); // #0f2744 Dark Navy
-  doc.rect(0, 0, pageWidth, 22, 'F');
-
-  // Gold accent line under header
-  doc.setFillColor(217, 119, 6); // #d97706 Gold
-  doc.rect(0, 22, pageWidth, 1.8, 'F');
-
-  // Company Name
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.setTextColor(255, 255, 255);
-  doc.text(comp.name, 14, 9);
-
-  // Subtitle
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(203, 213, 225); // Slate 300
-  doc.text(comp.tagline, 14, 14);
-  doc.text(`Head Office: ${comp.address} • Telp: ${comp.phone}`, 14, 18);
-
-  // Right Header Tag
-  doc.setFillColor(217, 119, 6);
-  doc.roundedRect(pageWidth - 65, 4, 51, 6, 1, 1, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('OFFICIAL PAYROLL DOCUMENT', pageWidth - 63, 8.2);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.setTextColor(255, 255, 255);
-  doc.text(`DOC: PAY-${year}${String(month).padStart(2, '0')}-${projCode}`, pageWidth - 65, 14);
-
   const printDate = new Date().toLocaleDateString('id-ID', {
     day: '2-digit',
     month: 'short',
     year: 'numeric'
   });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(203, 213, 225);
-  doc.text(`Cetak: ${printDate}`, pageWidth - 65, 18);
+
+  // 1. TOP HEADER - Corporate Dark Navy & Gold Accents Sesuai Master Identitas & Legalitas
+  drawOfficialPDFLetterhead({
+    doc,
+    pageWidth,
+    comp,
+    badgeText: 'OFFICIAL PAYROLL DOCUMENT',
+    docCode: `DOC: PAY-${year}${String(month).padStart(2, '0')}-${projCode}`,
+    docDate: `Cetak: ${printDate}`,
+    headerHeight: 22
+  });
 
   // 2. DOCUMENT TITLE & METADATA BAR
   doc.setFont('helvetica', 'bold');
@@ -481,27 +551,44 @@ export const generateIndividualPayslipPDF = ({
   doc.setFillColor(217, 119, 6); // Gold line
   doc.rect(0, 26, pageWidth, 1.5, 'F');
 
+  // Logo if available
+  let textX = 10;
+  if (comp.logoUrl && comp.logoUrl.startsWith('data:image')) {
+    try {
+      const fmt = comp.logoUrl.includes('png') ? 'PNG' : comp.logoUrl.includes('webp') ? 'WEBP' : 'JPEG';
+      doc.addImage(comp.logoUrl, fmt, 8, 3, 18, 18);
+      textX = 28;
+    } catch {
+      textX = 10;
+    }
+  }
+
   // Company Text
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.setTextColor(255, 255, 255);
-  doc.text(comp.name, 10, 9);
+  doc.text(comp.name, textX, 8);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(203, 213, 225);
-  doc.text(comp.tagline, 10, 14);
-  doc.text(`${comp.address} • Telp: ${comp.phone}`, 10, 18);
+  doc.text(comp.tagline, textX, 13);
+  doc.text(`${comp.address}${comp.city ? `, ${comp.city}` : ''} • Telp: ${comp.phone}`, textX, 17);
+  if (comp.taxId || comp.businessPermitNo) {
+    const leg = [comp.taxId ? `NPWP: ${comp.taxId}` : '', comp.businessPermitNo ? `NIB: ${comp.businessPermitNo}` : ''].filter(Boolean).join(' • ');
+    doc.setFontSize(5.8);
+    doc.text(leg, textX, 21);
+  }
 
   // Slip Gaji Tag
   doc.setFillColor(217, 119, 6);
-  doc.roundedRect(pageWidth - 45, 6, 35, 13, 1, 1, 'F');
+  doc.roundedRect(pageWidth - 45, 5, 35, 13, 1, 1, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
-  doc.text('SLIP GAJI RESMI', pageWidth - 27.5, 11.5, { align: 'center' });
+  doc.text('SLIP GAJI RESMI', pageWidth - 27.5, 10.5, { align: 'center' });
   doc.setFontSize(6.5);
-  doc.text(`${monthName.toUpperCase()} ${year}`, pageWidth - 27.5, 16, { align: 'center' });
+  doc.text(`${monthName.toUpperCase()} ${year}`, pageWidth - 27.5, 15, { align: 'center' });
 
   // Employee Identity Card Box
   doc.setFillColor(248, 250, 252);
@@ -680,39 +767,21 @@ export const generateInventoryUsagePDF = ({
   const pageWidth = doc.internal.pageSize.getWidth(); // ~297mm
   const pageHeight = doc.internal.pageSize.getHeight(); // ~210mm
 
-  // 1. TOP HEADER - Corporate Dark Navy & Gold Accents
-  doc.setFillColor(15, 39, 68); // #0f2744 Dark Navy
-  doc.rect(0, 0, pageWidth, 22, 'F');
-
-  // Gold accent line under header
-  doc.setFillColor(217, 119, 6); // #d97706 Gold
-  doc.rect(0, 22, pageWidth, 1.8, 'F');
-
-  // Company Name
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.setTextColor(255, 255, 255);
-  doc.text(comp.name, 14, 9);
-
-  // Subtitle
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(203, 213, 225); // Slate 300
-  doc.text(comp.tagline, 14, 14);
-  doc.text(`Head Office: ${comp.address} • Telp: ${comp.phone}`, 14, 18);
-
-  // Right Header Tag
-  doc.setFillColor(217, 119, 6);
-  doc.roundedRect(pageWidth - 70, 4, 56, 6, 1, 1, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.5);
-  doc.setTextColor(15, 23, 42);
-  doc.text('LOGISTIK & INVENTORY CONTROL', pageWidth - 68, 8.2);
-
   const printDate = new Date().toLocaleDateString('id-ID', {
     day: '2-digit',
     month: 'short',
     year: 'numeric'
+  });
+
+  // 1. TOP HEADER - Corporate Dark Navy & Gold Accents Sesuai Master Identitas & Legalitas
+  drawOfficialPDFLetterhead({
+    doc,
+    pageWidth,
+    comp,
+    badgeText: 'LOGISTIK & INVENTORY CONTROL',
+    docCode: `DOC: LOG-${projCode}-${new Date().toISOString().substring(0, 10).replace(/-/g, '')}`,
+    docDate: `Cetak: ${printDate}`,
+    headerHeight: 22
   });
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
@@ -1005,37 +1074,15 @@ export const generateCompletedTasksPDF = ({
 
   // Helper: Draw Header on Page
   const drawHeader = () => {
-    doc.setFillColor(15, 39, 68); // Dark Navy
-    doc.rect(0, 0, pageWidth, 20, 'F');
-
-    doc.setFillColor(217, 119, 6); // Amber Gold
-    doc.rect(0, 20, pageWidth, 1.5, 'F');
-
-    // Title & Company
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(255, 255, 255);
-    doc.text(comp.name, margin, 8);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(203, 213, 225);
-    doc.text(comp.tagline, margin, 12);
-    doc.text(`${comp.address} • Telp: ${comp.phone}`, margin, 16);
-
-    // Right Tag
-    doc.setFillColor(217, 119, 6);
-    doc.roundedRect(pageWidth - margin - 48, 4, 48, 5.5, 1, 1, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6);
-    doc.setTextColor(15, 23, 42);
-    doc.text('OFFICIAL CLEANING REPORT', pageWidth - margin - 46, 7.8);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(255, 255, 255);
-    doc.text(`DOC: CLN-${projCode}-${currentTimestamp.toISOString().substring(0, 10).replace(/-/g, '')}`, pageWidth - margin - 48, 13);
-    doc.text(`Tanggal: ${printDateDDMMYYYY}`, pageWidth - margin - 48, 17);
+    drawOfficialPDFLetterhead({
+      doc,
+      pageWidth,
+      comp,
+      badgeText: 'OFFICIAL CLEANING REPORT',
+      docCode: `DOC: CLN-${projCode}-${currentTimestamp.toISOString().substring(0, 10).replace(/-/g, '')}`,
+      docDate: `Tanggal: ${printDateDDMMYYYY}`,
+      headerHeight: 21
+    });
   };
 
   // Helper: Draw Footer with Timestamp
@@ -1358,11 +1405,11 @@ export const generateCompletedTasksPDF = ({
     doc.text('Disetujui & Diverifikasi,', margin + sigW * 2.5, sigY, { align: 'center' });
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
-    doc.text('Operations Manager', margin + sigW * 2.5, sigY + 3.5, { align: 'center' });
+    doc.text(comp.directorTitle || 'Operations Manager', margin + sigW * 2.5, sigY + 3.5, { align: 'center' });
     doc.line(margin + sigW * 2.15, sigY + 14, margin + sigW * 2.85, sigY + 14);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6);
-    doc.text('( Head of Facility Services )', margin + sigW * 2.5, sigY + 17.5, { align: 'center' });
+    doc.text(comp.directorName ? `( ${comp.directorName} )` : '( Head of Facility Services )', margin + sigW * 2.5, sigY + 17.5, { align: 'center' });
   }
 
   // Draw Footer on all pages
@@ -1398,45 +1445,18 @@ export const generateSingleSopPDF = (sop: SopItem) => {
   const printTimestampStr = formatDateTimeStamp(currentTimestamp);
   const comp = getCompany();
 
+  // Helper: Draw Header on Page
   const drawHeader = () => {
-    // 1. Dark Navy Top Banner
-    doc.setFillColor(15, 39, 68); // #0f2744 Dark Navy
-    doc.rect(0, 0, pageWidth, 21, 'F');
-
-    // 2. Gold Accent Line
-    doc.setFillColor(217, 119, 6); // #d97706 Gold
-    doc.rect(0, 21, pageWidth, 1.8, 'F');
-
-    // Company Name & Logo text
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(255, 255, 255);
-    doc.text(comp.name, margin, 8.5);
-
-    // Subtitles
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.8);
-    doc.setTextColor(203, 213, 225);
-    doc.text('Pusat Standar Operasional Prosedur (SOP) & Jaminan Mutu Kebersihan', margin, 13);
-    doc.text(`${comp.address} • Telp: ${comp.phone}`, margin, 17);
-
-    // Right Header Tag
-    doc.setFillColor(217, 119, 6);
-    doc.roundedRect(pageWidth - margin - 52, 4, 52, 5.5, 1, 1, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6);
-    doc.setTextColor(15, 23, 42);
-    doc.text('DOKUMEN RESMI STANDAR MUTU', pageWidth - margin - 50, 7.8);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.5);
-    doc.setTextColor(255, 255, 255);
-    doc.text(`KODE: ${sop.code || 'SOP-MUTU'} • v${sop.version || '1.0'}`, pageWidth - margin - 52, 13.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6);
-    doc.setTextColor(203, 213, 225);
-    doc.text(`Revisi: ${sop.lastUpdated || printDateDDMMYYYY}`, pageWidth - margin - 52, 17.5);
+    drawOfficialPDFLetterhead({
+      doc,
+      pageWidth,
+      comp,
+      badgeText: 'DOKUMEN RESMI STANDAR MUTU',
+      docCode: `KODE: ${sop.code || 'SOP-MUTU'} • v${sop.version || '1.0'}`,
+      docDate: `Revisi: ${sop.lastUpdated || printDateDDMMYYYY}`,
+      headerHeight: 22,
+      subtitleOverride: 'Pusat Standar Operasional Prosedur (SOP) & Jaminan Mutu Kebersihan'
+    });
   };
 
   const drawFooter = (pageNum: number, totalPages: number) => {
@@ -1755,11 +1775,11 @@ export const generateSingleSopPDF = (sop: SopItem) => {
   doc.text('Disetujui Oleh,', margin + sigColW * 2.5, sigY, { align: 'center' });
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  doc.text('Operations Director', margin + sigColW * 2.5, sigY + 3.5, { align: 'center' });
+  doc.text(comp.directorTitle || 'Operations Director', margin + sigColW * 2.5, sigY + 3.5, { align: 'center' });
   doc.line(margin + sigColW * 2.15, sigY + 13, margin + sigColW * 2.85, sigY + 13);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(5.5);
-  doc.text('( Direktur Operasional )', margin + sigColW * 2.5, sigY + 16.5, { align: 'center' });
+  doc.text(comp.directorName ? `( ${comp.directorName} )` : '( Direktur Operasional )', margin + sigColW * 2.5, sigY + 16.5, { align: 'center' });
 
   // Draw Footer on all pages
   const totalPages = doc.internal.pages.length - 1;
@@ -1769,7 +1789,8 @@ export const generateSingleSopPDF = (sop: SopItem) => {
   }
 
   const safeTitle = (sop.code || sop.title).replace(/[^a-zA-Z0-9]/g, '_');
-  const fileName = `SOP_${safeTitle}_Rajawali.pdf`;
+  const safeComp = (comp.brandName || comp.name).replace(/[^a-zA-Z0-9]/g, '_');
+  const fileName = `SOP_${safeTitle}_${safeComp}.pdf`;
   doc.save(fileName);
 };
 
@@ -1800,38 +1821,16 @@ export const generateSopsCatalogPDF = (sops: SopItem[], categoryFilter: string =
   const comp = getCompany();
 
   const drawHeader = () => {
-    doc.setFillColor(15, 39, 68);
-    doc.rect(0, 0, pageWidth, 21, 'F');
-    doc.setFillColor(217, 119, 6);
-    doc.rect(0, 21, pageWidth, 1.8, 'F');
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(255, 255, 255);
-    doc.text(comp.name, margin, 8.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.8);
-    doc.setTextColor(203, 213, 225);
-    doc.text('Kompilasi Buku Pedoman Standar Operasional Prosedur (SOP) & Mutu', margin, 13);
-    doc.text(`${comp.address} • Telp: ${comp.phone}`, margin, 17);
-
-    doc.setFillColor(217, 119, 6);
-    doc.roundedRect(pageWidth - margin - 52, 4, 52, 5.5, 1, 1, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6);
-    doc.setTextColor(15, 23, 42);
-    doc.text('BUKU KATALOG STANDAR MUTU', pageWidth - margin - 50, 7.8);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.5);
-    doc.setTextColor(255, 255, 255);
-    doc.text(`TOTAL: ${targetSops.length} DOKUMEN SOP`, pageWidth - margin - 52, 13.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6);
-    doc.setTextColor(203, 213, 225);
-    doc.text(`Cetak: ${printDateDDMMYYYY}`, pageWidth - margin - 52, 17.5);
+    drawOfficialPDFLetterhead({
+      doc,
+      pageWidth,
+      comp,
+      badgeText: 'BUKU KATALOG STANDAR MUTU',
+      docCode: `TOTAL: ${targetSops.length} DOKUMEN SOP`,
+      docDate: `Cetak: ${printDateDDMMYYYY}`,
+      headerHeight: 22,
+      subtitleOverride: 'Kompilasi Buku Pedoman Standar Operasional Prosedur (SOP) & Mutu'
+    });
   };
 
   const drawFooter = (pageNum: number, totalPages: number) => {
@@ -1958,35 +1957,16 @@ export const generateMaterialRequestPDF = (
   doc.setFillColor(15, 39, 68); // #0f2744 Dark Navy
   doc.rect(0, 0, pageWidth, 22, 'F');
 
-  // Gold accent line under header
-  doc.setFillColor(217, 119, 6); // #d97706 Gold
-  doc.rect(0, 22, pageWidth, 1.8, 'F');
-
-  // Company Name
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(255, 255, 255);
-  doc.text(comp.name || 'PT RAJAWALI CYCLE INDONESIA', margin, 9);
-
-  // Subtitle
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(203, 213, 225);
-  doc.text(comp.tagline || 'Integrated Facility Services & Operational Management', margin, 14);
-  doc.text(`${comp.address || 'Jakarta'} • Telp: ${comp.phone || '(021) 5299-8800'}`, margin, 18);
-
-  // Right Header Tag: Status & Code
-  doc.setFillColor(217, 119, 6);
-  doc.roundedRect(pageWidth - 62, 4, 48, 6, 1, 1, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(255, 255, 255);
-  doc.text(`KODE: ${request.requestCode}`, pageWidth - 38, 8.2, { align: 'center' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(226, 232, 240);
-  doc.text(`Status: ${request.status}`, pageWidth - 14, 18, { align: 'right' });
+  // 1. TOP HEADER - Corporate Dark Navy & Gold Accents Sesuai Master Identitas & Legalitas
+  drawOfficialPDFLetterhead({
+    doc,
+    pageWidth,
+    comp,
+    badgeText: `KODE: ${request.requestCode}`,
+    docCode: `STATUS: ${request.status}`,
+    docDate: `Tgl: ${formatDateDDMMYYYY(request.requestDate)}`,
+    headerHeight: 22
+  });
 
   let curY = 30;
 

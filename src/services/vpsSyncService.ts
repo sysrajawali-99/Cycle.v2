@@ -30,6 +30,7 @@ class VpsSyncService {
 
   private syncQueue: Map<string, any> = new Map();
   private debounceTimer: any = null;
+  private isStartupSyncing = false;
 
   public init() {
     if (this.isInitialized || typeof window === 'undefined') return;
@@ -110,7 +111,9 @@ class VpsSyncService {
 
   public async checkStatus(): Promise<VpsConnectionStatus> {
     try {
-      const res = await fetch('/api/vps/status');
+      const res = await fetch('/api/vps/status', {
+        signal: AbortSignal.timeout(10000)
+      });
       if (res.ok) {
         const json = await res.json();
         this.currentStatus = {
@@ -136,7 +139,10 @@ class VpsSyncService {
     this.notifyStatusListeners();
 
     try {
-      const res = await fetch('/api/vps/reconnect', { method: 'POST' });
+      const res = await fetch('/api/vps/reconnect', {
+        method: 'POST',
+        signal: AbortSignal.timeout(15000)
+      });
       if (res.ok) {
         const json = await res.json();
         this.currentStatus = {
@@ -247,7 +253,8 @@ class VpsSyncService {
         body: JSON.stringify({
           states: allStates,
           meta: { userId: storageService.getActiveUser()?.id, userName: storageService.getActiveUser()?.name }
-        })
+        }),
+        signal: AbortSignal.timeout(20000)
       });
 
       const json = await res.json();
@@ -269,7 +276,9 @@ class VpsSyncService {
     this.notifyStatusListeners();
 
     try {
-      const res = await fetch('/api/vps/states');
+      const res = await fetch('/api/vps/states', {
+        signal: AbortSignal.timeout(20000)
+      });
       if (!res.ok) throw new Error('Gagal mengambil data dari VPS');
 
       const json = await res.json();
@@ -300,8 +309,12 @@ class VpsSyncService {
    * Automatically synchronize with VPS on startup in background
    */
   private async autoSyncOnStartup() {
+    if (this.isStartupSyncing) return;
+    this.isStartupSyncing = true;
     try {
-      const res = await fetch('/api/vps/states');
+      const res = await fetch('/api/vps/states', {
+        signal: AbortSignal.timeout(15000)
+      });
       if (!res.ok) return;
 
       const json = await res.json();
@@ -323,6 +336,8 @@ class VpsSyncService {
       }
     } catch (err) {
       console.warn('[VPS Auto-Sync] Background startup sync:', err);
+    } finally {
+      this.isStartupSyncing = false;
     }
   }
 

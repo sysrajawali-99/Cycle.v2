@@ -283,27 +283,27 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
   return (
     <div
       id="bulk-delete-division-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto"
     >
       <div
         id="bulk-delete-division-modal-card"
-        className="bg-slate-900 border border-rose-500/40 rounded-3xl max-w-2xl w-full my-6 p-5 sm:p-7 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200"
+        className="bg-white border border-rose-300 rounded-3xl max-w-2xl w-full my-6 p-5 sm:p-7 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200"
       >
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-rose-500/20 pb-4">
+        <div className="flex items-start justify-between border-b border-rose-100 pb-4">
           <div className="flex items-center space-x-3">
-            <div className="p-3 rounded-2xl bg-rose-500/20 border border-rose-500/30 text-rose-400">
+            <div className="p-3 rounded-2xl bg-rose-100 border border-rose-200 text-rose-600">
               <Trash2 className="w-6 h-6" />
             </div>
             <div>
-              <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-black border border-rose-500/30 mb-1 tracking-wider uppercase">
-                <ShieldAlert className="w-3 h-3" />
+              <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 text-[10px] font-black border border-rose-200 mb-1 tracking-wider uppercase">
+                <ShieldAlert className="w-3 h-3 text-rose-600" />
                 <span>Otoritas Super Admin (HQ)</span>
               </div>
-              <h3 className="font-black text-white text-base sm:text-lg">
+              <h3 className="font-black text-slate-900 text-base sm:text-lg">
                 Hapus Data Masal per Divisi
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Pembersihan permanen data operasional untuk masing-masing divisi perusahaan
               </p>
             </div>
@@ -313,7 +313,7 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
             id="close-bulk-delete-modal-btn"
             onClick={onClose}
             disabled={isProcessing}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -321,11 +321,11 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
 
         {/* NON-SUPERADMIN ALERT */}
         {!isSuperAdmin && (
-          <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-600/40 flex items-start space-x-3 text-rose-300">
-            <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start space-x-3 text-rose-800">
+            <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <h4 className="text-xs font-black text-white">AKSES DITOLAK: HANYA SUPER ADMIN</h4>
-              <p className="text-[11px] text-rose-200/90 leading-relaxed">
+              <h4 className="text-xs font-black text-rose-900">AKSES DITOLAK: HANYA SUPER ADMIN</h4>
+              <p className="text-[11px] text-rose-700 leading-relaxed">
                 Fitur Hapus Data Masal hanya dapat diakses dan dieksekusi oleh <b>Super Admin (HQ)</b>.
                 Role Anda saat ini adalah <b>{currentUser?.role || 'User'}</b>. Silakan hubungi Super Admin jika
                 Anda memerlukan pengosongan data pada divisi ini.
@@ -336,7 +336,7 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
 
         {/* DIVISION SELECTOR TABS */}
         <div className="space-y-2">
-          <label className="block text-xs font-bold text-slate-300">
+          <label className="block text-xs font-bold text-slate-700">
             1. Pilih Divisi yang Ingin Dihapus Masal:
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -350,17 +350,17 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
               }}
               className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
                 selectedDivision === 'finance'
-                  ? 'bg-emerald-950/40 border-emerald-500 text-white shadow-lg shadow-emerald-950/50 ring-1 ring-emerald-500'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-white'
+                  ? 'bg-emerald-50 border-emerald-500 text-slate-900 shadow-sm ring-1 ring-emerald-500'
+                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-100'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <Wallet className="w-4 h-4 text-emerald-400" />
-                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <Wallet className="w-4 h-4 text-emerald-600" />
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">
                   {totalFinanceRecords} data
                 </span>
               </div>
-              <span className="text-xs font-bold">Divisi Keuangan</span>
+              <span className="text-xs font-bold text-slate-900">Divisi Keuangan</span>
               <span className="text-[10px] text-slate-500 line-clamp-1">Kas, Jurnal, AP/AR, Bank</span>
             </button>
 
@@ -374,17 +374,17 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
               }}
               className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
                 selectedDivision === 'hrm'
-                  ? 'bg-blue-950/40 border-blue-500 text-white shadow-lg shadow-blue-950/50 ring-1 ring-blue-500'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-white'
+                  ? 'bg-blue-50 border-blue-500 text-slate-900 shadow-sm ring-1 ring-blue-500'
+                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-100'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <Users className="w-4 h-4 text-blue-400" />
-                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                <Users className="w-4 h-4 text-blue-600" />
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">
                   {totalHrmRecords} data
                 </span>
               </div>
-              <span className="text-xs font-bold">Divisi HRD</span>
+              <span className="text-xs font-bold text-slate-900">Divisi HRD</span>
               <span className="text-[10px] text-slate-500 line-clamp-1">Karyawan, Presensi, SOP</span>
             </button>
 
@@ -398,17 +398,17 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
               }}
               className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
                 selectedDivision === 'operations'
-                  ? 'bg-amber-950/40 border-amber-500 text-white shadow-lg shadow-amber-950/50 ring-1 ring-amber-500'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-white'
+                  ? 'bg-amber-50 border-amber-500 text-slate-900 shadow-sm ring-1 ring-amber-500'
+                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-100'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <Building2 className="w-4 h-4 text-amber-400" />
-                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <Building2 className="w-4 h-4 text-amber-600" />
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
                   {totalOperationsRecords} data
                 </span>
               </div>
-              <span className="text-xs font-bold">Divisi Operasional</span>
+              <span className="text-xs font-bold text-slate-900">Divisi Operasional</span>
               <span className="text-[10px] text-slate-500 line-clamp-1">Gedung, Stok, Kanban</span>
             </button>
 
@@ -422,17 +422,17 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
               }}
               className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
                 selectedDivision === 'blast'
-                  ? 'bg-purple-950/40 border-purple-500 text-white shadow-lg shadow-purple-950/50 ring-1 ring-purple-500'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-white'
+                  ? 'bg-purple-50 border-purple-500 text-slate-900 shadow-sm ring-1 ring-purple-500'
+                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-100'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <Megaphone className="w-4 h-4 text-purple-400" />
-                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                <Megaphone className="w-4 h-4 text-purple-600" />
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">
                   {totalBlastRecords} data
                 </span>
               </div>
-              <span className="text-xs font-bold">Divisi Broadcast</span>
+              <span className="text-xs font-bold text-slate-900">Divisi Broadcast</span>
               <span className="text-[10px] text-slate-500 line-clamp-1">Pesan Siaran Manajemen</span>
             </button>
 
@@ -446,20 +446,20 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
               }}
               className={`col-span-2 sm:col-span-2 p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
                 selectedDivision === 'all'
-                  ? 'bg-rose-950/50 border-rose-500 text-white shadow-lg shadow-rose-950/50 ring-1 ring-rose-500'
-                  : 'bg-rose-950/20 border-rose-900/40 text-rose-300 hover:border-rose-700 hover:text-white'
+                  ? 'bg-rose-50 border-rose-500 text-slate-900 shadow-sm ring-1 ring-rose-500'
+                  : 'bg-rose-50/50 border-rose-200 text-rose-800 hover:border-rose-300 hover:bg-rose-100/60'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center space-x-1.5">
-                  <Database className="w-4 h-4 text-rose-400" />
-                  <span className="text-xs font-black text-rose-300">Semua Divisi Sekaligus</span>
+                  <Database className="w-4 h-4 text-rose-600" />
+                  <span className="text-xs font-black text-rose-700">Semua Divisi Sekaligus</span>
                 </div>
-                <span className="text-[10px] font-black px-2 py-0.5 rounded bg-rose-500/30 text-rose-200 border border-rose-500/40">
+                <span className="text-[10px] font-black px-2 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">
                   Total: {totalAllRecords} data
                 </span>
               </div>
-              <span className="text-[10px] text-rose-300/80">
+              <span className="text-[10px] text-rose-600">
                 Kosongkan total seluruh sistem (Finance, HRD, Operasional, Broadcast)
               </span>
             </button>
@@ -467,27 +467,27 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
         </div>
 
         {/* PERMANENT DELETION WARNING BOX */}
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-2">
-          <div className="flex items-center space-x-2 text-rose-400 font-black text-xs sm:text-sm">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-2">
+          <div className="flex items-center space-x-2 text-rose-700 font-black text-xs sm:text-sm">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
             <span>PERINGATAN KERAS: DATA AKAN HILANG PERMANEN & TIDAK BISA DIKEMBALIKAN</span>
           </div>
-          <p className="text-[11px] text-slate-300 leading-relaxed">
+          <p className="text-[11px] text-slate-700 leading-relaxed">
             Jika Anda mengeksekusi penghapusan ini, seluruh data pada <b>{currentMeta.label}</b> akan dihapus secara
             permanen hingga <b>0 record</b>.
             <br />
-            <span className="text-rose-300 font-bold">
+            <span className="text-rose-700 font-bold">
               Data yang terhapus meliputi: data yang diinput manual oleh admin, file/dokumen yang diupload (seperti mutasi rekening koran e-Statement), maupun data demo/simulasi bawaan sistem.
             </span>
           </p>
 
-          <div className="pt-2 border-t border-rose-500/20 mt-2">
-            <div className="text-[11px] font-bold text-slate-200 mb-1">
+          <div className="pt-2 border-t border-rose-200 mt-2">
+            <div className="text-[11px] font-bold text-slate-800 mb-1">
               Rincian data yang akan dimusnahkan ({currentMeta.totalCount} record):
             </div>
             <ul className="space-y-1">
               {currentMeta.details.map((detail, idx) => (
-                <li key={idx} className="flex items-center space-x-2 text-[11px] text-slate-300">
+                <li key={idx} className="flex items-center space-x-2 text-[11px] text-slate-700">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
                   <span>{detail}</span>
                 </li>
@@ -498,10 +498,10 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
 
         {/* CONFIRMATION INPUTS (ENABLED ONLY FOR SUPER ADMIN) */}
         {isSuperAdmin && (
-          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
             <div>
-              <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                2. Ketik kata konfirmasi <code className="text-rose-400 font-black px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/30">HAPUS</code> di bawah ini:
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                2. Ketik kata konfirmasi <code className="text-rose-700 font-black px-1.5 py-0.5 rounded bg-rose-100 border border-rose-200">HAPUS</code> di bawah ini:
               </label>
               <input
                 type="text"
@@ -510,27 +510,27 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
                 value={confirmWord}
                 onChange={(e) => setConfirmWord(e.target.value)}
                 placeholder="Ketik HAPUS"
-                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-sm uppercase tracking-wider focus:border-rose-500 focus:outline-none"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono text-sm uppercase tracking-wider focus:border-rose-500 focus:outline-none"
               />
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-[11px] font-bold text-slate-300">
+                <label className="block text-[11px] font-bold text-slate-700">
                   3. Masukkan 6 Digit PIN Otorisasi Super Admin (Default: 888999 atau 123456):
                 </label>
                 <button
                   type="button"
                   id="toggle-pin-visibility-btn"
                   onClick={() => setShowPin(!showPin)}
-                  className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center space-x-1 cursor-pointer"
+                  className="text-[10px] text-slate-500 hover:text-slate-800 flex items-center space-x-1 cursor-pointer"
                 >
                   {showPin ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   <span>{showPin ? 'Sembunyikan' : 'Lihat'}</span>
                 </button>
               </div>
               <div className="relative">
-                <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+                <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
                   type={showPin ? 'text' : 'password'}
                   id="input-confirm-security-pin"
@@ -539,7 +539,7 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
                   onChange={(e) => setSecurityPin(e.target.value)}
                   placeholder="Masukkan 6-digit PIN Keamanan (888999)"
                   maxLength={10}
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-sm focus:border-rose-500 focus:outline-none"
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono text-sm focus:border-rose-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -548,28 +548,28 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
 
         {/* ERROR MESSAGE */}
         {errorMessage && (
-          <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs flex items-center space-x-2 animate-in fade-in">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center space-x-2 animate-in fade-in">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
             <span>{errorMessage}</span>
           </div>
         )}
 
         {/* SUCCESS MESSAGE */}
         {successMessage && (
-          <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs flex items-center space-x-2 animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center space-x-2 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
             <span>{successMessage}</span>
           </div>
         )}
 
         {/* ACTIONS */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+        <div className="flex items-center justify-between pt-3 border-t border-slate-200">
           <button
             type="button"
             id="cancel-bulk-delete-btn"
             disabled={isProcessing}
             onClick={onClose}
-            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl cursor-pointer transition"
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer transition border border-slate-300"
           >
             Batal
           </button>
@@ -589,7 +589,7 @@ export const BulkDeleteDivisionModal: React.FC<BulkDeleteDivisionModalProps> = (
               isProcessing ||
               confirmWord.trim().toUpperCase() !== 'HAPUS' ||
               securityPin.trim().length < 4
-                ? 'bg-slate-800 text-slate-600 border border-slate-700 cursor-not-allowed opacity-60'
+                ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
                 : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30 ring-1 ring-rose-500'
             }`}
           >

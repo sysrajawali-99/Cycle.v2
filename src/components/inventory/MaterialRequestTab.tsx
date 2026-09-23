@@ -45,6 +45,8 @@ import {
 } from '../../types';
 import { formatCurrency, formatNumber, formatDateDDMMYYYY } from '../../utils/formatters';
 import { generateMaterialRequestPDF } from '../../utils/pdfExport';
+import { OfficialLetterhead } from '../common/OfficialLetterhead';
+import { storageService } from '../../services/storageService';
 
 interface MaterialRequestTabProps {
   projects: Project[];
@@ -1886,63 +1888,35 @@ const MaterialRequestDetailSlipModal: React.FC<DetailSlipModalProps> = ({
 
         {/* Printable Slip Paper Container */}
         <div className="p-6 sm:p-8 bg-white text-slate-900 max-h-[80vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-0">
-          {/* Header Kop Surat */}
-          <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
-            <div className="flex items-start space-x-3.5 max-w-xl">
-              {companyProfile?.logoUrl ? (
-                <div className="w-12 h-12 shrink-0 bg-white rounded-lg p-1 border border-slate-200 flex items-center justify-center">
-                  <img
-                    src={companyProfile.logoUrl}
-                    alt={companyProfile.name}
-                    className="max-w-full max-h-full object-contain"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-              ) : (
-                <div className="w-10 h-10 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black text-base shrink-0">
-                  {companyProfile?.brandName?.charAt(0) || companyProfile?.name?.charAt(0) || 'R'}
-                </div>
-              )}
-              <div>
-                <h1 className="text-lg font-black tracking-tight text-slate-950 uppercase">
-                  {companyProfile?.name || 'PT RAJAWALI CYCLE INDONESIA'}
-                </h1>
-                <p className="text-xs text-slate-600 font-medium">
-                  {companyProfile?.tagline || 'Integrated Facility Services & Enterprise Management'}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-0.5 max-w-md">
-                  {companyProfile?.address || 'Menara Rajawali Lt. 12, Mega Kuningan, Jakarta Selatan'} • Telp: {companyProfile?.phone || '(021) 5299-8800'}
-                </p>
-                {(companyProfile?.taxId || companyProfile?.businessPermitNo) && (
-                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                    {companyProfile?.taxId && <span>NPWP: {companyProfile.taxId} </span>}
-                    {companyProfile?.businessPermitNo && <span>• NIB: {companyProfile.businessPermitNo}</span>}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-xs font-mono font-bold text-slate-500 block uppercase">
-                FORMULIR RESMI LOGISTIK
+          {/* Header Kop Surat Sesuai Master Identitas & Legalitas */}
+          <OfficialLetterhead
+            company={companyProfile || storageService.getCompanyProfile()}
+            departmentSubtitle="Divisi Operasional & Chemical Management System"
+            showLegal={true}
+            className="border-b-2 border-slate-900 pb-4 mb-3"
+          />
+
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4 text-xs">
+            <div>
+              <span className="font-mono text-slate-500 uppercase font-semibold">
+                KODE: <strong className="text-slate-900 font-bold">{request.requestCode}</strong> • TGL: {formatDateDDMMYYYY(request.requestDate)}
               </span>
-              <div className="text-base font-black font-mono text-slate-900 mt-1">
-                {request.requestCode}
-              </div>
-              <div className="mt-1">
-                <span
-                  className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                    request.status === 'APPROVED'
-                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                      : request.status === 'REVISED'
-                      ? 'bg-sky-100 text-sky-800 border-sky-300'
-                      : request.status === 'REJECTED'
-                      ? 'bg-rose-100 text-rose-800 border-rose-300'
-                      : 'bg-amber-100 text-amber-800 border-amber-300'
-                  }`}
-                >
-                  STATUS: {request.status}
-                </span>
-              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-[11px] font-mono text-slate-500 uppercase font-bold">FORMULIR RESMI LOGISTIK</span>
+              <span
+                className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                  request.status === 'APPROVED'
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : request.status === 'REVISED'
+                    ? 'bg-sky-100 text-sky-800 border-sky-300'
+                    : request.status === 'REJECTED'
+                    ? 'bg-rose-100 text-rose-800 border-rose-300'
+                    : 'bg-amber-100 text-amber-800 border-amber-300'
+                }`}
+              >
+                STATUS: {request.status}
+              </span>
             </div>
           </div>
 

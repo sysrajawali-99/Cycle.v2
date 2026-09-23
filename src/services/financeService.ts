@@ -968,8 +968,14 @@ export const financeService = {
   exportProfitLossToExcel(pl: ProfitLossStatement, companyName?: string) {
     const comp = storageService.getCompanyProfile();
     const finalCompanyName = companyName || comp.name || 'PT RAJAWALI CYCLE INDONESIA';
+    const addressLine = `${comp.address || ''}${comp.city ? `, ${comp.city}` : ''} • Telp: ${comp.phone || '-'}`;
+    const legalLine = [comp.taxId ? `NPWP: ${comp.taxId}` : '', comp.businessPermitNo ? `NIB: ${comp.businessPermitNo}` : ''].filter(Boolean).join(' • ');
+
     const data = [
       [finalCompanyName],
+      [comp.tagline || 'Integrated Facility Services & Enterprise Management'],
+      [addressLine],
+      ...(legalLine ? [[legalLine]] : []),
       ['LAPORAN LABA RUGI (PROFIT & LOSS STATEMENT)'],
       [`Periode: ${pl.periodLabel}`],
       [''],
@@ -1006,8 +1012,14 @@ export const financeService = {
   exportBalanceSheetToExcel(bs: BalanceSheetStatement, companyName?: string) {
     const comp = storageService.getCompanyProfile();
     const finalCompanyName = companyName || comp.name || 'PT RAJAWALI CYCLE INDONESIA';
+    const addressLine = `${comp.address || ''}${comp.city ? `, ${comp.city}` : ''} • Telp: ${comp.phone || '-'}`;
+    const legalLine = [comp.taxId ? `NPWP: ${comp.taxId}` : '', comp.businessPermitNo ? `NIB: ${comp.businessPermitNo}` : ''].filter(Boolean).join(' • ');
+
     const data = [
       [finalCompanyName],
+      [comp.tagline || 'Integrated Facility Services & Enterprise Management'],
+      [addressLine],
+      ...(legalLine ? [[legalLine]] : []),
       ['LAPORAN POSISI KEUANGAN (NERACA / BALANCE SHEET)'],
       [`Per Tanggal: ${bs.asOfDate}`],
       [''],
@@ -1051,41 +1063,84 @@ export const financeService = {
       format: 'a4'
     });
 
-    // Header Kop Perusahaan
-    doc.setFillColor(15, 23, 42); // slate-900
-    doc.rect(0, 0, 210, 28, 'F');
+    const pageWidth = 210;
+
+    // Header Kop Perusahaan (Navy & Gold Line)
+    doc.setFillColor(15, 39, 68);
+    doc.rect(0, 0, pageWidth, 26, 'F');
+    doc.setFillColor(217, 119, 6);
+    doc.rect(0, 26, pageWidth, 1.5, 'F');
+
+    // Logo if present
+    let textX = 14;
+    if (comp.logoUrl && comp.logoUrl.startsWith('data:image')) {
+      try {
+        const fmt = comp.logoUrl.includes('png') ? 'PNG' : comp.logoUrl.includes('webp') ? 'WEBP' : 'JPEG';
+        doc.addImage(comp.logoUrl, fmt, 12, 3, 18, 18);
+        textX = 34;
+      } catch {
+        textX = 14;
+      }
+    }
 
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text(comp.name, 14, 11);
+    doc.setFontSize(13);
+    doc.text(comp.name || 'PT RAJAWALI CYCLE INDONESIA', textX, 8);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
+    doc.setFontSize(7.2);
     doc.setTextColor(203, 213, 225);
-    doc.text(`${comp.tagline || 'Integrated Facility Management & Cleaning Services'} | Finance Division`, 14, 17);
-    doc.text(`${comp.address}${comp.city ? `, ${comp.city}` : ''} • Telp: ${comp.phone}`, 14, 22);
+    doc.text(`${comp.tagline || 'Integrated Facility Management & Cleaning Services'} | Divisi Keuangan & Akuntansi`, textX, 12.5);
+    doc.text(`${comp.address || ''}${comp.city ? `, ${comp.city}` : ''} • Telp: ${comp.phone || '-'}${comp.email ? ` • Email: ${comp.email}` : ''}`, textX, 16.5);
+
+    const legalLine = [
+      comp.taxId ? `NPWP: ${comp.taxId}` : '',
+      comp.businessPermitNo ? `NIB: ${comp.businessPermitNo}` : ''
+    ].filter(Boolean).join(' • ');
+    if (legalLine) {
+      doc.setFontSize(6.2);
+      doc.setTextColor(148, 163, 184);
+      doc.text(legalLine, textX, 20.5);
+    }
+
+    // Right Tag: Financial Statement
+    doc.setFillColor(217, 119, 6);
+    doc.roundedRect(pageWidth - 62, 4, 48, 6, 1, 1, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('OFFICIAL FINANCE REPORT', pageWidth - 38, 8.2, { align: 'center' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`DOC: FIN-${new Date().toISOString().substring(0, 10).replace(/-/g, '')}`, pageWidth - 14, 15, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(203, 213, 225);
+    doc.text(`Tgl: ${new Date().toLocaleDateString('id-ID')}`, pageWidth - 14, 19.5, { align: 'right' });
 
     // Title section
     doc.setTextColor(30, 41, 59);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
-    doc.text(title.toUpperCase(), 14, 38);
+    doc.text(title.toUpperCase(), 14, 37);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Periode Laporan : ${period}`, 14, 44);
-    doc.text(`Dicetak Pada     : ${new Date().toLocaleString('id-ID')}`, 14, 49);
+    doc.text(`Periode Laporan : ${period}`, 14, 43);
+    doc.text(`Dicetak Pada     : ${new Date().toLocaleString('id-ID')}`, 14, 48);
 
     // Render AutoTable
     autoTable(doc, {
-      startY: 54,
+      startY: 53,
       head: [headers],
       body: rows as any,
       theme: 'grid',
       headStyles: {
-        fillColor: [30, 41, 59],
+        fillColor: [15, 39, 68],
         textColor: [255, 255, 255],
         fontStyle: 'bold',
         fontSize: 8.5
@@ -1104,17 +1159,27 @@ export const financeService = {
 
     // Footer signature
     const finalY = (doc as any).lastAutoTable?.finalY || 200;
-    if (finalY < 240) {
-      doc.setFontSize(8.5);
+    if (finalY < 235) {
+      doc.setFontSize(8);
       doc.setTextColor(71, 85, 105);
-      doc.text('Disiapkan Oleh,', 20, finalY + 15);
+      doc.text('Disiapkan Oleh,', 20, finalY + 14);
       doc.text(comp.financeManagerName ? `(${comp.financeManagerName})` : '( Finance Officer )', 20, finalY + 28);
       doc.text(comp.financeManagerTitle || 'Finance & Accounting Officer', 20, finalY + 33);
 
-      doc.text('Disetujui Oleh,', 140, finalY + 15);
+      doc.text('Disetujui Oleh,', 140, finalY + 14);
       doc.text(comp.directorName ? `(${comp.directorName})` : '( Direktur Utama )', 140, finalY + 28);
       doc.text(comp.directorTitle || 'Direktur Utama', 140, finalY + 33);
     }
+
+    // Bottom note
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text(
+      comp.letterheadFooterNote || `Dokumen resmi laporan keuangan diterbitkan secara digital oleh Sistem ERP ${comp.name}.`,
+      pageWidth / 2,
+      290,
+      { align: 'center' }
+    );
 
     doc.save(`${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
   },

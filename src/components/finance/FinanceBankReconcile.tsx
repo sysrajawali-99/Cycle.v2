@@ -25,7 +25,9 @@ import {
   AlertTriangle,
   ShieldAlert,
   X,
-  RotateCcw
+  RotateCcw,
+  Pencil,
+  Save
 } from 'lucide-react';
 import {
   BankStatementImport,
@@ -130,6 +132,15 @@ export const FinanceBankReconcile: React.FC<FinanceBankReconcileProps> = ({
   const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
   const [deleteRelatedTransactions, setDeleteRelatedTransactions] = useState(true);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
+  // Edit Statement Item State
+  const [editingItem, setEditingItem] = useState<BankStatementItem | null>(null);
+  const [editDate, setEditDate] = useState<string>('');
+  const [editDescription, setEditDescription] = useState<string>('');
+  const [editType, setEditType] = useState<'CR' | 'DB'>('CR');
+  const [editAmount, setEditAmount] = useState<number | string>(0);
+  const [editSyncMatchedTrx, setEditSyncMatchedTrx] = useState<boolean>(true);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // Selected Active Statement
   const activeStatement = useMemo(() => {
@@ -1651,6 +1662,133 @@ export const FinanceBankReconcile: React.FC<FinanceBankReconcileProps> = ({
     setTimeout(() => setNotification(null), 3500);
   };
 
+  // ---------------------------------------------------------------------------
+  // EDIT STATEMENT ITEM (TANGGAL, KETERANGAN, JENIS, NOMINAL) & UPDATE
+  // ---------------------------------------------------------------------------
+  const handleOpenEditModal = (item: BankStatementItem) => {
+    setEditingItem(item);
+    setEditDate(item.date || new Date().toISOString().split('T')[0]);
+    setEditDescription(item.description || '');
+    setEditType(item.type || 'CR');
+    setEditAmount(item.amount || 0);
+    setEditSyncMatchedTrx(true);
+    setEditError(null);
+  };
+
+  const handleUpdateStatementItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem || !activeStatement) return;
+
+    const trimmedDesc = editDescription.trim();
+    if (!trimmedDesc) {
+      setEditError('Keterangan mutasi bank tidak boleh kosong.');
+      return;
+    }
+
+    const numAmount = typeof editAmount === 'string' ? parseFloat(editAmount) : editAmount;
+    if (isNaN(numAmount) || numAmount < 0) {
+      setEditError('Nominal mutasi harus berupa angka valid dan lebih besar atau sama dengan 0.');
+      return;
+    }
+
+    if (!editDate) {
+      setEditError('Tanggal mutasi bank harus diisi.');
+      return;
+    }
+
+    // 1. Update the statement item in activeStatement
+    const updatedItems = activeStatement.items.map((i) => {
+      if (i.id === editingItem.id) {
+        return {
+          ...i,
+          date: editDate,
+          description: trimmedDesc,
+          type: editType,
+          amount: numAmount
+        };
+      }
+      return i;
+    });
+
+    const totalCredit = updatedItems.filter((i) => i.type === 'CR').reduce((s, i) => s + i.amount, 0);
+    const totalDebit = updatedItems.filter((i) => i.type === 'DB').reduce((s, i) => s + i.amount, 0);
+    const matchedCount = updatedItems.filter(
+      (i) => i.matchStatus === 'MATCHED' || i.matchStatus === 'MANUAL_MATCHED'
+    ).length;
+
+    const updatedStatement: BankStatementImport = {
+      ...activeStatement,
+      items: updatedItems,
+      totalCredit,
+      totalDebit,
+      matchedCount,
+      unmatchedCount: updatedItems.length - matchedCount
+    };
+
+    const nextStatements = bankStatements.map((s) =>
+      s.id === activeStatement.id ? updatedStatement : s
+    );
+    onUpdateStatements(nextStatements);
+
+    // 2. If matched to a system transaction and user opted to sync:
+    let syncedTrxCode: string | undefined = undefined;
+    if (editSyncMatchedTrx && (editingItem.matchedTransactionId || editingItem.matchedTransactionCode)) {
+      const targetTrx = transactions.find(
+        (t) =>
+          t.id === editingItem.matchedTransactionId ||
+          t.bankStatementItemId === editingItem.id ||
+          (editingItem.matchedTransactionCode && t.code === editingItem.matchedTransactionCode)
+      );
+
+      if (targetTrx) {
+        syncedTrxCode = targetTrx.code;
+        const newTrxType = editType === 'CR' ? 'INCOME' : 'EXPENSE';
+        const updatedTrx: FinanceTransaction = {
+          ...targetTrx,
+          date: editDate,
+          amount: numAmount,
+          title: trimmedDesc,
+          description: `Mutasi Bank: ${trimmedDesc}`,
+          type: newTrxType,
+          lines: targetTrx.lines.map((line) => {
+            if (line.debit > 0) return { ...line, debit: numAmount };
+            if (line.credit > 0) return { ...line, credit: numAmount };
+            return line;
+          }),
+          updatedAt: new Date().toISOString()
+        };
+
+        onUpdateTransaction(updatedTrx);
+
+        const updatedAllTrxs = transactions.map((t) => (t.id === targetTrx.id ? updatedTrx : t));
+        recalculateAndSyncAccounts(updatedAllTrxs);
+      }
+    }
+
+    // 3. Audit log
+    if (onLogAudit) {
+      onLogAudit({
+        id: `aud-${Date.now()}`,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        userName: currentUser?.name || 'Finance Admin',
+        userRole: currentUser?.role || 'Admin Operasional',
+        actionType: 'UPDATE',
+        module: 'Rekonsiliasi Bank',
+        recordId: editingItem.id,
+        recordCode: editingItem.matchedTransactionCode || editingItem.referenceNumber || 'STATEMENT_ITEM',
+        description: `Memperbarui baris mutasi bank: Tanggal ${editDate}, Keterangan "${trimmedDesc}", Jenis ${editType}, Nominal ${financeService.formatRupiah(numAmount)}${syncedTrxCode ? ` (sinkron ke transaksi sistem ${syncedTrxCode})` : ''}.`
+      });
+    }
+
+    setNotification({
+      type: 'success',
+      message: `Data mutasi bank "${trimmedDesc}" berhasil di-update${syncedTrxCode ? ` & transaksi sistem (${syncedTrxCode}) telah disinkronkan` : ''}.`
+    });
+    setTimeout(() => setNotification(null), 3500);
+
+    setEditingItem(null);
+  };
+
   // Quick Preset Sample Loader
   const handleLoadSampleStatement = (bankKey: 'BNI' | 'BCA' | 'MANDIRI' = 'BNI') => {
     const sample = getSamplePresetStatement(bankKey);
@@ -2251,6 +2389,15 @@ export const FinanceBankReconcile: React.FC<FinanceBankReconcileProps> = ({
                             </button>
                           )}
 
+                          {/* Tombol Edit Mutasi */}
+                          <button
+                            onClick={() => handleOpenEditModal(item)}
+                            className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-blue-900/60 text-slate-400 hover:text-blue-400 border border-slate-700/60 hover:border-blue-500/50 transition-all cursor-pointer"
+                            title="Edit data mutasi (Tanggal, Keterangan, Jenis, Nominal)"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
                           <button
                             onClick={() => handleDeleteStatementItem(item)}
                             className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700/60 hover:border-rose-500/50 transition-all cursor-pointer"
@@ -2500,6 +2647,178 @@ export const FinanceBankReconcile: React.FC<FinanceBankReconcileProps> = ({
                 <span>Ya, Hapus Semua ({bankStatements.length}) & Transaksi Terkait</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: EDIT DATA MUTASI REKENING KORAN */}
+      {/* ------------------------------------------------------------- */}
+      {editingItem && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Edit Data Mutasi Rekening Koran</h3>
+                  <p className="text-xs text-slate-400">
+                    Revisi tanggal, keterangan, jenis transaksi, dan nominal mutasi bank
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingItem(null)}
+                className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+                title="Tutup"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 bg-rose-950/60 border border-rose-500/40 rounded-xl text-rose-300 text-xs flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{editError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateStatementItem} className="space-y-4">
+              {/* Tanggal Mutasi */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1.5 flex items-center space-x-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Tanggal Mutasi Bank</span>
+                  <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Keterangan Mutasi Bank */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1.5 flex items-center space-x-1.5">
+                  <FileText className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Keterangan Mutasi Bank</span>
+                  <span className="text-rose-400">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Contoh: TRANSFER MASUK DARI PT ABC / PEMBAYARAN TAGIHAN"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none leading-relaxed"
+                />
+              </div>
+
+              {/* Jenis Mutasi (CR vs DB) */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1.5">
+                  Jenis Mutasi (Aliran Dana) <span className="text-rose-400">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditType('CR')}
+                    className={`flex items-center justify-center space-x-2 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      editType === 'CR'
+                        ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/30'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
+                    <span>CR - Uang Masuk (+)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditType('DB')}
+                    className={`flex items-center justify-center space-x-2 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      editType === 'DB'
+                        ? 'bg-rose-950/60 border-rose-500 text-rose-300 ring-2 ring-rose-500/30'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <ArrowUpRight className="w-4 h-4 text-rose-400" />
+                    <span>DB - Uang Keluar (-)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Nominal Mutasi */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1.5 flex items-center justify-between">
+                  <span>Nominal Mutasi (Rp) <span className="text-rose-400">*</span></span>
+                  <span className="font-mono text-[11px] font-bold text-blue-400">
+                    {financeService.formatRupiah(typeof editAmount === 'string' ? parseFloat(editAmount) || 0 : editAmount)}
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="any"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-sm font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Transaksi Sistem Terkait Notice (If Matched) */}
+              {(editingItem.matchedTransactionId || editingItem.matchedTransactionCode) && (
+                <div className="p-3 bg-amber-950/40 border border-amber-500/30 rounded-xl space-y-2">
+                  <div className="flex items-start space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="text-xs text-amber-200">
+                      <span className="font-bold">Perhatian: Mutasi Sudah Match</span>
+                      <p className="text-[11px] text-amber-300/80 mt-0.5">
+                        Mutasi ini telah dicocokkan dengan transaksi sistem{' '}
+                        <span className="font-mono font-bold text-white">
+                          {editingItem.matchedTransactionCode || editingItem.matchedTransactionId}
+                        </span>.
+                      </p>
+                    </div>
+                  </div>
+                  <label className="flex items-center space-x-2 text-xs text-amber-100 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={editSyncMatchedTrx}
+                      onChange={(e) => setEditSyncMatchedTrx(e.target.checked)}
+                      className="rounded border-amber-600 bg-slate-950 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>Sinkronkan perubahan tanggal, keterangan, dan nominal ke transaksi sistem terkait</span>
+                  </label>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingItem(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+
+                <button
+                  type="submit"
+                  className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-900/30 transition-all cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Update</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

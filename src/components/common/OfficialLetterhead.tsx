@@ -4,12 +4,17 @@ import { storageService } from '../../services/storageService';
 
 export interface OfficialLetterheadProps {
   companyProfile?: CompanyProfile;
+  company?: CompanyProfile;
+  departmentSubtitle?: string;
   documentTitle?: string;
   documentCode?: string;
   documentDate?: string;
   documentStatus?: string;
   variant?: 'full' | 'compact' | 'minimal';
   showLegalInfo?: boolean;
+  showLegal?: boolean;
+  showBankInfo?: boolean;
+  className?: string;
 }
 
 /**
@@ -18,19 +23,25 @@ export interface OfficialLetterheadProps {
  */
 export const OfficialLetterhead: React.FC<OfficialLetterheadProps> = ({
   companyProfile: propProfile,
+  company,
+  departmentSubtitle,
   documentTitle,
   documentCode,
   documentDate,
   documentStatus,
   variant = 'full',
-  showLegalInfo = true
+  showLegalInfo,
+  showLegal,
+  showBankInfo = false,
+  className = ''
 }) => {
-  const profile = propProfile || storageService.getCompanyProfile();
+  const profile = company || propProfile || storageService.getCompanyProfile();
+  const effectiveShowLegal = showLegal !== undefined ? showLegal : (showLegalInfo !== undefined ? showLegalInfo : true);
 
   const primaryBank = profile.bankAccounts?.find((b) => b.isPrimary) || profile.bankAccounts?.[0];
 
   return (
-    <div className="w-full pb-4 border-b-2 border-slate-900 text-slate-900 select-none">
+    <div className={`w-full pb-4 border-b-2 border-slate-900 text-slate-900 select-none ${className}`}>
       <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
         {/* Left: Logo & Company Identity */}
         <div className="flex items-start space-x-3.5 max-w-2xl">
@@ -54,7 +65,7 @@ export const OfficialLetterhead: React.FC<OfficialLetterheadProps> = ({
               {profile.name || 'PT RAJAWALI CYCLE INDONESIA'}
             </h1>
             <p className="text-[11px] font-bold text-slate-700 tracking-wide uppercase">
-              {profile.tagline || 'Integrated Facility Services & Enterprise Management'}
+              {departmentSubtitle || profile.tagline || 'Integrated Facility Services & Enterprise Management'}
             </p>
             <p className="text-[10px] text-slate-600 leading-snug">
               {profile.address}{profile.city ? `, ${profile.city}` : ''}
@@ -66,11 +77,11 @@ export const OfficialLetterhead: React.FC<OfficialLetterheadProps> = ({
               {profile.website && <span>• Web: <strong className="text-slate-700">{profile.website}</strong></span>}
             </div>
 
-            {showLegalInfo && (profile.taxId || profile.businessPermitNo) && (
+            {effectiveShowLegal && (profile.taxId || profile.businessPermitNo) && (
               <div className="text-[9px] text-slate-600 pt-0.5 flex flex-wrap items-center gap-x-2">
                 {profile.taxId && <span>NPWP: <strong className="font-mono text-slate-800">{profile.taxId}</strong></span>}
                 {profile.businessPermitNo && <span>• NIB: <strong className="font-mono text-slate-800">{profile.businessPermitNo}</strong></span>}
-                {primaryBank && (
+                {showBankInfo && primaryBank && (
                   <span>• Rek: <strong className="font-mono text-slate-800">{primaryBank.bankName} {primaryBank.accountNumber}</strong> a/n {primaryBank.accountHolder}</span>
                 )}
               </div>
@@ -107,3 +118,4 @@ export const OfficialLetterhead: React.FC<OfficialLetterheadProps> = ({
     </div>
   );
 };
+

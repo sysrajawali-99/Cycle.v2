@@ -1,6 +1,7 @@
 import express from 'express';
 import http from 'http';
 import path from 'path';
+import { execSync } from 'child_process';
 import { createServer as createViteServer } from 'vite';
 import { Server as SocketIOServer } from 'socket.io';
 import { GoogleGenAI } from '@google/genai';
@@ -40,10 +41,30 @@ function getGeminiClient(): GoogleGenAI | null {
 }
 
 // -------------------------------------------------------------
-// Health Check
+// Health Check & Project Archive Download
 // -------------------------------------------------------------
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/export-zip', (_req, res) => {
+  try {
+    const zipPath = path.join('/tmp', 'rajawali-cycle.zip');
+    execSync(`python3 -c "
+import os, zipfile
+zip_path = '${zipPath}'
+with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+    for root, dirs, files in os.walk('.'):
+        dirs[:] = [d for d in dirs if d not in ('node_modules', '.git', 'dist', '.cache', '.vercel')]
+        for file in files:
+            file_path = os.path.join(root, file)
+            arcname = os.path.relpath(file_path, '.')
+            zf.write(file_path, arcname)
+"`);
+    res.download(zipPath, 'rajawali-cycle.zip');
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to generate zip' });
+  }
 });
 
 // -------------------------------------------------------------

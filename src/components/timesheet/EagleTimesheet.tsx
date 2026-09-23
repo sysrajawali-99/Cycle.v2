@@ -42,6 +42,7 @@ import {
   downloadCSV
 } from '../../utils/formatters';
 import { generateTimesheetPDF } from '../../utils/pdfExport';
+import { OfficialLetterhead } from '../common/OfficialLetterhead';
 
 interface EagleTimesheetProps {
   projects: Project[];
@@ -1419,55 +1420,25 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                     className="bg-white text-slate-950 w-full max-w-6xl p-6 sm:p-8 rounded-xl shadow-2xl space-y-5 text-xs font-sans"
                     style={{ minWidth: '950px' }}
                   >
-                    {/* Header Kop Resmi */}
-                    <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
-                      <div className="flex items-start space-x-3.5 max-w-2xl">
-                        {comp.logoUrl ? (
-                          <div className="w-14 h-14 shrink-0 bg-white rounded-lg p-1 border border-slate-200 flex items-center justify-center">
-                            <img
-                              src={comp.logoUrl}
-                              alt={comp.name}
-                              className="max-w-full max-h-full object-contain"
-                              referrerPolicy="no-referrer"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-14 h-14 shrink-0 bg-slate-950 text-amber-400 font-black rounded-xl flex items-center justify-center text-xl shadow-sm border border-slate-900">
-                            {comp.brandName?.charAt(0) || comp.name?.charAt(0) || 'R'}
-                          </div>
-                        )}
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <span className="font-black text-lg text-slate-900 tracking-wider uppercase">
-                              {comp.name}
-                            </span>
-                            <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300 uppercase">
-                              OFFICIAL PAYROLL REPORT
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-600 font-medium">
-                            {comp.tagline || 'Integrated Facility Management, Commercial Cleaning, & Hospitality Support Services'}
-                          </p>
-                          <p className="text-[10px] text-slate-500">
-                            {comp.address}{comp.city ? `, ${comp.city}` : ''} • Telp: {comp.phone} {comp.email ? `• Email: ${comp.email}` : ''}
-                          </p>
-                          {(comp.taxId || comp.businessPermitNo) && (
-                            <p className="text-[9.5px] text-slate-500 font-mono mt-0.5">
-                              {comp.taxId && <span>NPWP: {comp.taxId} </span>}
-                              {comp.businessPermitNo && <span>• NIB: {comp.businessPermitNo}</span>}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">
-                          Dokumen Terverifikasi
+                    {/* Header Kop Resmi Sesuai Master Identitas & Legalitas */}
+                    <div className="space-y-3 border-b-2 border-slate-900 pb-4">
+                      <OfficialLetterhead
+                        company={comp}
+                        departmentSubtitle="Divisi Operasional & Manajemen Keuangan Personil (Payroll)"
+                        showLegal={true}
+                        showBankInfo={false}
+                      />
+                      <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                        <span className="font-mono text-[11px] font-semibold">
+                          KODE DOKUMEN: <strong className="text-slate-800">DOC-{currentYear}{String(currentMonth).padStart(2, '0')}-{pdfProjCode}</strong>
                         </span>
-                        <span className="font-mono text-xs font-bold text-slate-800">
-                          DOC-{currentYear}{String(currentMonth).padStart(2, '0')}-{pdfProjCode}
-                        </span>
-                        <div className="text-[10px] text-slate-500 mt-0.5">
-                          Tgl Cetak: {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+                        <div className="flex items-center space-x-2">
+                          <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300 uppercase">
+                            OFFICIAL PAYROLL REPORT
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            Cetak: {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+                          </span>
                         </div>
                       </div>
                     </div>

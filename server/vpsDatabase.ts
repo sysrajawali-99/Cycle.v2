@@ -61,29 +61,57 @@ function writeLocalStore(store: Record<string, any>) {
   }
 }
 
+let inFlightRemoteStatesPromise: Promise<Record<string, any> | null> | null = null;
+let lastRemoteSyncSuccessTime = 0;
+
 /**
- * Fetch and synchronize states from remote VPS into local cache
+ * Fetch and synchronize states from remote VPS into local cache with deduplication and retries
  */
-async function syncFromRemoteVps(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${url}/api/vps/states`, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(6000)
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (json && json.success && json.states && typeof json.states === 'object') {
+export async function fetchStatesFromRemoteVps(url: string, retries = 1): Promise<Record<string, any> | null> {
+  if (inFlightRemoteStatesPromise) {
+    return inFlightRemoteStatesPromise;
+  }
+
+  inFlightRemoteStatesPromise = (async () => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await fetch(`${url}/api/vps/states`, {
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(20000)
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.success && json.states && typeof json.states === 'object') {
+            const local = readLocalStore();
+            const merged = { ...local, ...json.states };
+            writeLocalStore(merged);
+            lastSyncTimestamp = new Date().toISOString();
+            lastRemoteSyncSuccessTime = Date.now();
+            console.log(`[VPS] Successfully synced ${Object.keys(json.states).length} entities from remote VPS.`);
+            return merged;
+          }
+        }
+      } catch (err: any) {
+        if (attempt < retries) {
+          // Brief backoff before retry
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
         const local = readLocalStore();
-        const merged = { ...local, ...json.states };
-        writeLocalStore(merged);
-        console.log(`[VPS] Successfully synced ${Object.keys(json.states).length} entities from remote VPS.`);
-        return true;
+        if (Object.keys(local).length > 0) {
+          console.log(`[VPS] Remote VPS states fetch fallback to local cache (${err?.message || 'offline'}). Serving ${Object.keys(local).length} records.`);
+          return local;
+        } else {
+          console.warn('[VPS] Remote state fetch failed and local cache is empty:', err?.message || err);
+        }
       }
     }
-  } catch (err: any) {
-    console.info('[VPS] Initial state fetch from remote VPS skipped/failed:', err?.message || err);
-  }
-  return false;
+    return null;
+  })().finally(() => {
+    inFlightRemoteStatesPromise = null;
+  });
+
+  return inFlightRemoteStatesPromise;
 }
 
 /**
@@ -118,7 +146,7 @@ export async function initVpsDatabase(): Promise<VpsDbStatus> {
     try {
       const res = await fetch(`${cleanedUrl}/api/vps/status`, {
         headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(6000)
+        signal: AbortSignal.timeout(10000)
       });
 
       if (res.ok) {
@@ -129,8 +157,8 @@ export async function initVpsDatabase(): Promise<VpsDbStatus> {
         lastSyncTimestamp = new Date().toISOString();
         console.log(`[VPS] Connected to Remote VPS API at ${cleanedUrl} (Host: ${remoteHost})`);
 
-        // Synchronize remote data to local store in background
-        syncFromRemoteVps(cleanedUrl).catch(() => {});
+        // Synchronize remote data to local store in background with deduplication
+        fetchStatesFromRemoteVps(cleanedUrl).catch(() => {});
         return getVpsDbStatus();
       } else {
         throw new Error(`Remote VPS responded with status ${res.status}`);
@@ -280,7 +308,7 @@ export async function saveVpsState(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data, meta }),
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(12000)
       }).catch((err) => {
         console.warn(`[VPS] Remote VPS sync failed for key ${key}:`, err?.message || err);
       });
@@ -314,7 +342,7 @@ export async function getVpsState(key: string): Promise<any | null> {
 }
 
 /**
- * Get all states from database
+ * Get all states from database with stale-while-revalidate and in-flight deduplication
  */
 export async function getAllVpsStates(): Promise<Record<string, any>> {
   if (dbEngine === 'postgresql' && pgPool) {
@@ -331,22 +359,29 @@ export async function getAllVpsStates(): Promise<Record<string, any>> {
   }
 
   if (dbEngine === 'remote_vps' && remoteVpsUrl) {
+    const local = readLocalStore();
+    const hasLocalData = Object.keys(local).length > 0;
+    const isStale = Date.now() - lastRemoteSyncSuccessTime > 30000;
+
+    // Fast return: if local cache has data and is not stale, serve immediately
+    if (hasLocalData && !isStale) {
+      return local;
+    }
+
+    // Stale-while-revalidate: if local cache has data, return it immediately and refresh in background
+    if (hasLocalData) {
+      fetchStatesFromRemoteVps(remoteVpsUrl).catch(() => {});
+      return local;
+    }
+
+    // If local cache is empty, wait for remote fetch
     try {
-      const res = await fetch(`${remoteVpsUrl}/api/vps/states`, {
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(4000)
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json?.states && typeof json.states === 'object') {
-          const local = readLocalStore();
-          const merged = { ...local, ...json.states };
-          writeLocalStore(merged);
-          return merged;
-        }
+      const remoteData = await fetchStatesFromRemoteVps(remoteVpsUrl);
+      if (remoteData && Object.keys(remoteData).length > 0) {
+        return remoteData;
       }
     } catch (err: any) {
-      console.info('[VPS] Remote states fetch error, using local cache:', err?.message || err);
+      console.info('[VPS] Remote states fetch error, using local fallback:', err?.message || err);
     }
   }
 
@@ -386,7 +421,7 @@ export async function bulkSaveVpsStates(states: Record<string, any>): Promise<nu
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ states }),
-        signal: AbortSignal.timeout(8000)
+        signal: AbortSignal.timeout(20000)
       }).catch((err) => {
         console.warn('[VPS] Remote VPS bulk-sync failed:', err?.message || err);
       });
