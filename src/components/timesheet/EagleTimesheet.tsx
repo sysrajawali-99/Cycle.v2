@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   CalendarCheck2,
+  CalendarRange,
   CheckCircle2,
   XCircle,
   AlertCircle,
@@ -22,7 +23,9 @@ import {
   Table,
   UserCheck,
   Calendar as CalendarIcon,
-  Clock
+  Clock,
+  RotateCcw,
+  ArrowRight
 } from 'lucide-react';
 import {
   Project,
@@ -44,6 +47,17 @@ import {
 import { generateTimesheetPDF } from '../../utils/pdfExport';
 import { OfficialLetterhead } from '../common/OfficialLetterhead';
 
+export interface PeriodDay {
+  day: number;
+  month: number;
+  year: number;
+  dateKey: string;      // YYYY-MM-DD
+  dmy: string;          // DD-MM-YYYY
+  shortLabel: string;   // D/M
+  dayName: string;      // Jum, Sab, etc.
+  isWeekend: boolean;
+}
+
 interface EagleTimesheetProps {
   projects: Project[];
   employees: Employee[];
@@ -61,24 +75,38 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
   onUpdateTimesheets,
   userRole
 }) => {
-  // Calendar month state: Default to August 2026
+  // Mode Periode: Buka-Tutup Buku (Cut-off) atau Standar Kalender (1-31)
+  const [isCutoffMode, setIsCutoffMode] = useState<boolean>(true);
+
+  // Filter Tanggal Buka Timesheet (dd - mm - yyyy): Default 21 - 8 - 2026
+  const [startDay, setStartDay] = useState<number>(21);
+  const [startMonth, setStartMonth] = useState<number>(8);
+  const [startYear, setStartYear] = useState<number>(2026);
+
+  // Filter Tanggal Tutup Timesheet (dd - mm - yyyy): Default 20 - 9 - 2026
+  const [endDay, setEndDay] = useState<number>(20);
+  const [endMonth, setEndMonth] = useState<number>(9);
+  const [endYear, setEndYear] = useState<number>(2026);
+
+  // Calendar month state (digunakan saat navigasi bulan atau non-cutoff mode)
   const [currentMonth, setCurrentMonth] = useState<number>(8);
   const [currentYear, setCurrentYear] = useState<number>(2026);
-  
-  // Mobile / View Mode: 'daily' (Mobile-Friendly Roll-Call) or 'matrix' (31-Day Table)
+
+  // Mobile / View Mode: 'daily' (Mobile-Friendly Roll-Call) or 'matrix' (Grid Table)
   const [viewMode, setViewMode] = useState<'daily' | 'matrix'>('daily');
-  const [activeDailyDate, setActiveDailyDate] = useState<number>(25); // Default today (day 25)
+  const [activeDailyDateKey, setActiveDailyDateKey] = useState<string>('2026-08-25');
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [filterShift, setFilterShift] = useState<string>('ALL');
   const [filterPosition, setFilterPosition] = useState<string>('ALL');
-  const [selectedDayToBulk, setSelectedDayToBulk] = useState<number>(25);
+  const [selectedDayToBulkKey, setSelectedDayToBulkKey] = useState<string>('');
 
   // Deduction Modal State
   const [editingDeduction, setEditingDeduction] = useState<{
     employee: Employee;
-    timesheetRecord: TimesheetMonthRecord;
+    targetMonth: number;
+    targetYear: number;
     amount: number;
     reason: string;
     bonus: number;
@@ -91,19 +119,93 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
   // Status legend modal or tooltip
   const [showLegend, setShowLegend] = useState(false);
 
-  // Days in selected month
-  const totalDays = useMemo(() => {
-    return getDaysInMonth(currentYear, currentMonth);
-  }, [currentYear, currentMonth]);
+  // Helper format 2-digit padding
+  const pad2 = (n: number) => String(n).padStart(2, '0');
 
-  const daysArray = useMemo(() => {
-    return Array.from({ length: totalDays }, (_, i) => i + 1);
-  }, [totalDays]);
+  // Helper format dd-mm-yyyy
+  const formatDMY = (d: number, m: number, y: number) => `${pad2(d)} - ${pad2(m)} - ${y}`;
+
+  // Generate daftar hari lengkap dalam periode aktif (Cut-off range atau 1 Bulan Penuh)
+  const activePeriodDays: PeriodDay[] = useMemo(() => {
+    const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+
+    if (!isCutoffMode) {
+      const daysInM = getDaysInMonth(currentYear, currentMonth);
+      return Array.from({ length: daysInM }, (_, i) => {
+        const d = i + 1;
+        const dt = new Date(currentYear, currentMonth - 1, d);
+        const dayOfWeek = dt.getDay();
+        return {
+          day: d,
+          month: currentMonth,
+          year: currentYear,
+          dateKey: `${currentYear}-${pad2(currentMonth)}-${pad2(d)}`,
+          dmy: `${pad2(d)} - ${pad2(currentMonth)} - ${currentYear}`,
+          shortLabel: String(d),
+          dayName: dayNames[dayOfWeek],
+          isWeekend: dayOfWeek === 0 || dayOfWeek === 6
+        };
+      });
+    }
+
+    // Cut-off Mode: Dari (startDay, startMonth, startYear) sampai (endDay, endMonth, endYear)
+    const list: PeriodDay[] = [];
+    const startDt = new Date(startYear, startMonth - 1, startDay);
+    const endDt = new Date(endYear, endMonth - 1, endDay);
+
+    let cur = startDt <= endDt ? new Date(startDt) : new Date(endDt);
+    const target = startDt <= endDt ? new Date(endDt) : new Date(startDt);
+
+    let safetyCount = 0;
+    while (cur <= target && safetyCount < 95) {
+      safetyCount++;
+      const d = cur.getDate();
+      const m = cur.getMonth() + 1;
+      const y = cur.getFullYear();
+      const dayOfWeek = cur.getDay();
+
+      list.push({
+        day: d,
+        month: m,
+        year: y,
+        dateKey: `${y}-${pad2(m)}-${pad2(d)}`,
+        dmy: `${pad2(d)} - ${pad2(m)} - ${y}`,
+        shortLabel: `${d}/${m}`,
+        dayName: dayNames[dayOfWeek],
+        isWeekend: dayOfWeek === 0 || dayOfWeek === 6
+      });
+
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    return list;
+  }, [isCutoffMode, currentMonth, currentYear, startDay, startMonth, startYear, endDay, endMonth, endYear]);
+
+  // Object hari yang sedang aktif pada Absensi Harian (Mobile Roll-Call)
+  const activeDayObj: PeriodDay = useMemo(() => {
+    if (activePeriodDays.length === 0) {
+      return {
+        day: 25,
+        month: 8,
+        year: 2026,
+        dateKey: '2026-08-25',
+        dmy: '25 - 08 - 2026',
+        shortLabel: '25/8',
+        dayName: 'Sel',
+        isWeekend: false
+      };
+    }
+    const found = activePeriodDays.find((p) => p.dateKey === activeDailyDateKey);
+    return found || activePeriodDays[0];
+  }, [activePeriodDays, activeDailyDateKey]);
+
+  // Sync default bulk day ke hari pertama atau active day
+  const effectiveBulkDayKey = selectedDayToBulkKey || activeDayObj.dateKey;
 
   // Filtered employees
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
-      if (emp.status === 'Resign') return false; // Only active/mutated in current roster
+      if (emp.status === 'Resign') return false;
       if (selectedProjectId !== 'ALL' && emp.projectId !== selectedProjectId) return false;
       if (filterShift !== 'ALL' && !emp.shift.includes(filterShift)) return false;
       if (filterPosition !== 'ALL' && emp.position !== filterPosition) return false;
@@ -119,25 +221,20 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     });
   }, [employees, selectedProjectId, filterShift, filterPosition, searchQuery]);
 
-  // Helper to find or create timesheet record for an employee for this month/year
-  const getRecordForEmployee = (employeeId: string): TimesheetMonthRecord => {
+  // Helper untuk membaca / membuat TimesheetMonthRecord pada bulan & tahun tertentu
+  const getRecordForEmployeeMonth = (employeeId: string, month: number, year: number): TimesheetMonthRecord => {
     const existing = timesheets.find(
-      (ts) =>
-        ts.employeeId === employeeId &&
-        ts.month === currentMonth &&
-        ts.year === currentYear
+      (ts) => ts.employeeId === employeeId && ts.month === month && ts.year === year
     );
-
     if (existing) return existing;
 
-    // Default empty record
-    const emp = employees.find(e => e.id === employeeId);
+    const emp = employees.find((e) => e.id === employeeId);
     return {
-      id: `ts-${employeeId}-${currentYear}-${currentMonth}`,
+      id: `ts-${employeeId}-${year}-${month}`,
       employeeId,
       projectId: emp?.projectId || '',
-      month: currentMonth,
-      year: currentYear,
+      month,
+      year,
       days: {},
       deductionAmount: 0,
       deductionReason: '',
@@ -146,12 +243,29 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     };
   };
 
-  // Direct status setter for mobile buttons
-  const handleSetStatusDirect = (employeeId: string, day: number, newStatus: AttendanceStatus | '') => {
-    const currentRecord = getRecordForEmployee(employeeId);
-    const existingStatus = currentRecord.days[day] || '';
+  // Helper membaca status presensi karyawan pada hari, bulan, dan tahun tertentu
+  const getStatusForEmployeeDate = (
+    employeeId: string,
+    day: number,
+    month: number,
+    year: number
+  ): AttendanceStatus | '' => {
+    const rec = timesheets.find(
+      (ts) => ts.employeeId === employeeId && ts.month === month && ts.year === year
+    );
+    return rec?.days[day] || '';
+  };
 
-    // If tapping the same status, toggle it off to empty
+  // Set status presensi langsung (untuk tombol touch mobile Hadir, Alpa, Izin, Off)
+  const handleSetStatusDirect = (
+    employeeId: string,
+    day: number,
+    month: number,
+    year: number,
+    newStatus: AttendanceStatus | ''
+  ) => {
+    const currentRecord = getRecordForEmployeeMonth(employeeId, month, year);
+    const existingStatus = currentRecord.days[day] || '';
     const finalStatus = existingStatus === newStatus ? '' : newStatus;
 
     const newDays = { ...currentRecord.days };
@@ -168,10 +282,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
 
     const nextTimesheets = [...timesheets];
     const existingIdx = nextTimesheets.findIndex(
-      (ts) =>
-        ts.employeeId === employeeId &&
-        ts.month === currentMonth &&
-        ts.year === currentYear
+      (ts) => ts.employeeId === employeeId && ts.month === month && ts.year === year
     );
 
     if (existingIdx >= 0) {
@@ -183,9 +294,9 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     onUpdateTimesheets(nextTimesheets);
   };
 
-  // Cycle Attendance Status on Click: '' -> 'H' -> 'A' -> 'I' -> 'O' -> ''
-  const handleCellClick = (employeeId: string, day: number) => {
-    const currentRecord = getRecordForEmployee(employeeId);
+  // Siklus status presensi saat klik sel: '' -> 'H' -> 'A' -> 'I' -> 'O' -> ''
+  const handleCellClick = (employeeId: string, day: number, month: number, year: number) => {
+    const currentRecord = getRecordForEmployeeMonth(employeeId, month, year);
     const currentStatus = currentRecord.days[day] || '';
 
     let nextStatus: AttendanceStatus = 'H';
@@ -209,10 +320,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
 
     const nextTimesheets = [...timesheets];
     const existingIdx = nextTimesheets.findIndex(
-      (ts) =>
-        ts.employeeId === employeeId &&
-        ts.month === currentMonth &&
-        ts.year === currentYear
+      (ts) => ts.employeeId === employeeId && ts.month === month && ts.year === year
     );
 
     if (existingIdx >= 0) {
@@ -224,12 +332,12 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     onUpdateTimesheets(nextTimesheets);
   };
 
-  // Bulk action: Mark all filtered employees present for a given day
-  const handleBulkMarkPresent = (day: number) => {
+  // Bulk action: Hadirkan semua personil aktif untuk tanggal tertentu
+  const handleBulkMarkPresent = (day: number, month: number, year: number) => {
     const nextTimesheets = [...timesheets];
 
     filteredEmployees.forEach((emp) => {
-      const rec = getRecordForEmployee(emp.id);
+      const rec = getRecordForEmployeeMonth(emp.id, month, year);
       const updatedRec: TimesheetMonthRecord = {
         ...rec,
         days: {
@@ -239,10 +347,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       };
 
       const existingIdx = nextTimesheets.findIndex(
-        (ts) =>
-          ts.employeeId === emp.id &&
-          ts.month === currentMonth &&
-          ts.year === currentYear
+        (ts) => ts.employeeId === emp.id && ts.month === month && ts.year === year
       );
 
       if (existingIdx >= 0) {
@@ -255,12 +360,12 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     onUpdateTimesheets(nextTimesheets);
   };
 
-  // Bulk action: Clear specific day
-  const handleBulkClearDay = (day: number) => {
+  // Bulk action: Kosongkan presensi tanggal tertentu
+  const handleBulkClearDay = (day: number, month: number, year: number) => {
     const nextTimesheets = [...timesheets];
 
     filteredEmployees.forEach((emp) => {
-      const rec = getRecordForEmployee(emp.id);
+      const rec = getRecordForEmployeeMonth(emp.id, month, year);
       const newDays = { ...rec.days };
       delete newDays[day];
 
@@ -270,10 +375,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       };
 
       const existingIdx = nextTimesheets.findIndex(
-        (ts) =>
-          ts.employeeId === emp.id &&
-          ts.month === currentMonth &&
-          ts.year === currentYear
+        (ts) => ts.employeeId === emp.id && ts.month === month && ts.year === year
       );
 
       if (existingIdx >= 0) {
@@ -286,22 +388,45 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     onUpdateTimesheets(nextTimesheets);
   };
 
-  // Calculation helpers per row
-  const calculateRowStats = (employee: Employee, record: TimesheetMonthRecord) => {
+  // Perhitungan statistik baris (Hadir, Alpha, Izin, Potongan, Gaji Bersih) mengikuti tanggal yang dipilih
+  const calculateRowStats = (employee: Employee) => {
     let hadir = 0;
     let alpa = 0;
     let izin = 0;
     let off = 0;
 
-    Object.values(record.days).forEach((status) => {
-      if (status === 'H') hadir++;
-      else if (status === 'A') alpa++;
-      else if (status === 'I') izin++;
-      else if (status === 'O') off++;
+    // Hitung presensi tepat di dalam rentang tanggal aktif
+    activePeriodDays.forEach((pDay) => {
+      const st = getStatusForEmployeeDate(employee.id, pDay.day, pDay.month, pDay.year);
+      if (st === 'H') hadir++;
+      else if (st === 'A') alpa++;
+      else if (st === 'I') izin++;
+      else if (st === 'O') off++;
     });
 
-    const grossPay = hadir * employee.dailyRate + (record.bonusAmount || 0);
-    const deduction = record.deductionAmount || 0;
+    // Kumpulkan bulan-bulan unik dalam rentang periode untuk agregasi potongan & bonus
+    const distinctMonths = new Set<string>();
+    activePeriodDays.forEach((pDay) => {
+      distinctMonths.add(`${pDay.year}-${pDay.month}`);
+    });
+
+    let deduction = 0;
+    let bonus = 0;
+    const deductionReasons: string[] = [];
+
+    distinctMonths.forEach((key) => {
+      const [y, m] = key.split('-').map(Number);
+      const rec = timesheets.find(
+        (ts) => ts.employeeId === employee.id && ts.month === m && ts.year === y
+      );
+      if (rec) {
+        if (rec.deductionAmount) deduction += rec.deductionAmount;
+        if (rec.bonusAmount) bonus += rec.bonusAmount;
+        if (rec.deductionReason) deductionReasons.push(rec.deductionReason);
+      }
+    });
+
+    const grossPay = hadir * employee.dailyRate + bonus;
     const netPay = Math.max(0, grossPay - deduction);
 
     return {
@@ -311,12 +436,13 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       off,
       grossPay,
       deduction,
-      bonus: record.bonusAmount || 0,
+      bonus,
+      deductionReason: deductionReasons.join('; '),
       netPay
     };
   };
 
-  // Stats for the active daily roll-call
+  // Statistik untuk hari aktif di mode Absensi Harian (Mobile Roll-Call)
   const dailyStats = useMemo(() => {
     let hadir = 0;
     let alpa = 0;
@@ -325,8 +451,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     let unrecorded = 0;
 
     filteredEmployees.forEach((emp) => {
-      const rec = getRecordForEmployee(emp.id);
-      const st = rec.days[activeDailyDate];
+      const st = getStatusForEmployeeDate(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year);
       if (st === 'H') hadir++;
       else if (st === 'A') alpa++;
       else if (st === 'I') izin++;
@@ -335,9 +460,9 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     });
 
     return { hadir, alpa, izin, off, unrecorded, total: filteredEmployees.length };
-  }, [filteredEmployees, timesheets, activeDailyDate, currentMonth, currentYear]);
+  }, [filteredEmployees, timesheets, activeDayObj]);
 
-  // Overall Financial & Attendance Summary for current view
+  // Ringkasan konsolidasi KPI finansial & kehadiran untuk seluruh karyawan dalam periode terpilih
   const summary = useMemo(() => {
     let totalPayrollAll = 0;
     let totalDeductionsAll = 0;
@@ -347,8 +472,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     let totalIzinAll = 0;
 
     filteredEmployees.forEach((emp) => {
-      const rec = getRecordForEmployee(emp.id);
-      const stats = calculateRowStats(emp, rec);
+      const stats = calculateRowStats(emp);
       totalPayrollAll += stats.netPay;
       totalDeductionsAll += stats.deduction;
       totalBonusAll += stats.bonus;
@@ -366,15 +490,45 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       totalAlpaAll,
       totalIzinAll
     };
-  }, [filteredEmployees, timesheets, currentMonth, currentYear]);
+  }, [filteredEmployees, timesheets, activePeriodDays]);
 
-  // Month navigation
+  // Navigasi hari pada Absensi Harian (Kemarin & Besok)
+  const handlePrevDay = () => {
+    const currentIndex = activePeriodDays.findIndex((p) => p.dateKey === activeDayObj.dateKey);
+    if (currentIndex > 0) {
+      setActiveDailyDateKey(activePeriodDays[currentIndex - 1].dateKey);
+    }
+  };
+
+  const handleNextDay = () => {
+    const currentIndex = activePeriodDays.findIndex((p) => p.dateKey === activeDayObj.dateKey);
+    if (currentIndex >= 0 && currentIndex < activePeriodDays.length - 1) {
+      setActiveDailyDateKey(activePeriodDays[currentIndex + 1].dateKey);
+    }
+  };
+
+  // Navigasi Bulan Cepat
   const handlePrevMonth = () => {
     if (currentMonth === 1) {
       setCurrentMonth(12);
       setCurrentYear(currentYear - 1);
+      if (isCutoffMode) {
+        setStartMonth(11);
+        setStartYear(currentYear - 1);
+        setEndMonth(12);
+        setEndYear(currentYear - 1);
+      }
     } else {
-      setCurrentMonth(currentMonth - 1);
+      const newM = currentMonth - 1;
+      setCurrentMonth(newM);
+      if (isCutoffMode) {
+        const prevM = newM === 1 ? 12 : newM - 1;
+        const prevY = newM === 1 ? currentYear - 1 : currentYear;
+        setStartMonth(prevM);
+        setStartYear(prevY);
+        setEndMonth(newM);
+        setEndYear(currentYear);
+      }
     }
   };
 
@@ -382,42 +536,42 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     if (currentMonth === 12) {
       setCurrentMonth(1);
       setCurrentYear(currentYear + 1);
+      if (isCutoffMode) {
+        setStartMonth(12);
+        setStartYear(currentYear);
+        setEndMonth(1);
+        setEndYear(currentYear + 1);
+      }
     } else {
-      setCurrentMonth(currentMonth + 1);
+      const newM = currentMonth + 1;
+      setCurrentMonth(newM);
+      if (isCutoffMode) {
+        setStartMonth(currentMonth);
+        setStartYear(currentYear);
+        setEndMonth(newM);
+        setEndYear(currentYear);
+      }
     }
   };
 
-  // Day navigation for Daily Roll-Call
-  const handlePrevDay = () => {
-    if (activeDailyDate > 1) {
-      setActiveDailyDate(activeDailyDate - 1);
-    }
-  };
-
-  const handleNextDay = () => {
-    if (activeDailyDate < totalDays) {
-      setActiveDailyDate(activeDailyDate + 1);
-    }
-  };
-
-  // Save deduction / bonus edits
+  // Simpan potongan / denda & lembur
   const handleSaveDeduction = () => {
     if (!editingDeduction) return;
 
-    const nextTimesheets = [...timesheets];
-    const existingIdx = nextTimesheets.findIndex(
-      (ts) =>
-        ts.employeeId === editingDeduction.employee.id &&
-        ts.month === currentMonth &&
-        ts.year === currentYear
-    );
+    const { employee, targetMonth, targetYear, amount, reason, bonus } = editingDeduction;
+    const currentRec = getRecordForEmployeeMonth(employee.id, targetMonth, targetYear);
 
     const updatedRec: TimesheetMonthRecord = {
-      ...editingDeduction.timesheetRecord,
-      deductionAmount: Number(editingDeduction.amount) || 0,
-      deductionReason: editingDeduction.reason,
-      bonusAmount: Number(editingDeduction.bonus) || 0
+      ...currentRec,
+      deductionAmount: Number(amount) || 0,
+      deductionReason: reason,
+      bonusAmount: Number(bonus) || 0
     };
+
+    const nextTimesheets = [...timesheets];
+    const existingIdx = nextTimesheets.findIndex(
+      (ts) => ts.employeeId === employee.id && ts.month === targetMonth && ts.year === targetYear
+    );
 
     if (existingIdx >= 0) {
       nextTimesheets[existingIdx] = updatedRec;
@@ -429,7 +583,42 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     setEditingDeduction(null);
   };
 
-  // Export CSV
+  // Tombol Pintas Preset Cut-Off Periode
+  const applyPreset21to20 = () => {
+    setIsCutoffMode(true);
+    setStartDay(21);
+    setStartMonth(8);
+    setStartYear(2026);
+    setEndDay(20);
+    setEndMonth(9);
+    setEndYear(2026);
+    setActiveDailyDateKey('2026-08-21');
+  };
+
+  const applyPreset26to25 = () => {
+    setIsCutoffMode(true);
+    setStartDay(26);
+    setStartMonth(7);
+    setStartYear(2026);
+    setEndDay(25);
+    setEndMonth(8);
+    setEndYear(2026);
+    setActiveDailyDateKey('2026-07-26');
+  };
+
+  const applyPresetFullMonth = () => {
+    setIsCutoffMode(true);
+    const lastDay = getDaysInMonth(currentYear, currentMonth);
+    setStartDay(1);
+    setStartMonth(currentMonth);
+    setStartYear(currentYear);
+    setEndDay(lastDay);
+    setEndMonth(currentMonth);
+    setEndYear(currentYear);
+    setActiveDailyDateKey(`${currentYear}-${pad2(currentMonth)}-01`);
+  };
+
+  // Export CSV sesuai rentang tanggal yang dipilih
   const handleExportCSV = () => {
     const headers = [
       'NIK',
@@ -438,7 +627,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       'Lokasi Proyek',
       'Shift',
       'Rate Harian (Rp)',
-      ...daysArray.map((d) => `Tgl ${d}`),
+      ...activePeriodDays.map((d) => `Tgl ${d.dmy}`),
       'Total Hadir',
       'Total Alpa',
       'Total Izin',
@@ -451,11 +640,13 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     const rows: (string | number)[][] = [headers];
 
     filteredEmployees.forEach((emp) => {
-      const rec = getRecordForEmployee(emp.id);
-      const stats = calculateRowStats(emp, rec);
+      const stats = calculateRowStats(emp);
       const proj = projects.find((p) => p.id === emp.projectId);
 
-      const dayCells = daysArray.map((d) => rec.days[d] || '-');
+      const dayCells = activePeriodDays.map((pDay) => {
+        const st = getStatusForEmployeeDate(emp.id, pDay.day, pDay.month, pDay.year);
+        return st || '-';
+      });
 
       rows.push([
         emp.nik,
@@ -469,21 +660,23 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
         stats.alpa,
         stats.izin,
         stats.deduction,
-        rec.deductionReason || '',
+        stats.deductionReason || '',
         stats.bonus,
         stats.netPay
       ]);
     });
 
-    const filename = `Timesheet_Rajawali_${getMonthName(currentMonth)}_${currentYear}.csv`;
+    const startStr = `${startDay}-${startMonth}-${startYear}`;
+    const endStr = `${endDay}-${endMonth}-${endYear}`;
+    const filename = `Timesheet_Rajawali_CutOff_${startStr}_sd_${endStr}.csv`;
     downloadCSV(filename, rows);
   };
 
   return (
     <div className="space-y-4">
-      {/* Header & Controls Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-5 shadow-xl space-y-3">
-        {/* Top Header: Title & Month Picker & View Mode Toggle */}
+      {/* Header & Main Controls Card */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-5 shadow-xl space-y-4">
+        {/* Top Header: Title & Quick Buttons */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center space-x-3">
             <div className="p-2.5 sm:p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 shrink-0">
@@ -497,16 +690,19 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                 <span className="bg-emerald-500/20 text-emerald-300 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
                   {summary.totalEmployees} Personil
                 </span>
+                <span className="bg-amber-500/20 text-amber-300 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full border border-amber-500/30 hidden sm:inline-block">
+                  {activePeriodDays.length} Hari Aktif
+                </span>
               </div>
               <p className="text-[11px] sm:text-xs text-slate-400">
-                Sistem absensi harian dan perhitungan payroll otomatis 1-31 hari.
+                Sistem absensi harian dan perhitungan payroll terintegrasi dengan filter buka & tutup buku.
               </p>
             </div>
           </div>
 
-          {/* Month Navigator & View Mode Buttons */}
+          {/* View Mode Toggle, Month Quick Selector & Export Buttons */}
           <div className="flex items-center flex-wrap gap-2 justify-between lg:justify-end">
-            {/* View Mode Toggle: Mobile Card vs 31-Day Matrix */}
+            {/* View Mode Toggle: Absensi Harian vs Matriks 31 Hari */}
             <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1">
               <button
                 id="view-mode-daily-btn"
@@ -530,28 +726,28 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                 }`}
               >
                 <Table className="w-3.5 h-3.5" />
-                <span>Matriks 31 Hari</span>
+                <span>Matriks Grid</span>
               </button>
             </div>
 
-            {/* Month Picker */}
+            {/* Quick Month Navigator */}
             <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1">
               <button
                 id="prev-month-btn"
                 onClick={handlePrevMonth}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                aria-label="Bulan Sebelumnya"
+                title="Bulan Sebelumnya"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <div className="px-2.5 py-1 font-bold text-xs sm:text-sm text-amber-300 min-w-[120px] text-center">
+              <div className="px-2.5 py-1 font-bold text-xs sm:text-sm text-amber-300 min-w-[110px] text-center">
                 {getMonthName(currentMonth)} {currentYear}
               </div>
               <button
                 id="next-month-btn"
                 onClick={handleNextMonth}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                aria-label="Bulan Berikutnya"
+                title="Bulan Berikutnya"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -562,13 +758,13 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
               id="export-timesheet-csv-btn"
               onClick={handleExportCSV}
               className="flex items-center space-x-1 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold text-xs rounded-xl border border-slate-700 transition cursor-pointer"
-              title="Unduh Rekap Format CSV"
+              title="Unduh Rekap Format CSV Periode Ini"
             >
               <Download className="w-3.5 h-3.5 text-amber-400" />
               <span className="hidden xs:inline">Export CSV</span>
             </button>
 
-            {/* Direct Download PDF Button */}
+            {/* Download PDF Button */}
             <button
               id="open-pdf-report-btn"
               onClick={() => {
@@ -576,18 +772,292 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                 setShowPDFModal(true);
               }}
               className="flex items-center space-x-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer"
-              title="Download Rekap Matriks 1-31 Hari sebagai Dokumen PDF Resmi (Ukuran A4)"
+              title="Download Rekap Payroll PDF Resmi Standar A4"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Download PDF Rekap</span>
+              <span>Download PDF</span>
             </button>
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* FITUR BARU: PILIHAN FILTER TANGGAL, BULAN & TAHUN BUKA & TUTUP BUKU       */}
+        {/* ========================================================================= */}
+        <div className="bg-slate-950/90 border-2 border-amber-500/30 rounded-2xl p-3.5 sm:p-4 shadow-xl space-y-3">
+          {/* Card Header & Badge Status */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
+            <div className="flex items-center space-x-2">
+              <CalendarRange className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="text-xs sm:text-sm font-extrabold text-white">
+                Periode Buka & Tutup Buku Timesheet (Cut-Off Payroll)
+              </span>
+            </div>
+
+            {/* Active Period Badge Format: dd-mm-yyyy sampai dd-mm-yyyy */}
+            <div className="flex items-center space-x-2">
+              <span className="text-[11px] font-bold text-slate-400 hidden md:inline">
+                Periode Terpilih:
+              </span>
+              <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 bg-amber-500/15 border border-amber-500/40 rounded-xl text-amber-300 font-black text-xs">
+                <span>Buka: {formatDMY(startDay, startMonth, startYear)}</span>
+                <span className="text-slate-400">s/d</span>
+                <span>Tutup: {formatDMY(endDay, endMonth, endYear)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Filter Dua Panel: Buka (Start) & Tutup (End) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* Panel 1: Buka Timesheet (Tanggal Mulai) */}
+            <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-3 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-xs font-black text-emerald-400 uppercase tracking-wide">
+                    🟢 Buka Timesheet (Tanggal Mulai)
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono font-bold bg-slate-950 px-2 py-0.5 rounded text-emerald-300 border border-emerald-500/20">
+                  {formatDMY(startDay, startMonth, startYear)}
+                </span>
+              </div>
+
+              {/* Tiga Selector Manual: Hari, Bulan, Tahun + Datepicker Kalender */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 text-xs">
+                {/* Hari (dd) */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-semibold mb-1">
+                    Hari (dd):
+                  </label>
+                  <select
+                    id="timesheet-start-day"
+                    value={startDay}
+                    onChange={(e) => {
+                      setStartDay(Number(e.target.value));
+                      setIsCutoffMode(true);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-2 py-1.5 text-xs font-bold focus:border-emerald-500 focus:outline-none cursor-pointer"
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <option key={d} value={d} className="bg-slate-900">
+                        {pad2(d)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Bulan (mm) */}
+                <div className="sm:col-span-2">
+                  <label className="block text-[10px] text-slate-400 font-semibold mb-1">
+                    Bulan (mm):
+                  </label>
+                  <select
+                    id="timesheet-start-month"
+                    value={startMonth}
+                    onChange={(e) => {
+                      setStartMonth(Number(e.target.value));
+                      setIsCutoffMode(true);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-2 py-1.5 text-xs font-bold focus:border-emerald-500 focus:outline-none cursor-pointer"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <option key={m} value={m} className="bg-slate-900">
+                        {pad2(m)} - {getMonthName(m)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Tahun (yyyy) */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-semibold mb-1">
+                    Tahun (yyyy):
+                  </label>
+                  <select
+                    id="timesheet-start-year"
+                    value={startYear}
+                    onChange={(e) => {
+                      setStartYear(Number(e.target.value));
+                      setIsCutoffMode(true);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-2 py-1.5 text-xs font-bold focus:border-emerald-500 focus:outline-none cursor-pointer"
+                  >
+                    {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map((y) => (
+                      <option key={y} value={y} className="bg-slate-900">
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Quick Input Kalender Langsung */}
+              <div className="flex items-center justify-between text-[11px] pt-1 text-slate-400 border-t border-slate-800/60">
+                <span>Pilih via Kalender:</span>
+                <input
+                  id="timesheet-start-date-picker"
+                  type="date"
+                  value={`${startYear}-${pad2(startMonth)}-${pad2(startDay)}`}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    const [y, m, d] = e.target.value.split('-').map(Number);
+                    setStartYear(y);
+                    setStartMonth(m);
+                    setStartDay(d);
+                    setIsCutoffMode(true);
+                  }}
+                  className="bg-slate-950 border border-slate-800 rounded px-2 py-0.5 text-[11px] text-emerald-300 font-mono focus:outline-none focus:border-emerald-500 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Panel 2: Tutup Timesheet (Tanggal Selesai) */}
+            <div className="bg-slate-900 border border-rose-500/30 rounded-xl p-3 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
+                  <span className="text-xs font-black text-rose-400 uppercase tracking-wide">
+                    🔴 Tutup Timesheet (Tanggal Selesai)
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono font-bold bg-slate-950 px-2 py-0.5 rounded text-rose-300 border border-rose-500/20">
+                  {formatDMY(endDay, endMonth, endYear)}
+                </span>
+              </div>
+
+              {/* Tiga Selector Manual: Hari, Bulan, Tahun + Datepicker Kalender */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 text-xs">
+                {/* Hari (dd) */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-semibold mb-1">
+                    Hari (dd):
+                  </label>
+                  <select
+                    id="timesheet-end-day"
+                    value={endDay}
+                    onChange={(e) => {
+                      setEndDay(Number(e.target.value));
+                      setIsCutoffMode(true);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-2 py-1.5 text-xs font-bold focus:border-rose-500 focus:outline-none cursor-pointer"
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <option key={d} value={d} className="bg-slate-900">
+                        {pad2(d)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Bulan (mm) */}
+                <div className="sm:col-span-2">
+                  <label className="block text-[10px] text-slate-400 font-semibold mb-1">
+                    Bulan (mm):
+                  </label>
+                  <select
+                    id="timesheet-end-month"
+                    value={endMonth}
+                    onChange={(e) => {
+                      setEndMonth(Number(e.target.value));
+                      setIsCutoffMode(true);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-2 py-1.5 text-xs font-bold focus:border-rose-500 focus:outline-none cursor-pointer"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <option key={m} value={m} className="bg-slate-900">
+                        {pad2(m)} - {getMonthName(m)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Tahun (yyyy) */}
+                <div>
+                  <label className="block text-[10px] text-slate-400 font-semibold mb-1">
+                    Tahun (yyyy):
+                  </label>
+                  <select
+                    id="timesheet-end-year"
+                    value={endYear}
+                    onChange={(e) => {
+                      setEndYear(Number(e.target.value));
+                      setIsCutoffMode(true);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-2 py-1.5 text-xs font-bold focus:border-rose-500 focus:outline-none cursor-pointer"
+                  >
+                    {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map((y) => (
+                      <option key={y} value={y} className="bg-slate-900">
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Quick Input Kalender Langsung */}
+              <div className="flex items-center justify-between text-[11px] pt-1 text-slate-400 border-t border-slate-800/60">
+                <span>Pilih via Kalender:</span>
+                <input
+                  id="timesheet-end-date-picker"
+                  type="date"
+                  value={`${endYear}-${pad2(endMonth)}-${pad2(endDay)}`}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    const [y, m, d] = e.target.value.split('-').map(Number);
+                    setEndYear(y);
+                    setEndMonth(m);
+                    setEndDay(d);
+                    setIsCutoffMode(true);
+                  }}
+                  className="bg-slate-950 border border-slate-800 rounded px-2 py-0.5 text-[11px] text-rose-300 font-mono focus:outline-none focus:border-rose-500 cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Preset Periode Cepat & Keterangan Otomatisasi */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <div className="flex items-center flex-wrap gap-1.5 text-xs">
+              <span className="text-[11px] text-slate-400 font-semibold mr-1">Preset Cepat:</span>
+              <button
+                id="preset-cutoff-21-20-btn"
+                onClick={applyPreset21to20}
+                className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg font-bold text-[11px] transition cursor-pointer"
+                title="Sesuai Permintaan: Buka 21-8-2026 sampai 20-9-2026"
+              >
+                ⚡ Cut-Off 21 - 20 (21-08-2026 s/d 20-09-2026)
+              </button>
+
+              <button
+                id="preset-cutoff-26-25-btn"
+                onClick={applyPreset26to25}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg font-semibold text-[11px] transition cursor-pointer"
+              >
+                ⚡ Cut-Off 26 - 25 (26-07-2026 s/d 25-08-2026)
+              </button>
+
+              <button
+                id="preset-full-month-btn"
+                onClick={applyPresetFullMonth}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg font-semibold text-[11px] transition cursor-pointer"
+              >
+                📅 1 Bulan Kalender (1 - 31)
+              </button>
+            </div>
+
+            <div className="flex items-center space-x-2 text-[11px] text-slate-400">
+              <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold">
+                ✓ Otomatis Aktif
+              </span>
+              <span>Kolom Hadir, Alpa, Izin, Potongan & Gaji Bersih mengikuti tanggal ini</span>
+            </div>
           </div>
         </div>
 
         {/* Legend Drawer Trigger */}
         <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[11px] text-slate-400">
           <div className="flex items-center space-x-2">
-            <span className="font-semibold text-slate-300">Status Absensi:</span>
+            <span className="font-semibold text-slate-300">Status Presensi:</span>
             <span className="text-emerald-400 font-bold">H: Hadir</span> • 
             <span className="text-rose-400 font-bold">A: Alpa</span> • 
             <span className="text-amber-400 font-bold">I: Izin</span> • 
@@ -596,10 +1066,10 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
           <button
             id="show-legend-btn"
             onClick={() => setShowLegend(!showLegend)}
-            className="text-amber-400 hover:underline flex items-center space-x-1"
+            className="text-amber-400 hover:underline flex items-center space-x-1 cursor-pointer"
           >
             <HelpCircle className="w-3 h-3" />
-            <span>Panduan</span>
+            <span>Panduan & Legend</span>
           </button>
         </div>
 
@@ -611,30 +1081,30 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                 <span className="w-6 h-6 rounded bg-emerald-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                   ✓
                 </span>
-                <span className="text-slate-300"><b>Hadir (H)</b>: Gaji Penuh</span>
+                <span className="text-slate-300"><b>Hadir (H)</b>: Gaji Penuh Sesuai Rate Harian</span>
               </div>
               <div className="flex items-center space-x-1.5">
                 <span className="w-6 h-6 rounded bg-rose-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                   ✗
                 </span>
-                <span className="text-slate-300"><b>Alpa (A)</b>: Mangkir</span>
+                <span className="text-slate-300"><b>Alpa (A)</b>: Mangkir / Tanpa Keterangan</span>
               </div>
               <div className="flex items-center space-x-1.5">
                 <span className="w-6 h-6 rounded bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-sm">
                   !
                 </span>
-                <span className="text-slate-300"><b>Izin (I)</b>: Sakit / Dinas</span>
+                <span className="text-slate-300"><b>Izin (I)</b>: Sakit / Izin Dinas</span>
               </div>
               <div className="flex items-center space-x-1.5">
                 <span className="w-6 h-6 rounded bg-slate-700 text-slate-300 flex items-center justify-center font-bold text-xs shadow-sm">
                   OFF
                 </span>
-                <span className="text-slate-300"><b>Off (O)</b>: Jadwal Libur</span>
+                <span className="text-slate-300"><b>Off (O)</b>: Jadwal Roster Libur</span>
               </div>
             </div>
             <button
               onClick={() => setShowLegend(false)}
-              className="text-slate-400 hover:text-white text-xs font-semibold"
+              className="text-slate-400 hover:text-white text-xs font-semibold cursor-pointer"
             >
               Tutup ✕
             </button>
@@ -642,7 +1112,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
         )}
       </div>
 
-      {/* Filters Bar */}
+      {/* Filters Bar: Search, Shift, Position, and Summary KPI Counters */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
         {/* Search */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex items-center space-x-2">
@@ -694,21 +1164,21 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
           </select>
         </div>
 
-        {/* Quick KPI Badge */}
+        {/* Quick KPI Badge: Total Personil & Total Payroll Periode */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between">
           <div className="text-xs">
             <span className="text-slate-400">Total Personil:</span>{' '}
             <span className="font-bold text-white">{summary.totalEmployees} Org</span>
           </div>
           <div className="text-xs">
-            <span className="text-slate-400">Payroll:</span>{' '}
+            <span className="text-slate-400">Payroll Periode:</span>{' '}
             <span className="font-bold text-amber-400">{formatCurrency(summary.totalPayrollAll)}</span>
           </div>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* MODE 1: MOBILE DAILY ROLL-CALL VIEW (Optimized for Android & iPhone)      */}
+      {/* MODE 1: MOBILE DAILY ROLL-CALL VIEW (Absensi Harian)                       */}
       {/* ========================================================================= */}
       {viewMode === 'daily' && (
         <div className="space-y-4">
@@ -718,8 +1188,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
               <button
                 id="daily-prev-day-btn"
                 onClick={handlePrevDay}
-                disabled={activeDailyDate <= 1}
-                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200 text-xs font-semibold"
+                disabled={activePeriodDays.findIndex((p) => p.dateKey === activeDayObj.dateKey) <= 0}
+                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200 text-xs font-semibold cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
                 <span className="hidden xs:inline">Kemarin</span>
@@ -728,45 +1198,47 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
               {/* Centered Big Date */}
               <div className="text-center">
                 <div className="text-xs text-amber-400 font-bold uppercase tracking-wider">
-                  {getDayName(currentYear, currentMonth, activeDailyDate)}
+                  {activeDayObj.dayName} • {getMonthName(activeDayObj.month)} {activeDayObj.year}
                 </div>
                 <div className="text-lg sm:text-xl font-extrabold text-white">
-                  Tanggal {activeDailyDate} {getMonthName(currentMonth)} {currentYear}
+                  Tanggal {activeDayObj.day} ({formatDMY(activeDayObj.day, activeDayObj.month, activeDayObj.year)})
                 </div>
               </div>
 
               <button
                 id="daily-next-day-btn"
                 onClick={handleNextDay}
-                disabled={activeDailyDate >= totalDays}
-                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200 text-xs font-semibold"
+                disabled={
+                  activePeriodDays.findIndex((p) => p.dateKey === activeDayObj.dateKey) >=
+                  activePeriodDays.length - 1
+                }
+                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200 text-xs font-semibold cursor-pointer"
               >
                 <span className="hidden xs:inline">Besok</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Horizontal Scrollable Day Pills */}
+            {/* Horizontal Scrollable Day Pills: Menampilkan seluruh tanggal dalam periode terpilih */}
             <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 pt-1 scrollbar-none">
-              {daysArray.map((day) => {
-                const dayName = getDayName(currentYear, currentMonth, day);
-                const isSelected = activeDailyDate === day;
-                const weekend = isWeekend(currentYear, currentMonth, day);
+              {activePeriodDays.map((pDay) => {
+                const isSelected = activeDayObj.dateKey === pDay.dateKey;
                 return (
                   <button
-                    key={day}
-                    id={`day-pill-${day}`}
-                    onClick={() => setActiveDailyDate(day)}
-                    className={`flex flex-col items-center justify-center min-w-[42px] py-1.5 rounded-xl text-xs transition-all shrink-0 ${
+                    key={pDay.dateKey}
+                    id={`day-pill-${pDay.dateKey}`}
+                    onClick={() => setActiveDailyDateKey(pDay.dateKey)}
+                    className={`flex flex-col items-center justify-center min-w-[48px] py-1.5 rounded-xl text-xs transition-all shrink-0 cursor-pointer ${
                       isSelected
                         ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/30 scale-105 ring-2 ring-amber-400'
-                        : weekend
+                        : pDay.isWeekend
                         ? 'bg-slate-950/80 text-amber-400/80 hover:bg-slate-800 border border-amber-500/20'
                         : 'bg-slate-950 text-slate-300 hover:bg-slate-800 border border-slate-800'
                     }`}
                   >
-                    <span className="text-[9px] uppercase leading-none opacity-80">{dayName}</span>
-                    <span className="text-sm font-bold mt-0.5">{day}</span>
+                    <span className="text-[9px] uppercase leading-none opacity-80">{pDay.dayName}</span>
+                    <span className="text-sm font-bold mt-0.5">{pDay.day}</span>
+                    <span className="text-[8px] opacity-70">/{pDay.month}</span>
                   </button>
                 );
               })}
@@ -798,16 +1270,16 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
               <div className="flex items-center space-x-1.5">
                 <button
                   id="mobile-bulk-mark-present-btn"
-                  onClick={() => handleBulkMarkPresent(activeDailyDate)}
-                  className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95"
+                  onClick={() => handleBulkMarkPresent(activeDayObj.day, activeDayObj.month, activeDayObj.year)}
+                  className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
                 >
                   <CheckCheck className="w-3.5 h-3.5" />
                   <span>Hadirkan Semua</span>
                 </button>
                 <button
                   id="mobile-bulk-clear-day-btn"
-                  onClick={() => handleBulkClearDay(activeDailyDate)}
-                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl"
+                  onClick={() => handleBulkClearDay(activeDayObj.day, activeDayObj.month, activeDayObj.year)}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl cursor-pointer"
                 >
                   Kosongkan
                 </button>
@@ -823,9 +1295,13 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
               </div>
             ) : (
               filteredEmployees.map((emp) => {
-                const rec = getRecordForEmployee(emp.id);
-                const stats = calculateRowStats(emp, rec);
-                const currentStatus = rec.days[activeDailyDate] || '';
+                const stats = calculateRowStats(emp);
+                const currentStatus = getStatusForEmployeeDate(
+                  emp.id,
+                  activeDayObj.day,
+                  activeDayObj.month,
+                  activeDayObj.year
+                );
                 const proj = projects.find((p) => p.id === emp.projectId);
 
                 return (
@@ -853,9 +1329,9 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         </div>
                       </div>
 
-                      {/* Month Accumulation Badge */}
+                      {/* Period Accumulation Badge */}
                       <div className="text-right shrink-0">
-                        <div className="text-[10px] text-slate-400">Total Hadir:</div>
+                        <div className="text-[10px] text-slate-400">Total Hadir Periode:</div>
                         <div className="text-sm font-black text-emerald-400">
                           {stats.hadir} <span className="text-[10px] font-normal text-slate-400">Hari</span>
                         </div>
@@ -865,13 +1341,15 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       </div>
                     </div>
 
-                    {/* Touch Attendance Action Buttons (4 Large Touch Targets for iOS/Android) */}
+                    {/* Touch Attendance Action Buttons (H, A, I, O) */}
                     <div className="grid grid-cols-4 gap-1.5 pt-1">
                       {/* Hadir Button */}
                       <button
-                        id={`btn-hadir-${emp.id}-${activeDailyDate}`}
-                        onClick={() => handleSetStatusDirect(emp.id, activeDailyDate, 'H')}
-                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 ${
+                        id={`btn-hadir-${emp.id}-${activeDayObj.dateKey}`}
+                        onClick={() =>
+                          handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, 'H')
+                        }
+                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
                           currentStatus === 'H'
                             ? 'bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-500/30'
                             : 'bg-slate-950/80 text-emerald-400/80 border-emerald-500/30 hover:bg-emerald-950/40'
@@ -883,9 +1361,11 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
 
                       {/* Alpa Button */}
                       <button
-                        id={`btn-alpa-${emp.id}-${activeDailyDate}`}
-                        onClick={() => handleSetStatusDirect(emp.id, activeDailyDate, 'A')}
-                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 ${
+                        id={`btn-alpa-${emp.id}-${activeDayObj.dateKey}`}
+                        onClick={() =>
+                          handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, 'A')
+                        }
+                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
                           currentStatus === 'A'
                             ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/30'
                             : 'bg-slate-950/80 text-rose-400/80 border-rose-500/30 hover:bg-rose-950/40'
@@ -897,11 +1377,13 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
 
                       {/* Izin Button */}
                       <button
-                        id={`btn-izin-${emp.id}-${activeDailyDate}`}
-                        onClick={() => handleSetStatusDirect(emp.id, activeDailyDate, 'I')}
-                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 ${
+                        id={`btn-izin-${emp.id}-${activeDayObj.dateKey}`}
+                        onClick={() =>
+                          handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, 'I')
+                        }
+                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
                           currentStatus === 'I'
-                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/30'
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/30 font-black'
                             : 'bg-slate-950/80 text-amber-400/80 border-amber-500/30 hover:bg-amber-950/40'
                         }`}
                       >
@@ -911,22 +1393,24 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
 
                       {/* Off Button */}
                       <button
-                        id={`btn-off-${emp.id}-${activeDailyDate}`}
-                        onClick={() => handleSetStatusDirect(emp.id, activeDailyDate, 'O')}
-                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 ${
+                        id={`btn-off-${emp.id}-${activeDayObj.dateKey}`}
+                        onClick={() =>
+                          handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, 'O')
+                        }
+                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
                           currentStatus === 'O'
-                            ? 'bg-slate-700 text-white border-slate-600 shadow-md'
-                            : 'bg-slate-950/80 text-slate-400 border-slate-800 hover:bg-slate-800'
+                            ? 'bg-slate-700 text-white border-slate-500 shadow-md'
+                            : 'bg-slate-950/80 text-slate-400 border-slate-700 hover:bg-slate-800'
                         }`}
                       >
-                        <span className="text-xs font-mono">OFF</span>
+                        <span className="text-[11px] font-mono">OFF</span>
                         <span className="text-[10px] mt-0.5">Libur</span>
                       </button>
                     </div>
 
-                    {/* Bottom Info: Rate & Deduction Trigger */}
-                    <div className="flex items-center justify-between text-[11px] pt-2 border-t border-slate-800/80">
-                      <div className="text-slate-400">
+                    {/* Bottom Metadata & Edit Deduction Button */}
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/80">
+                      <div>
                         Rate: <span className="text-slate-200 font-semibold">{formatCurrency(emp.dailyRate)}</span>/hr
                       </div>
 
@@ -935,17 +1419,18 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         onClick={() =>
                           setEditingDeduction({
                             employee: emp,
-                            timesheetRecord: rec,
-                            amount: rec.deductionAmount || 0,
-                            reason: rec.deductionReason || '',
-                            bonus: rec.bonusAmount || 0
+                            targetMonth: endMonth,
+                            targetYear: endYear,
+                            amount: stats.deduction,
+                            reason: stats.deductionReason,
+                            bonus: stats.bonus
                           })
                         }
-                        className="flex items-center space-x-1 text-amber-400 hover:underline font-semibold"
+                        className="flex items-center space-x-1 text-amber-400 hover:underline font-semibold cursor-pointer"
                       >
                         <Edit3 className="w-3 h-3" />
                         <span>
-                          {rec.deductionAmount > 0 || rec.bonusAmount > 0
+                          {stats.deduction > 0 || stats.bonus > 0
                             ? 'Edit Denda/Bonus'
                             : '+ Potongan/Lembur'}
                         </span>
@@ -960,14 +1445,55 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* MODE 2: FULL 31-DAY MATRIX TABLE                                          */}
+      {/* MODE 2: FULL MATRIX TABLE (GRID SESUAI PERIODE TANGGAL TERPILIH)          */}
       {/* ========================================================================= */}
       {viewMode === 'matrix' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-          {/* Mobile swipe hint banner */}
-          <div className="bg-slate-950/80 px-3 py-1.5 text-[11px] text-slate-400 flex items-center justify-between border-b border-slate-800 md:hidden">
-            <span>👉 Geser tabel ke kanan/kiri untuk melihat tgl 1-31</span>
-            <span className="font-bold text-amber-400">Mode Grid</span>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden space-y-0">
+          {/* Top Quick Bulk Bar for Grid View */}
+          <div className="bg-slate-950 px-3 py-2 text-xs flex flex-wrap items-center justify-between gap-2 border-b border-slate-800">
+            <div className="flex items-center space-x-2">
+              <span className="text-slate-400 font-medium">Aksi Cepat Tanggal:</span>
+              <select
+                value={effectiveBulkDayKey}
+                onChange={(e) => setSelectedDayToBulkKey(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-amber-300 font-bold rounded px-2 py-1 text-xs focus:outline-none cursor-pointer"
+              >
+                {activePeriodDays.map((pDay) => (
+                  <option key={pDay.dateKey} value={pDay.dateKey}>
+                    Tgl {pDay.day} ({pDay.dmy}) - {pDay.dayName}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => {
+                  const targetDay = activePeriodDays.find((p) => p.dateKey === effectiveBulkDayKey);
+                  if (targetDay) {
+                    handleBulkMarkPresent(targetDay.day, targetDay.month, targetDay.year);
+                  }
+                }}
+                className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded text-xs transition cursor-pointer"
+              >
+                ✓ Hadirkan Semua
+              </button>
+
+              <button
+                onClick={() => {
+                  const targetDay = activePeriodDays.find((p) => p.dateKey === effectiveBulkDayKey);
+                  if (targetDay) {
+                    handleBulkClearDay(targetDay.day, targetDay.month, targetDay.year);
+                  }
+                }}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition cursor-pointer"
+              >
+                Kosongkan
+              </button>
+            </div>
+
+            <div className="text-[11px] text-slate-400">
+              Periode: <strong className="text-white">{formatDMY(startDay, startMonth, startYear)}</strong> s/d{' '}
+              <strong className="text-white">{formatDMY(endDay, endMonth, endYear)}</strong> ({activePeriodDays.length} Hari)
+            </div>
           </div>
 
           <div className="overflow-x-auto max-h-[620px] relative scrollbar-thin scrollbar-thumb-slate-700">
@@ -989,31 +1515,35 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                     Rate / Hari
                   </th>
 
-                  {/* Dynamic 1-31 Date Columns */}
-                  {daysArray.map((day) => {
-                    const dayName = getDayName(currentYear, currentMonth, day);
-                    const weekend = isWeekend(currentYear, currentMonth, day);
+                  {/* Kolom Tanggal Dinamis Sesuai Periode Terpilih */}
+                  {activePeriodDays.map((pDay) => {
+                    const isHighlighted = effectiveBulkDayKey === pDay.dateKey;
                     return (
                       <th
-                        key={day}
-                        onClick={() => setSelectedDayToBulk(day)}
-                        title={`Klik untuk pilih Tgl ${day} (${dayName})`}
+                        key={pDay.dateKey}
+                        onClick={() => setSelectedDayToBulkKey(pDay.dateKey)}
+                        title={`Klik untuk pilih Tgl ${pDay.dmy} (${pDay.dayName})`}
                         className={`p-1.5 text-center min-w-[34px] max-w-[34px] border-r border-slate-800/80 cursor-pointer transition-colors ${
-                          weekend ? 'bg-amber-950/30 text-amber-400' : 'text-slate-300'
-                        } ${selectedDayToBulk === day ? 'ring-2 ring-amber-500 bg-amber-500/20' : 'hover:bg-slate-800'}`}
+                          pDay.isWeekend ? 'bg-amber-950/30 text-amber-400' : 'text-slate-300'
+                        } ${isHighlighted ? 'ring-2 ring-amber-500 bg-amber-500/20' : 'hover:bg-slate-800'}`}
                       >
-                        <div className="text-[11px] font-extrabold">{day}</div>
-                        <div className="text-[9px] font-normal text-slate-400">{dayName}</div>
+                        <div className="text-[11px] font-extrabold">{pDay.day}</div>
+                        <div className="text-[8px] font-normal text-slate-400 leading-tight">
+                          {pDay.dayName}
+                        </div>
+                        <div className="text-[7px] text-slate-500 font-mono">
+                          /{pDay.month}
+                        </div>
                       </th>
                     );
                   })}
 
-                  {/* Summary & Financial Calculation Columns */}
+                  {/* Summary & Financial Calculation Columns (Mengikuti Periode Tanggal Terpilih) */}
                   <th className="p-3 text-center min-w-[60px] bg-slate-950 border-l border-slate-800 text-emerald-400">
                     Hadir
                   </th>
                   <th className="p-3 text-center min-w-[50px] bg-slate-950 border-r border-slate-800 text-rose-400">
-                    Alpa
+                    Alpha
                   </th>
                   <th className="p-3 text-center min-w-[50px] bg-slate-950 border-r border-slate-800 text-amber-400">
                     Izin
@@ -1031,14 +1561,13 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
               <tbody className="divide-y divide-slate-800/60 text-xs">
                 {filteredEmployees.length === 0 ? (
                   <tr>
-                    <td colSpan={totalDays + 9} className="p-12 text-center text-slate-500">
+                    <td colSpan={activePeriodDays.length + 9} className="p-12 text-center text-slate-500">
                       <p className="text-base font-semibold text-slate-400">Tidak ada data karyawan yang cocok.</p>
                     </td>
                   </tr>
                 ) : (
                   filteredEmployees.map((emp, index) => {
-                    const rec = getRecordForEmployee(emp.id);
-                    const stats = calculateRowStats(emp, rec);
+                    const stats = calculateRowStats(emp);
                     const proj = projects.find((p) => p.id === emp.projectId);
 
                     return (
@@ -1073,19 +1602,18 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                           {formatCurrency(emp.dailyRate)}
                         </td>
 
-                        {/* 1-31 Attendance Check Cells */}
-                        {daysArray.map((day) => {
-                          const status = rec.days[day] || '';
-                          const weekend = isWeekend(currentYear, currentMonth, day);
+                        {/* Presensi Tanggal Periode Terpilih */}
+                        {activePeriodDays.map((pDay) => {
+                          const status = getStatusForEmployeeDate(emp.id, pDay.day, pDay.month, pDay.year);
 
                           return (
                             <td
-                              key={day}
-                              id={`cell-${emp.id}-${day}`}
-                              onClick={() => handleCellClick(emp.id, day)}
-                              title={`Klik untuk ubah kehadiran ${emp.name} (Tgl ${day})`}
+                              key={pDay.dateKey}
+                              id={`cell-${emp.id}-${pDay.dateKey}`}
+                              onClick={() => handleCellClick(emp.id, pDay.day, pDay.month, pDay.year)}
+                              title={`Klik untuk ubah kehadiran ${emp.name} (Tgl ${pDay.dmy})`}
                               className={`p-1 text-center border-r border-slate-800/50 cursor-pointer select-none transition-all ${
-                                weekend ? 'bg-amber-950/10' : ''
+                                pDay.isWeekend ? 'bg-amber-950/10' : ''
                               } hover:bg-amber-500/20 active:scale-95`}
                             >
                               <div
@@ -1111,35 +1639,36 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                           );
                         })}
 
-                        {/* Hadir Count */}
+                        {/* Kolom Hadir */}
                         <td className="p-3 text-center font-bold text-emerald-400 bg-slate-950/40 border-l border-slate-800">
                           {stats.hadir}
                         </td>
 
-                        {/* Alpa Count */}
+                        {/* Kolom Alpha */}
                         <td className="p-3 text-center font-bold text-rose-400 bg-slate-950/40 border-r border-slate-800">
                           {stats.alpa}
                         </td>
 
-                        {/* Izin Count */}
+                        {/* Kolom Izin */}
                         <td className="p-3 text-center font-bold text-amber-400 bg-slate-950/40 border-r border-slate-800">
                           {stats.izin}
                         </td>
 
-                        {/* Potongan & Lembur Button */}
+                        {/* Kolom Potongan & Tombol Edit */}
                         <td className="p-3 text-right bg-slate-950/40 border-r border-slate-800 hidden sm:table-cell">
                           <button
                             id={`matrix-edit-deduction-btn-${emp.id}`}
                             onClick={() =>
                               setEditingDeduction({
                                 employee: emp,
-                                timesheetRecord: rec,
-                                amount: rec.deductionAmount || 0,
-                                reason: rec.deductionReason || '',
-                                bonus: rec.bonusAmount || 0
+                                targetMonth: endMonth,
+                                targetYear: endYear,
+                                amount: stats.deduction,
+                                reason: stats.deductionReason,
+                                bonus: stats.bonus
                               })
                             }
-                            className="text-right hover:text-amber-400 transition-colors w-full group/btn"
+                            className="text-right hover:text-amber-400 transition-colors w-full group/btn cursor-pointer"
                           >
                             <div className="font-semibold text-rose-400">
                               {stats.deduction > 0 ? `- ${formatCurrency(stats.deduction)}` : 'Rp 0'}
@@ -1150,12 +1679,12 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                               </div>
                             )}
                             <div className="text-[10px] text-slate-500 group-hover/btn:text-amber-400">
-                              {rec.deductionReason ? `(${rec.deductionReason})` : 'Edit'}
+                              {stats.deductionReason ? `(${stats.deductionReason})` : 'Edit Potongan'}
                             </div>
                           </button>
                         </td>
 
-                        {/* Net Take Home Pay */}
+                        {/* Kolom Gaji Bersih */}
                         <td className="p-3 text-right font-black text-amber-400 sticky right-0 z-10 bg-slate-900 group-hover:bg-slate-800 shadow-[-4px_0_10px_rgba(0,0,0,0.5)]">
                           <div className="text-sm">{formatCurrency(stats.netPay)}</div>
                           <div className="text-[10px] text-slate-500 font-normal">
@@ -1167,23 +1696,57 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   })
                 )}
               </tbody>
+
+              {/* Summary Footer Row */}
+              <tfoot className="bg-slate-950 text-slate-200 font-black border-t-2 border-slate-700 sticky bottom-0 z-20 text-xs">
+                <tr>
+                  <td colSpan={4} className="p-3 text-right uppercase border-r border-slate-800">
+                    TOTAL KONSOLIDASI PERIODE:
+                  </td>
+                  <td
+                    colSpan={activePeriodDays.length}
+                    className="p-3 text-center text-slate-400 border-r border-slate-800 text-[11px]"
+                  >
+                    {activePeriodDays.length} Hari ({formatDMY(startDay, startMonth, startYear)} s/d {formatDMY(endDay, endMonth, endYear)})
+                  </td>
+                  <td className="p-3 text-center font-black text-emerald-400 bg-emerald-950/40 border-r border-slate-800">
+                    {summary.totalHadirAll}
+                  </td>
+                  <td className="p-3 text-center font-black text-rose-400 bg-rose-950/40 border-r border-slate-800">
+                    {summary.totalAlpaAll}
+                  </td>
+                  <td className="p-3 text-center font-black text-amber-400 bg-amber-950/40 border-r border-slate-800">
+                    {summary.totalIzinAll}
+                  </td>
+                  <td className="p-3 text-right font-black text-rose-300 bg-slate-950 border-r border-slate-800 hidden sm:table-cell">
+                    {formatCurrency(summary.totalDeductionsAll)}
+                  </td>
+                  <td className="p-3 text-right font-black text-amber-400 bg-amber-950/60 sticky right-0 z-30 shadow-[-4px_0_10px_rgba(0,0,0,0.5)] text-sm">
+                    {formatCurrency(summary.totalPayrollAll)}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
       )}
 
-      {/* Deduction / Bonus Modal Form */}
+      {/* ========================================================================= */}
+      {/* DEDUCTION / BONUS MODAL FORM                                              */}
+      {/* ========================================================================= */}
       {editingDeduction && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h3 className="font-bold text-white text-base">Atur Potongan Denda & Lembur</h3>
-                <p className="text-xs text-slate-400">{editingDeduction.employee.name} ({editingDeduction.employee.nik})</p>
+                <p className="text-xs text-slate-400">
+                  {editingDeduction.employee.name} ({editingDeduction.employee.nik}) • Periode {formatDMY(startDay, startMonth, startYear)} s/d {formatDMY(endDay, endMonth, endYear)}
+                </p>
               </div>
               <button
                 onClick={() => setEditingDeduction(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
+                className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
               >
                 ✕
               </button>
@@ -1239,7 +1802,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                     })
                   }
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                  placeholder="Contoh: Terlambat 45 menit, atribut seragam tidak lengkap tgl 12..."
+                  placeholder="Contoh: Terlambat hadir, atribut seragam tidak lengkap..."
                 />
               </div>
 
@@ -1273,14 +1836,14 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
             <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
               <button
                 onClick={() => setEditingDeduction(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-colors"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button
                 id="save-deduction-btn"
                 onClick={handleSaveDeduction}
-                className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-colors"
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-colors cursor-pointer"
               >
                 Simpan Potongan
               </button>
@@ -1289,25 +1852,27 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
         </div>
       )}
 
-      {/* SAVE / PRINT PDF MODAL & PRINTABLE DOCUMENT */}
+      {/* ========================================================================= */}
+      {/* SAVE / PRINT PDF MODAL & OFFICIAL DOCUMENT PREVIEW                        */}
+      {/* ========================================================================= */}
       {showPDFModal && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-7xl shadow-2xl overflow-hidden flex flex-col max-h-[96vh]">
-            {/* Top Control Bar (Hidden when printing) */}
+            {/* Top Control Bar */}
             <div className="p-4 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0 no-print">
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 rounded-xl shadow-lg shadow-amber-500/20 font-bold">
+                <div className="p-2.5 bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 rounded-xl shadow-lg shadow-amber-500/20 font-bold">
                   <Download className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                    <span>Download PDF Laporan Payroll (Ukuran A4)</span>
+                    <span>Download PDF Laporan Payroll (Ukuran A4 Landscape)</span>
                     <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30">
-                      Standar A4 Landscape
+                      Standar Cetak Resmi
                     </span>
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Dokumen resmi siap unduh berstandar A4 dengan presisi vector tajam & format full color korporat.
+                    Periode: <strong>{formatDMY(startDay, startMonth, startYear)}</strong> s/d <strong>{formatDMY(endDay, endMonth, endYear)}</strong> ({activePeriodDays.length} Hari Aktif).
                   </p>
                 </div>
               </div>
@@ -1315,7 +1880,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
               {/* Controls: Location Filter + Direct PDF Download + Close */}
               <div className="flex flex-wrap items-center gap-2.5">
                 <div className="flex items-center space-x-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-700 text-xs">
-                  <span className="text-slate-400 font-semibold">Pilihan Lokasi:</span>
+                  <span className="text-slate-400 font-semibold">Lokasi:</span>
                   <select
                     id="pdf-location-selector"
                     value={pdfSelectedProjectId}
@@ -1333,17 +1898,26 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   </select>
                 </div>
 
-                {/* DIRECT DOWNLOAD PDF (A4 format via jsPDF) */}
+                {/* DIRECT DOWNLOAD PDF */}
                 <button
                   id="direct-download-pdf-btn"
                   onClick={() => {
+                    const startStr = `${startDay}-${startMonth}-${startYear}`;
+                    const endStr = `${endDay}-${endMonth}-${endYear}`;
                     generateTimesheetPDF({
                       projects,
                       employees,
                       timesheets,
                       selectedProjectId: pdfSelectedProjectId,
                       month: currentMonth,
-                      year: currentYear
+                      year: currentYear,
+                      customPeriodLabel: `PERIODE: ${startStr} s/d ${endStr}`,
+                      customDays: activePeriodDays.map((p) => ({
+                        day: p.day,
+                        month: p.month,
+                        year: p.year,
+                        label: p.shortLabel
+                      }))
                     });
                   }}
                   className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/30 transition cursor-pointer"
@@ -1363,7 +1937,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
               </div>
             </div>
 
-            {/* Document Content Area (Scrollable in UI, full printed on paper) */}
+            {/* Document Content Area */}
             <div className="overflow-y-auto p-4 sm:p-6 bg-slate-950 flex justify-center">
               {(() => {
                 const pdfEmployees = employees.filter((emp) => {
@@ -1391,8 +1965,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                 let totalNetSum = 0;
 
                 const rowsData = pdfEmployees.map((emp, index) => {
-                  const rec = getRecordForEmployee(emp.id);
-                  const stats = calculateRowStats(emp, rec);
+                  const stats = calculateRowStats(emp);
 
                   totalHadirSum += stats.hadir;
                   totalAlpaSum += stats.alpa;
@@ -1406,7 +1979,6 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   return {
                     index: index + 1,
                     emp,
-                    rec,
                     stats,
                     empProj
                   };
@@ -1418,19 +1990,17 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   <div
                     id="printable-payroll-sheet"
                     className="bg-white text-slate-950 w-full max-w-6xl p-6 sm:p-8 rounded-xl shadow-2xl space-y-5 text-xs font-sans"
-                    style={{ minWidth: '950px' }}
                   >
-                    {/* Header Kop Resmi Sesuai Master Identitas & Legalitas */}
-                    <div className="space-y-3 border-b-2 border-slate-900 pb-4">
+                    {/* Kop Surat Resmi */}
+                    <div className="border-b-2 border-slate-900 pb-3 space-y-2">
                       <OfficialLetterhead
-                        company={comp}
-                        departmentSubtitle="Divisi Operasional & Manajemen Keuangan Personil (Payroll)"
-                        showLegal={true}
-                        showBankInfo={false}
+                        profile={comp}
+                        documentTitle="REKAPITULASI TIMESHEET & PENGGAJIAN (PAYROLL)"
+                        documentNumber={`PAY-${startYear}${pad2(startMonth)}-${pdfProjCode || 'CS'}`}
                       />
                       <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
                         <span className="font-mono text-[11px] font-semibold">
-                          KODE DOKUMEN: <strong className="text-slate-800">DOC-{currentYear}{String(currentMonth).padStart(2, '0')}-{pdfProjCode}</strong>
+                          KODE DOKUMEN: <strong className="text-slate-800">DOC-{startYear}{pad2(startMonth)}-{pdfProjCode}</strong>
                         </span>
                         <div className="flex items-center space-x-2">
                           <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-300 uppercase">
@@ -1449,16 +2019,16 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         REKAPITULASI TIMESHEET & PAYROLL CLEANING SERVICE
                       </h2>
                       <p className="text-xs text-slate-600 font-medium">
-                        Laporan Akumulasi Kehadiran Harian & Perhitungan Gaji Bersih Personil Lapangan
+                        Laporan Akumulasi Kehadiran Harian & Perhitungan Gaji Bersih Periode Cut-Off: {formatDMY(startDay, startMonth, startYear)} s/d {formatDMY(endDay, endMonth, endYear)}
                       </p>
                     </div>
 
-                    {/* Metadata Box (Periode, Lokasi, Total Personil, Nilai Payroll) */}
+                    {/* Metadata Box */}
                     <div className="bg-slate-50 border border-slate-300 rounded-lg p-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                       <div className="border-r border-slate-200 pr-2">
                         <span className="text-[10px] text-slate-500 font-bold uppercase block">Periode Penggajian</span>
-                        <span className="font-bold text-slate-900 text-xs sm:text-sm">
-                          {getMonthName(currentMonth)} {currentYear}
+                        <span className="font-bold text-slate-900 text-xs">
+                          {formatDMY(startDay, startMonth, startYear)} s/d {formatDMY(endDay, endMonth, endYear)}
                         </span>
                       </div>
 
@@ -1484,7 +2054,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       </div>
                     </div>
 
-                    {/* Quick Attendance Summary Chip */}
+                    {/* Summary Chip */}
                     <div className="flex items-center justify-between text-[11px] bg-slate-100 px-3 py-1.5 rounded border border-slate-200 font-medium text-slate-700">
                       <span>
                         Akumulasi: <strong>{totalHadirSum}</strong> Hadir •{' '}
@@ -1499,7 +2069,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       </span>
                     </div>
 
-                    {/* Table Data: Kolom #, Nama & Posisi, Project & Shift, Rate/Hari, Tanggal 1-31, Hadir, Alpa, Izin, Potongan, Gaji Bersih */}
+                    {/* Table Data */}
                     <div className="border border-slate-300 rounded-lg overflow-x-auto">
                       <table className="w-full text-left border-collapse text-[10px]">
                         <thead>
@@ -1515,26 +2085,18 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                               Rate / Hari
                             </th>
 
-                            {/* 31 Date Columns (1 to 31) */}
-                            {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
-                              const isDayInMonth = day <= totalDays;
-                              const weekend = isDayInMonth ? isWeekend(currentYear, currentMonth, day) : false;
-                              return (
-                                <th
-                                  key={day}
-                                  className={`py-1 px-0.5 text-center w-5 border-r border-slate-700 text-[9px] ${
-                                    !isDayInMonth
-                                      ? 'bg-slate-900 text-slate-600'
-                                      : weekend
-                                      ? 'bg-slate-700 text-amber-300'
-                                      : 'text-white'
-                                  }`}
-                                  title={`Tanggal ${day} ${getMonthName(currentMonth)}`}
-                                >
-                                  {day}
-                                </th>
-                              );
-                            })}
+                            {/* Date Columns Sesuai Periode Terpilih */}
+                            {activePeriodDays.map((pDay) => (
+                              <th
+                                key={pDay.dateKey}
+                                className={`py-1 px-0.5 text-center w-5 border-r border-slate-700 text-[9px] ${
+                                  pDay.isWeekend ? 'bg-slate-700 text-amber-300' : 'text-white'
+                                }`}
+                                title={`Tgl ${pDay.dmy}`}
+                              >
+                                {pDay.day}
+                              </th>
+                            ))}
 
                             <th className="py-2 px-1.5 text-center border-r border-slate-700 bg-emerald-900 text-emerald-100 w-8">
                               H
@@ -1557,7 +2119,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         <tbody className="divide-y divide-slate-200">
                           {rowsData.length === 0 ? (
                             <tr>
-                              <td colSpan={40} className="py-8 text-center text-slate-400 font-semibold">
+                              <td colSpan={activePeriodDays.length + 9} className="py-8 text-center text-slate-400 font-semibold">
                                 Tidak ada data personil pada lokasi ini.
                               </td>
                             </tr>
@@ -1589,20 +2151,15 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                   {formatCurrency(row.emp.dailyRate)}
                                 </td>
 
-                                {/* 31 Day Cells */}
-                                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
-                                  const isDayInMonth = day <= totalDays;
-                                  const status = isDayInMonth ? row.rec.days[day] || '' : '';
-                                  const weekend = isDayInMonth ? isWeekend(currentYear, currentMonth, day) : false;
+                                {/* Period Day Cells */}
+                                {activePeriodDays.map((pDay) => {
+                                  const status = getStatusForEmployeeDate(row.emp.id, pDay.day, pDay.month, pDay.year);
 
                                   let cellBg = '';
                                   let textColor = 'text-slate-700';
-                                  let displayTxt = status;
+                                  let displayTxt: string = status;
 
-                                  if (!isDayInMonth) {
-                                    cellBg = 'bg-slate-100 text-slate-300';
-                                    displayTxt = '-';
-                                  } else if (status === 'H') {
+                                  if (status === 'H') {
                                     cellBg = 'bg-emerald-50 text-emerald-800 font-bold';
                                   } else if (status === 'A') {
                                     cellBg = 'bg-rose-100 text-rose-800 font-black';
@@ -1611,16 +2168,16 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                   } else if (status === 'O') {
                                     cellBg = 'bg-slate-100 text-slate-400';
                                     displayTxt = 'OFF';
-                                  } else if (weekend) {
+                                  } else if (pDay.isWeekend) {
                                     cellBg = 'bg-amber-50/50';
                                   }
 
                                   return (
                                     <td
-                                      key={day}
+                                      key={pDay.dateKey}
                                       className={`py-1 px-0.5 text-center text-[9px] border-r border-slate-200 ${cellBg} ${textColor}`}
                                     >
-                                      {displayTxt}
+                                      {displayTxt || '-'}
                                     </td>
                                   );
                                 })}
@@ -1651,8 +2208,11 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                             <td colSpan={4} className="py-2.5 px-3 text-right uppercase tracking-wider border-r border-slate-300">
                               TOTAL REKAPITULASI (KONSOLIDASI):
                             </td>
-                            <td colSpan={31} className="py-2.5 px-1 text-center text-slate-500 border-r border-slate-300 text-[9px]">
-                              {totalDays} Hari Operasional
+                            <td
+                              colSpan={activePeriodDays.length}
+                              className="py-2.5 px-1 text-center text-slate-500 border-r border-slate-300 text-[9px]"
+                            >
+                              {activePeriodDays.length} Hari Periode
                             </td>
                             <td className="py-2.5 px-1.5 text-center text-emerald-800 bg-emerald-100 border-r border-slate-300">
                               {totalHadirSum}

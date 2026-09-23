@@ -119,6 +119,8 @@ interface ExportTimesheetPDFParams {
   selectedProjectId: string;
   month: number;
   year: number;
+  customPeriodLabel?: string;
+  customDays?: Array<{ day: number; month: number; year: number; label: string }>;
 }
 
 export const generateTimesheetPDF = ({
@@ -127,7 +129,9 @@ export const generateTimesheetPDF = ({
   timesheets,
   selectedProjectId,
   month,
-  year
+  year,
+  customPeriodLabel,
+  customDays
 }: ExportTimesheetPDFParams) => {
   const comp = getCompany();
   // Filter active employees
@@ -205,9 +209,9 @@ export const generateTimesheetPDF = ({
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(100, 116, 139);
   doc.text('PERIODE PENGGAJIAN', 17, boxY + 4);
-  doc.setFontSize(8.5);
+  doc.setFontSize(customPeriodLabel ? 7.5 : 8.5);
   doc.setTextColor(15, 23, 42);
-  doc.text(`${monthName.toUpperCase()} ${year}`, 17, boxY + 8.5);
+  doc.text(customPeriodLabel || `${monthName.toUpperCase()} ${year}`, 17, boxY + 8.5);
 
   // Box 2: Lokasi
   doc.setFillColor(248, 250, 252);
@@ -239,11 +243,17 @@ export const generateTimesheetPDF = ({
   let grandTotalIzin = 0;
   let grandTotalDeductions = 0;
 
+  const isCustomMode = customDays && customDays.length > 0;
+  const numDays = isCustomMode ? customDays.length : 31;
+
   // Prepare table headers
-  // Columns: No, Nama Karyawan & Posisi, Lokasi / Shift, Rate/Hari, 1..31, H, A, I, Potongan, Gaji Bersih
   const dateHeaders: string[] = [];
-  for (let d = 1; d <= 31; d++) {
-    dateHeaders.push(String(d));
+  if (isCustomMode) {
+    customDays.forEach((cd) => dateHeaders.push(cd.label));
+  } else {
+    for (let d = 1; d <= 31; d++) {
+      dateHeaders.push(String(d));
+    }
   }
 
   const tableHead = [
@@ -263,29 +273,22 @@ export const generateTimesheetPDF = ({
 
   // Prepare table body rows
   const tableBody = targetEmployees.map((emp, index) => {
-    const rec = timesheets.find(
-      (ts) => ts.employeeId === emp.id && ts.month === month && ts.year === year
-    ) || {
-      id: `ts-${emp.id}`,
-      employeeId: emp.id,
-      projectId: emp.projectId,
-      month,
-      year,
-      days: {},
-      deductionAmount: 0,
-      deductionReason: '',
-      bonusAmount: 0,
-      notes: ''
-    };
-
     let hadir = 0;
     let alpa = 0;
     let izin = 0;
-
     const dayCells: string[] = [];
-    for (let d = 1; d <= 31; d++) {
-      if (d <= totalDays) {
-        const st = rec.days[d] || '';
+
+    let deduction = 0;
+    let bonus = 0;
+
+    if (isCustomMode) {
+      const distinctMonths = new Set<string>();
+      customDays.forEach((cd) => {
+        distinctMonths.add(`${cd.year}-${cd.month}`);
+        const rec = timesheets.find(
+          (ts) => ts.employeeId === emp.id && ts.month === cd.month && ts.year === cd.year
+        );
+        const st = rec?.days[cd.day] || '';
         if (st === 'H') {
           hadir++;
           dayCells.push('H');
@@ -300,13 +303,59 @@ export const generateTimesheetPDF = ({
         } else {
           dayCells.push('');
         }
-      } else {
-        dayCells.push('-');
+      });
+
+      distinctMonths.forEach((key) => {
+        const [y, m] = key.split('-').map(Number);
+        const rec = timesheets.find(
+          (ts) => ts.employeeId === emp.id && ts.month === m && ts.year === y
+        );
+        if (rec) {
+          deduction += rec.deductionAmount || 0;
+          bonus += rec.bonusAmount || 0;
+        }
+      });
+    } else {
+      const rec = timesheets.find(
+        (ts) => ts.employeeId === emp.id && ts.month === month && ts.year === year
+      ) || {
+        id: `ts-${emp.id}`,
+        employeeId: emp.id,
+        projectId: emp.projectId,
+        month,
+        year,
+        days: {},
+        deductionAmount: 0,
+        deductionReason: '',
+        bonusAmount: 0,
+        notes: ''
+      };
+
+      for (let d = 1; d <= 31; d++) {
+        if (d <= totalDays) {
+          const st = rec.days[d] || '';
+          if (st === 'H') {
+            hadir++;
+            dayCells.push('H');
+          } else if (st === 'A') {
+            alpa++;
+            dayCells.push('A');
+          } else if (st === 'I') {
+            izin++;
+            dayCells.push('I');
+          } else if (st === 'O') {
+            dayCells.push('OFF');
+          } else {
+            dayCells.push('');
+          }
+        } else {
+          dayCells.push('-');
+        }
       }
+      deduction = rec.deductionAmount || 0;
+      bonus = rec.bonusAmount || 0;
     }
 
-    const deduction = rec.deductionAmount || 0;
-    const bonus = rec.bonusAmount || 0;
     const gross = hadir * emp.dailyRate + bonus;
     const net = Math.max(0, gross - deduction);
 
@@ -361,7 +410,7 @@ export const generateTimesheetPDF = ({
         `TOTAL KONSOLIDASI (${targetEmployees.length} PERSONIL)`,
         '',
         '',
-        ...Array(31).fill(''),
+        ...Array(numDays).fill(''),
         String(grandTotalHadir),
         String(grandTotalAlpa),
         String(grandTotalIzin),

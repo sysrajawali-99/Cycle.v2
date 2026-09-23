@@ -32,7 +32,10 @@ import {
   X,
   Tag,
   Info,
-  ChevronRight
+  ChevronRight,
+  Clock,
+  Landmark,
+  ShieldCheck
 } from 'lucide-react';
 import {
   ChartOfAccount,
@@ -100,6 +103,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('ALL');
   const [filterProject, setFilterProject] = useState<string>('ALL');
+  const [filterBankStatus, setFilterBankStatus] = useState<'ALL' | 'RECONCILED' | 'UNRECONCILED'>('ALL');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
@@ -115,6 +119,11 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
   const [viewTransactionDetail, setViewTransactionDetail] = useState<FinanceTransaction | null>(null);
   const [transactionToEdit, setTransactionToEdit] = useState<FinanceTransaction | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Bank Reconciliation Verification Modal States
+  const [reconcileModalTrx, setReconcileModalTrx] = useState<FinanceTransaction | null>(null);
+  const [reconcileSelectedStatus, setReconcileSelectedStatus] = useState<boolean>(true);
+  const [reconcileNote, setReconcileNote] = useState<string>('');
 
   // Registered Company Bank Accounts from CompanySettings (Rekening Bank Operasional & Catatan Dokumen)
   const currentCompanyProfile = companyProfile || storageService.getCompanyProfile();
@@ -230,6 +239,8 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
     return transactions.filter((trx) => {
       if (filterType !== 'ALL' && trx.type !== filterType) return false;
       if (filterProject !== 'ALL' && trx.projectId !== filterProject) return false;
+      if (filterBankStatus === 'RECONCILED' && !trx.isReconciled) return false;
+      if (filterBankStatus === 'UNRECONCILED' && trx.isReconciled) return false;
       if (startDate && trx.date < startDate) return false;
       if (endDate && trx.date > endDate) return false;
       if (searchQuery.trim()) {
@@ -243,7 +254,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
       }
       return true;
     });
-  }, [transactions, filterType, filterProject, startDate, endDate, searchQuery]);
+  }, [transactions, filterType, filterProject, filterBankStatus, startDate, endDate, searchQuery]);
 
   // Metrics summary
   const metrics = useMemo(() => {
@@ -544,6 +555,56 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
 
     setIsEditModalOpen(false);
     setTransactionToEdit(null);
+  };
+
+  // Bank Reconciliation Modal Handlers
+  const handleOpenReconcileModal = (trx: FinanceTransaction) => {
+    setReconcileModalTrx(trx);
+    // Default the selection to true (Reconciled) so if user clicked to verify, they can easily confirm
+    setReconcileSelectedStatus(true);
+    setReconcileNote(trx.bankStatementItemId ? `ID Mutasi: ${trx.bankStatementItemId}` : '');
+  };
+
+  const handleSaveReconcileStatus = (newStatus: boolean) => {
+    if (!reconcileModalTrx) return;
+
+    const updatedTrx: FinanceTransaction = {
+      ...reconcileModalTrx,
+      isReconciled: newStatus,
+      updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      updatedBy: currentUser?.name || 'Staff Keuangan'
+    };
+
+    if (onUpdateTransaction) {
+      onUpdateTransaction(updatedTrx);
+    }
+
+    if (onLogAudit) {
+      onLogAudit({
+        id: `aud-${Date.now()}`,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        userName: currentUser?.name || 'Staff Keuangan',
+        userRole: currentUser?.role || 'Admin Operasional',
+        actionType: 'UPDATE',
+        module: 'Rekonsiliasi Bank',
+        recordId: updatedTrx.id,
+        recordCode: updatedTrx.code,
+        description: `Status Bank transaksi ${updatedTrx.code} ("${updatedTrx.title}") diubah menjadi ${
+          newStatus ? 'RECONCILED (Sesuai Bank)' : 'UNRECONCILED (Belum Sesuai)'
+        }${reconcileNote.trim() ? ` - Catatan: ${reconcileNote.trim()}` : ''}`,
+        amount: updatedTrx.amount
+      });
+    }
+
+    setJournalActionNotice({
+      type: 'success',
+      message: `Status Bank untuk transaksi ${updatedTrx.code} berhasil diubah menjadi "${
+        newStatus ? 'Reconciled' : 'Unreconciled'
+      }"!`
+    });
+    setTimeout(() => setJournalActionNotice(null), 4000);
+
+    setReconcileModalTrx(null);
   };
 
   // Handle Form Submission: Cash In (Uang Masuk / BKM)
@@ -972,7 +1033,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
         trx.payeeOrPayer || '',
         trx.referenceNumber || '',
         trx.amount,
-        trx.isReconciled ? 'Matched' : 'Unreconciled'
+        trx.isReconciled ? 'Reconciled' : 'Unreconciled'
       ];
     });
     financeService.exportToCSV(`Buku_Kas_Transaksi_${startDate || 'Semua'}_${endDate || ''}`, headers, rows);
@@ -1862,6 +1923,17 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                 ))}
               </select>
 
+              <select
+                value={filterBankStatus}
+                onChange={(e) => setFilterBankStatus(e.target.value as 'ALL' | 'RECONCILED' | 'UNRECONCILED')}
+                className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-amber-500 cursor-pointer"
+                title="Filter berdasarkan status rekonsiliasi bank"
+              >
+                <option value="ALL">Semua Status Bank</option>
+                <option value="RECONCILED">🟢 Reconciled (Sesuai Bank)</option>
+                <option value="UNRECONCILED">🟡 Unreconciled (Belum Sesuai)</option>
+              </select>
+
               <div className="flex items-center space-x-1.5 bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
                 <input
@@ -1892,12 +1964,13 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
               </button>
             </div>
 
-            {(searchQuery || filterType !== 'ALL' || filterProject !== 'ALL' || startDate || endDate) && (
+            {(searchQuery || filterType !== 'ALL' || filterProject !== 'ALL' || filterBankStatus !== 'ALL' || startDate || endDate) && (
               <button
                 onClick={() => {
                   setSearchQuery('');
                   setFilterType('ALL');
                   setFilterProject('ALL');
+                  setFilterBankStatus('ALL');
                   setStartDate('');
                   setEndDate('');
                 }}
@@ -2086,16 +2159,27 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                             <div className="text-[10px] text-slate-500">{trx.paymentMethod}</div>
                           </td>
 
-                          <td className="p-3.5 text-center">
+                          <td className="p-3.5 text-center" onClick={(e) => e.stopPropagation()}>
                             {trx.isReconciled ? (
-                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
-                                <CheckCircle2 className="w-3 h-3" />
-                                <span>Matched</span>
-                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReconcileModal(trx)}
+                                className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold shadow-md shadow-emerald-950/40 transition-all cursor-pointer"
+                                title="Status Bank: Reconciled (Sesuai Bank). Klik untuk melihat rincian rekonsiliasi atau mengubah status."
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                                <span>Reconciled</span>
+                              </button>
                             ) : (
-                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReconcileModal(trx)}
+                                className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-300 text-[11px] font-bold border border-amber-500/40 shadow-sm transition-all cursor-pointer group"
+                                title="Status Bank: Unreconciled (Belum Sesuai). Klik untuk melihat detail & sesuaikan status ke Reconciled."
+                              >
+                                <Clock className="w-3.5 h-3.5 text-amber-400 group-hover:text-slate-950" />
                                 <span>Unreconciled</span>
-                              </span>
+                              </button>
                             )}
                           </td>
 
@@ -4057,6 +4141,40 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                   <div className="text-slate-200">{viewTransactionDetail.payeeOrPayer}</div>
                 </div>
               )}
+              <div>
+                <span className="text-slate-500 text-[10px]">Status Rekonsiliasi Bank:</span>
+                <div className="mt-0.5">
+                  {viewTransactionDetail.isReconciled ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trx = viewTransactionDetail;
+                        setViewTransactionDetail(null);
+                        handleOpenReconcileModal(trx);
+                      }}
+                      className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shadow-sm transition-all cursor-pointer"
+                      title="Status Reconciled. Klik untuk melihat detail atau ubah status."
+                    >
+                      <CheckCircle2 className="w-3 h-3 text-white" />
+                      <span>Reconciled (Sesuai Bank)</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trx = viewTransactionDetail;
+                        setViewTransactionDetail(null);
+                        handleOpenReconcileModal(trx);
+                      }}
+                      className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-300 text-[10px] font-bold border border-amber-500/40 shadow-sm transition-all cursor-pointer group"
+                      title="Klik untuk verifikasi & ubah status ke Reconciled"
+                    >
+                      <Clock className="w-3 h-3 text-amber-400 group-hover:text-slate-950" />
+                      <span>Unreconciled (Klik untuk Rekonsiliasi)</span>
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Journal Lines Breakdown */}
@@ -4095,6 +4213,23 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
             <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[11px] text-slate-500">
               <span>Dibuat oleh: {viewTransactionDetail.createdBy}</span>
               <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const trx = viewTransactionDetail;
+                    setViewTransactionDetail(null);
+                    handleOpenReconcileModal(trx);
+                  }}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md ${
+                    viewTransactionDetail.isReconciled
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/40'
+                      : 'bg-emerald-500/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 shadow-emerald-950/20'
+                  }`}
+                  title="Buka panel verifikasi rekonsiliasi status bank"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{viewTransactionDetail.isReconciled ? 'Status Bank: Reconciled' : 'Rekonsiliasi Bank'}</span>
+                </button>
                 {onUpdateTransaction && (
                   <button
                     type="button"
@@ -4115,6 +4250,316 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                 >
                   Tutup
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL: DETAIL & VERIFIKASI STATUS BANK (REKONSILIASI) */}
+      {/* ------------------------------------------------------------- */}
+      {reconcileModalTrx && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-xl w-full space-y-4 shadow-2xl animate-in zoom-in-95 my-8">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Landmark className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] font-mono text-amber-400 font-bold px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/30">
+                      {reconcileModalTrx.code}
+                    </span>
+                    <span className="text-xs text-slate-400 font-medium">Verifikasi Mutasi Bank</span>
+                  </div>
+                  <h3 className="font-bold text-white text-base mt-0.5">
+                    Detail & Status Rekonsiliasi Bank
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReconcileModalTrx(null)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+                title="Tutup Modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Current Status Banner */}
+            <div
+              className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${
+                reconcileModalTrx.isReconciled
+                  ? 'bg-emerald-950/40 border-emerald-500/40'
+                  : 'bg-amber-950/40 border-amber-500/40'
+              }`}
+            >
+              <div className="flex items-center space-x-2.5">
+                <div
+                  className={`p-2 rounded-xl ${
+                    reconcileModalTrx.isReconciled
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : 'bg-amber-500/20 text-amber-400'
+                  }`}
+                >
+                  {reconcileModalTrx.isReconciled ? (
+                    <CheckCircle2 className="w-4 h-4" />
+                  ) : (
+                    <Clock className="w-4 h-4" />
+                  )}
+                </div>
+                <div>
+                  <div className="text-[11px] text-slate-400">Status Bank Saat Ini:</div>
+                  <div className="text-xs font-semibold text-slate-200">
+                    {reconcileModalTrx.isReconciled
+                      ? 'Telah Terverifikasi Sesuai dengan Rekening Koran'
+                      : 'Belum Selesai Direkonsiliasi (Menunggu Verifikasi)'}
+                  </div>
+                </div>
+              </div>
+              <div>
+                {reconcileModalTrx.isReconciled ? (
+                  <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-950/50">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                    <span>Reconciled</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/40">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Unreconciled</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Transaction Detail Card */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-slate-400 font-semibold px-1">
+                <span>Rincian Pembukuan Transaksi:</span>
+                <span className="text-amber-400 font-mono text-[11px]">{reconcileModalTrx.date}</span>
+              </div>
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="text-slate-500 text-[10px]">Nominal Transaksi:</span>
+                    <div
+                      className={`font-mono font-bold text-base ${
+                        reconcileModalTrx.type === 'IN'
+                          ? 'text-emerald-400'
+                          : reconcileModalTrx.type === 'OUT'
+                          ? 'text-rose-400'
+                          : 'text-blue-400'
+                      }`}
+                    >
+                      {reconcileModalTrx.type === 'IN' ? '+' : reconcileModalTrx.type === 'OUT' ? '-' : ''}
+                      {financeService.formatRupiah(reconcileModalTrx.amount)}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px]">Jenis & Tipe:</span>
+                    <div className="mt-0.5">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-200 border border-slate-700">
+                        {reconcileModalTrx.type === 'IN'
+                          ? 'Uang Masuk (BKM)'
+                          : reconcileModalTrx.type === 'OUT'
+                          ? 'Uang Keluar (BKK)'
+                          : 'Jurnal Umum'}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px]">Akun Kas & Bank:</span>
+                    <div className="text-slate-200 font-semibold truncate">
+                      {reconcileModalTrx.primaryAccountCode} -{' '}
+                      {accounts.find((a) => a.code === reconcileModalTrx.primaryAccountCode)?.name || 'Kas & Bank'}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px]">Akun Lawan / Kategori:</span>
+                    <div className="text-slate-300 truncate">
+                      {reconcileModalTrx.contraAccountCode} -{' '}
+                      {accounts.find((a) => a.code === reconcileModalTrx.contraAccountCode)?.name || 'Akun Lawan'}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px]">Metode Pembayaran:</span>
+                    <div className="text-slate-200">{reconcileModalTrx.paymentMethod}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px]">No. Referensi / No. Faktur:</span>
+                    <div className="text-amber-400 font-mono font-semibold">
+                      {reconcileModalTrx.referenceNumber || '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px]">Pihak Terkait:</span>
+                    <div className="text-slate-200 truncate">{reconcileModalTrx.payeeOrPayer || '-'}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px]">Cost Center / Site:</span>
+                    <div className="text-slate-200 truncate">{reconcileModalTrx.projectName || 'HQ & Non-Project'}</div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-850">
+                  <span className="text-slate-500 text-[10px]">Keterangan & Uraian:</span>
+                  <div className="text-slate-200 font-medium mt-0.5">{reconcileModalTrx.title}</div>
+                  {reconcileModalTrx.description && (
+                    <div className="text-[11px] text-slate-400 mt-0.5">{reconcileModalTrx.description}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Checklist Panduan Kesesuaian */}
+            <div className="p-3 bg-slate-950/60 rounded-2xl border border-slate-800 text-[11px] space-y-1.5">
+              <div className="flex items-center space-x-1.5 text-amber-400 font-bold">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Panduan Kesesuaian Rekonsiliasi Bank</span>
+              </div>
+              <ul className="text-slate-400 space-y-1 pl-4 list-disc text-[11px]">
+                <li>Pastikan mutasi debit/kredit pada rekening koran bank memiliki nominal yang sama persis (<strong>{financeService.formatRupiah(reconcileModalTrx.amount)}</strong>).</li>
+                <li>Periksa keselarasan tanggal transaksi dengan tanggal efektif mutasi di bank.</li>
+                <li>Jika data mutasi bank sudah cocok, pilih opsi <strong>Reconciled</strong> (berwarna hijau dengan huruf putih) di bawah.</li>
+              </ul>
+            </div>
+
+            {/* Pilihan Status Bank (Reconciled vs Unreconciled) */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-300 block">
+                Pilihan Status Rekonsiliasi Bank:
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Pilihan Reconciled: Bewarna Hijau dan Huruf Bewarna Putih */}
+                <button
+                  type="button"
+                  onClick={() => setReconcileSelectedStatus(true)}
+                  className={`p-3.5 rounded-2xl transition-all text-left cursor-pointer flex flex-col justify-between ${
+                    reconcileSelectedStatus
+                      ? 'bg-emerald-600 text-white border-2 border-emerald-400 shadow-lg shadow-emerald-950/60'
+                      : 'bg-slate-950 border border-slate-800 text-slate-300 hover:border-emerald-500/60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span
+                      className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                        reconcileSelectedStatus
+                          ? 'bg-emerald-700/90 text-white'
+                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                      <span>Reconciled</span>
+                    </span>
+                    {reconcileSelectedStatus && (
+                      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                    )}
+                  </div>
+                  <div className={`text-xs font-bold ${reconcileSelectedStatus ? 'text-white' : 'text-slate-200'}`}>
+                    Sudah Sesuai (Matched)
+                  </div>
+                  <div className={`text-[10px] mt-0.5 ${reconcileSelectedStatus ? 'text-emerald-100' : 'text-slate-500'}`}>
+                    Transaksi internal telah dicocokkan dengan mutasi rekening koran bank.
+                  </div>
+                </button>
+
+                {/* Pilihan Unreconciled */}
+                <button
+                  type="button"
+                  onClick={() => setReconcileSelectedStatus(false)}
+                  className={`p-3.5 rounded-2xl transition-all text-left cursor-pointer flex flex-col justify-between ${
+                    !reconcileSelectedStatus
+                      ? 'bg-amber-500/20 text-amber-200 border-2 border-amber-500 shadow-lg shadow-amber-950/50'
+                      : 'bg-slate-950 border border-slate-800 text-slate-400 hover:border-amber-500/60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span
+                      className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                        !reconcileSelectedStatus
+                          ? 'bg-amber-500 text-slate-950'
+                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      }`}
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Unreconciled</span>
+                    </span>
+                    {!reconcileSelectedStatus && (
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                    )}
+                  </div>
+                  <div className={`text-xs font-bold ${!reconcileSelectedStatus ? 'text-amber-300' : 'text-slate-300'}`}>
+                    Belum Sesuai
+                  </div>
+                  <div className={`text-[10px] mt-0.5 ${!reconcileSelectedStatus ? 'text-amber-200/80' : 'text-slate-500'}`}>
+                    Belum cocok atau masih memerlukan klarifikasi mutasi bank.
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Catatan Verifikasi */}
+            <div>
+              <label className="text-[11px] text-slate-400 block mb-1">
+                Catatan Verifikasi Rekonsiliasi (Opsional):
+              </label>
+              <input
+                type="text"
+                value={reconcileNote}
+                onChange={(e) => setReconcileNote(e.target.value)}
+                placeholder="Contoh: Sesuai rekening koran BCA tgl 23/09 Ref Mutasi #88219"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            {/* Quick 1-Click Action if currently Unreconciled */}
+            {!reconcileModalTrx.isReconciled && (
+              <button
+                type="button"
+                onClick={() => handleSaveReconcileStatus(true)}
+                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/50 flex items-center justify-center space-x-2 cursor-pointer transition-all border border-emerald-400/40"
+              >
+                <CheckCircle2 className="w-4 h-4 text-white" />
+                <span>Transaksi Sudah Sesuai? 1-Klik Terapkan Status Reconciled</span>
+              </button>
+            )}
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-800 text-[11px] text-slate-500">
+              <span className="truncate max-w-[200px]">
+                Dibuat oleh: {reconcileModalTrx.createdBy}
+              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setReconcileModalTrx(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer transition-colors"
+                >
+                  Batal
+                </button>
+                {reconcileSelectedStatus ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSaveReconcileStatus(true)}
+                    className="flex items-center space-x-1.5 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-950/50 transition-all cursor-pointer border border-emerald-400/30"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-white" />
+                    <span>Simpan Status: Reconciled</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSaveReconcileStatus(false)}
+                    className="flex items-center space-x-1.5 px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs font-bold shadow-lg shadow-amber-950/50 transition-all cursor-pointer"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Simpan Status: Unreconciled</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
