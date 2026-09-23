@@ -152,8 +152,16 @@ export default function App() {
 
   // Initial Load from storage & listen to real-time sync / reset events
   useEffect(() => {
+    // 1. Immediate local memory load
     loadAllData();
     vpsSyncService.init();
+
+    // 2. Immediately retrieve persistent server database (ensures all data persists across AI Studio and GitHub updates)
+    vpsSyncService.autoSyncOnStartup().then((synced) => {
+      if (synced) {
+        loadAllData();
+      }
+    });
 
     let reloadTimeout: ReturnType<typeof setTimeout> | null = null;
     const handleDataReload = (e?: any) => {
@@ -172,6 +180,7 @@ export default function App() {
     window.addEventListener('app_data_reset', handleDataReload);
     window.addEventListener('rajawali_remote_update', handleDataReload);
     window.addEventListener('rajawali_data_synced', handleDataReload);
+    window.addEventListener('rajawali_startup_sync_completed', handleDataReload);
     window.addEventListener('storage', handleDataReload);
 
     return () => {
@@ -181,6 +190,7 @@ export default function App() {
       window.removeEventListener('app_data_reset', handleDataReload);
       window.removeEventListener('rajawali_remote_update', handleDataReload);
       window.removeEventListener('rajawali_data_synced', handleDataReload);
+      window.removeEventListener('rajawali_startup_sync_completed', handleDataReload);
       window.removeEventListener('storage', handleDataReload);
     };
   }, []);

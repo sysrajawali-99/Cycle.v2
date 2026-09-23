@@ -174,7 +174,11 @@ function applyStorageUpdate<T>(
   source: 'user_action' | 'system_sync' | 'remote_sync' | 'reset' = 'user_action'
 ): void {
   // 1. Instant local persistence
-  localStorage.setItem(storageKey, JSON.stringify(data));
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(data));
+  } catch (err) {
+    console.warn(`[Storage] LocalStorage write failed for ${storageKey}:`, err);
+  }
 
   // 2. Dispatch custom DOM event if requested
   if (customEventName) {
@@ -217,58 +221,6 @@ function applyStorageUpdate<T>(
 function initStorageQuietly<T>(key: string, data: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(data));
-  } catch {
-    // ignore
-  }
-}
-
-// One-time client auto-cleanup: wipe sample data and preserve ONLY location data
-const CLEANUP_MIGRATION_VERSION = 'rajawali_clean_locations_only_v2';
-if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-  try {
-    if (localStorage.getItem('rajawali_data_cleaned_locations_only') !== CLEANUP_MIGRATION_VERSION) {
-      // Ensure projects (locations) exist
-      const existingProjects = localStorage.getItem(STORAGE_KEYS.PROJECTS);
-      if (!existingProjects) {
-        localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(INITIAL_PROJECTS));
-      }
-
-      // Clear sample/demo operational and finance records
-      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.TIMESHEETS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.MUTATIONS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.INVENTORY_ITEMS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.PROJECT_STOCKS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.INVENTORY_LOGS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.MATERIAL_REQUESTS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.BLASTS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.FINANCE_TRANSACTIONS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.BANK_STATEMENTS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.PERIOD_CLOSINGS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.AUDIT_TRAILS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.DEBTS, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.RECEIVABLES, JSON.stringify([]));
-      localStorage.setItem(STORAGE_KEYS.INVESTMENTS, JSON.stringify([]));
-
-      // Reset initial and current account balances to 0
-      const existingAccountsRaw = localStorage.getItem(STORAGE_KEYS.CHART_OF_ACCOUNTS);
-      if (existingAccountsRaw) {
-        try {
-          const accounts = JSON.parse(existingAccountsRaw);
-          if (Array.isArray(accounts)) {
-            const cleaned = accounts.map((acc: any) => ({
-              ...acc,
-              initialBalance: 0,
-              currentBalance: 0
-            }));
-            localStorage.setItem(STORAGE_KEYS.CHART_OF_ACCOUNTS, JSON.stringify(cleaned));
-          }
-        } catch {}
-      }
-
-      localStorage.setItem('rajawali_data_cleaned_locations_only', CLEANUP_MIGRATION_VERSION);
-    }
   } catch {
     // ignore
   }

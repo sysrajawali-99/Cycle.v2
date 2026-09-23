@@ -23,6 +23,7 @@ let lastError: string | undefined;
 // Local fallback storage directory
 const LOCAL_DATA_DIR = path.join(process.cwd(), 'data');
 const LOCAL_DB_FILE = path.join(LOCAL_DATA_DIR, 'vps_local_store.json');
+const LOCAL_DB_BACKUP = path.join(LOCAL_DATA_DIR, 'vps_local_store.backup.json');
 
 const inMemoryCache: Record<string, any> = {};
 
@@ -31,7 +32,34 @@ function ensureLocalStore() {
     if (!fs.existsSync(LOCAL_DATA_DIR)) {
       fs.mkdirSync(LOCAL_DATA_DIR, { recursive: true });
     }
-    if (!fs.existsSync(LOCAL_DB_FILE)) {
+
+    const mainExists = fs.existsSync(LOCAL_DB_FILE);
+    const backupExists = fs.existsSync(LOCAL_DB_BACKUP);
+
+    if (mainExists) {
+      try {
+        const stats = fs.statSync(LOCAL_DB_FILE);
+        if (stats.size > 10) {
+          if (!backupExists || fs.statSync(LOCAL_DB_BACKUP).size < 10) {
+            fs.copyFileSync(LOCAL_DB_FILE, LOCAL_DB_BACKUP);
+          }
+          return;
+        }
+      } catch {}
+    }
+
+    if (backupExists) {
+      try {
+        const backupStats = fs.statSync(LOCAL_DB_BACKUP);
+        if (backupStats.size > 10) {
+          fs.copyFileSync(LOCAL_DB_BACKUP, LOCAL_DB_FILE);
+          console.log('[VPS Store] Restored local database from backup file.');
+          return;
+        }
+      } catch {}
+    }
+
+    if (!mainExists) {
       fs.writeFileSync(LOCAL_DB_FILE, JSON.stringify({}), 'utf8');
     }
   } catch (err) {
@@ -42,19 +70,37 @@ function ensureLocalStore() {
 function readLocalStore(): Record<string, any> {
   ensureLocalStore();
   try {
-    const raw = fs.readFileSync(LOCAL_DB_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-    return { ...inMemoryCache, ...parsed };
-  } catch {
-    return { ...inMemoryCache };
+    if (fs.existsSync(LOCAL_DB_FILE)) {
+      const raw = fs.readFileSync(LOCAL_DB_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+        return { ...inMemoryCache, ...parsed };
+      }
+    }
+  } catch (err) {
+    console.warn('[VPS Store] Error reading primary store, checking backup:', err);
   }
+
+  try {
+    if (fs.existsSync(LOCAL_DB_BACKUP)) {
+      const rawBackup = fs.readFileSync(LOCAL_DB_BACKUP, 'utf8');
+      const parsedBackup = JSON.parse(rawBackup);
+      if (parsedBackup && typeof parsedBackup === 'object') {
+        return { ...inMemoryCache, ...parsedBackup };
+      }
+    }
+  } catch {}
+
+  return { ...inMemoryCache };
 }
 
 function writeLocalStore(store: Record<string, any>) {
   Object.assign(inMemoryCache, store);
   ensureLocalStore();
   try {
-    fs.writeFileSync(LOCAL_DB_FILE, JSON.stringify(store, null, 2), 'utf8');
+    const serialized = JSON.stringify(store, null, 2);
+    fs.writeFileSync(LOCAL_DB_FILE, serialized, 'utf8');
+    fs.writeFileSync(LOCAL_DB_BACKUP, serialized, 'utf8');
     lastSyncTimestamp = new Date().toISOString();
   } catch (err) {
     console.error('Failed to write to local data store:', err);

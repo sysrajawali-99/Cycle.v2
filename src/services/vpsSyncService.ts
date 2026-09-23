@@ -95,6 +95,18 @@ class VpsSyncService {
       const activeUser = storageService.getActiveUser();
       this.queueStateSync(ctx.key, ctx.data, activeUser);
     });
+
+    // 4. Register page lifecycle listeners to flush pending syncs immediately on navigation / tab close
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', () => {
+        this.flushSyncQueue();
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+          this.flushSyncQueue();
+        }
+      });
+    }
   }
 
   public subscribeStatus(listener: StatusChangeListener): () => void {
@@ -175,15 +187,20 @@ class VpsSyncService {
       clearTimeout(this.debounceTimer);
     }
 
+    // Fast-batch debounce: 50ms for near-instant persistence while preventing micro-stutter
     this.debounceTimer = setTimeout(() => {
       this.flushSyncQueue();
-    }, 400);
+    }, 50);
   }
 
   /**
-   * Flush queue to server via Socket or HTTP
+   * Flush queue to server via Socket and HTTP immediately
    */
-  private async flushSyncQueue() {
+  public async flushSyncQueue(): Promise<void> {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
     if (this.syncQueue.size === 0) return;
 
     const items = Array.from(this.syncQueue.entries());
@@ -197,20 +214,29 @@ class VpsSyncService {
 
       // Realtime via Socket.IO if connected
       if (this.socket && this.currentStatus.socketConnected) {
-        this.socket.emit('sync_state', { key, data, meta });
+        try {
+          this.socket.emit('sync_state', { key, data, meta });
+        } catch (err) {
+          console.warn(`[VPS Sync] Socket emit failed for ${key}:`, err);
+        }
       }
 
-      // HTTP fallback for persistence guarantee
+      // HTTP fallback with keepalive for guaranteed persistence across page reload / navigation
       try {
-        await fetch(`/api/vps/state/${key}`, {
+        await fetch(`/api/vps/state/${encodeURIComponent(key)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data, meta })
+          body: JSON.stringify({ data, meta }),
+          keepalive: true
         });
         this.currentStatus.lastSync = new Date().toISOString();
         this.notifyStatusListeners();
       } catch (err) {
         console.warn(`[VPS Sync] HTTP save failed for ${key}:`, err);
+        // If save failed, re-queue item for next retry flush
+        if (!this.syncQueue.has(key)) {
+          this.syncQueue.set(key, { data, user });
+        }
       }
     }
   }
@@ -306,23 +332,27 @@ class VpsSyncService {
   }
 
   /**
-   * Automatically synchronize with VPS on startup in background
+   * Automatically synchronize with VPS on startup
+   * Returns true if remote states were retrieved and hydrated.
    */
-  private async autoSyncOnStartup() {
-    if (this.isStartupSyncing) return;
+  public async autoSyncOnStartup(): Promise<boolean> {
+    if (this.isStartupSyncing) return false;
     this.isStartupSyncing = true;
+    this.currentStatus.isSyncing = true;
+    this.notifyStatusListeners();
+
     try {
       const res = await fetch('/api/vps/states', {
         signal: AbortSignal.timeout(15000)
       });
-      if (!res.ok) return;
+      if (!res.ok) return false;
 
       const json = await res.json();
       const states = json.states;
       const keys = states && typeof states === 'object' ? Object.keys(states) : [];
 
       if (keys.length > 0) {
-        // VPS already has records: hydrate local memory silently
+        // VPS already has records: hydrate local storage immediately
         for (const [key, data] of Object.entries(states)) {
           if (data !== undefined && data !== null) {
             this.applyRemoteUpdate(key as StorageActionType, data);
@@ -330,14 +360,30 @@ class VpsSyncService {
         }
         this.currentStatus.lastSync = new Date().toISOString();
         this.notifyStatusListeners();
+
+        // Dispatch startup hydration event
+        try {
+          window.dispatchEvent(
+            new CustomEvent('rajawali_startup_sync_completed', { detail: { count: keys.length } })
+          );
+        } catch {}
+
+        return true;
       } else {
-        // Fresh database: seed VPS with current state automatically
-        await this.pushAllDataToVps();
+        // Only seed if local storage has actual data
+        const localEmps = storageService.getEmployees();
+        if (localEmps && localEmps.length > 0) {
+          await this.pushAllDataToVps();
+        }
+        return false;
       }
     } catch (err) {
       console.warn('[VPS Auto-Sync] Background startup sync:', err);
+      return false;
     } finally {
       this.isStartupSyncing = false;
+      this.currentStatus.isSyncing = false;
+      this.notifyStatusListeners();
     }
   }
 
