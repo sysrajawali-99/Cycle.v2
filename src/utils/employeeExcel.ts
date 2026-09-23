@@ -485,7 +485,7 @@ export async function parseEmployeeFile(
         ? 150000
         : 130000;
 
-    const finalRate = cleanedRate && cleanedRate >= 50000 ? cleanedRate : defaultPositionRate;
+    const finalRate = cleanedRate > 0 ? cleanedRate : defaultPositionRate;
 
     // 8. Column H (7): Status Keaktifan
     const rawStatus = getVal(statusIdx, 7);

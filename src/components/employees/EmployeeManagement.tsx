@@ -274,13 +274,16 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
       return;
     }
 
+    const finalDailyRate = Number(formData.dailyRate) || 0;
+
     if (editingEmployee) {
       // Update existing
       const updated = employees.map((emp) => {
         if (emp.id === editingEmployee.id) {
           return {
             ...emp,
-            ...formData
+            ...formData,
+            dailyRate: finalDailyRate
           };
         }
         return emp;
@@ -292,6 +295,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
       const newEmp: Employee = {
         id: `emp-${Date.now()}`,
         ...formData,
+        dailyRate: finalDailyRate,
         nik: formData.nik || `RC-${new Date().getFullYear()}${Math.floor(1000 + Math.random() * 9000)}`
       };
       onUpdateEmployees([newEmp, ...employees]);
@@ -1361,19 +1365,28 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Rate Gaji Harian (Rp):</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-slate-300 font-semibold">Rate Gaji Harian (Rp):</label>
+                    <span className="text-[11px] text-amber-400 font-mono font-bold">
+                      {formatCurrency(formData.dailyRate || 0)}
+                    </span>
+                  </div>
                   <input
                     id="modal-emp-dailyrate"
                     type="number"
-                    min="50000"
-                    step="5000"
-                    required
-                    value={formData.dailyRate}
+                    value={formData.dailyRate === 0 ? '' : formData.dailyRate}
                     onChange={(e) =>
-                      setFormData({ ...formData, dailyRate: Number(e.target.value) })
+                      setFormData({
+                        ...formData,
+                        dailyRate: e.target.value === '' ? 0 : Number(e.target.value)
+                      })
                     }
+                    placeholder="Contoh: 130000"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-amber-400 font-bold focus:outline-none focus:border-amber-500"
                   />
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Bebas diisi manual nominal berapa saja tanpa batas minimal atau peringatan sistem.
+                  </span>
                 </div>
 
                 <div>
