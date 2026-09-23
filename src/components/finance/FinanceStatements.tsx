@@ -75,13 +75,25 @@ export const FinanceStatements: React.FC<FinanceStatementsProps> = ({
   // Filter transactions by project if selected
   const filteredTransactions = useMemo(() => {
     if (selectedProjectId === 'ALL') return transactions;
-    return transactions.filter((t) => t.projectId === selectedProjectId);
-  }, [transactions, selectedProjectId]);
+    const targetProj = projects.find((p) => p.id === selectedProjectId || p.name === selectedProjectId || p.code === selectedProjectId);
+    return transactions.filter((t) => {
+      return (
+        t.projectId === selectedProjectId ||
+        (t.projectName && t.projectName === selectedProjectId) ||
+        (targetProj && (
+          t.projectId === targetProj.id ||
+          t.projectId === targetProj.name ||
+          t.projectId === targetProj.code ||
+          (t.projectName && t.projectName.trim().toLowerCase() === targetProj.name.trim().toLowerCase() && t.projectId !== 'ALL')
+        ))
+      );
+    });
+  }, [transactions, selectedProjectId, projects]);
 
   // Generate Statements
   const profitLoss = useMemo(() => {
-    return financeService.generateProfitLoss(accounts, filteredTransactions, startDate, endDate);
-  }, [accounts, filteredTransactions, startDate, endDate]);
+    return financeService.generateProfitLoss(accounts, filteredTransactions, startDate, endDate, selectedProjectId, projects);
+  }, [accounts, filteredTransactions, startDate, endDate, selectedProjectId, projects]);
 
   const balanceSheet = useMemo(() => {
     return financeService.generateBalanceSheet(accounts, filteredTransactions, endDate);

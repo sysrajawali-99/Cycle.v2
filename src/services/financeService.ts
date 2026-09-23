@@ -112,30 +112,66 @@ export const financeService = {
     transactions: FinanceTransaction[] = [],
     startDate?: string,
     endDate?: string,
-    projectId?: string
+    projectId?: string,
+    projects?: Project[]
   ): GeneralLedgerAccount[] {
     const safeTransactions = Array.isArray(transactions) ? transactions : [];
     const safeAccounts = Array.isArray(accounts) ? accounts : [];
+
+    const isProjectSpecific = Boolean(projectId && projectId !== 'ALL');
+    const targetProject = isProjectSpecific
+      ? projects?.find((p) => p.id === projectId || p.name === projectId || p.code === projectId)
+      : undefined;
 
     const filteredTrx = safeTransactions.filter((t) => {
       if (!t) return false;
       if (startDate && t.date < startDate) return false;
       if (endDate && t.date > endDate) return false;
-      if (projectId && projectId !== 'ALL' && t.projectId !== projectId && t.projectId !== 'ALL') {
-        return false;
+      if (isProjectSpecific) {
+        // If filtering for a specific site, exclude transactions marked for Seluruh Lokasi (HQ) / ALL
+        const isMatchingProject =
+          t.projectId === projectId ||
+          (t.projectName && t.projectName === projectId) ||
+          (targetProject && (
+            t.projectId === targetProject.id ||
+            t.projectId === targetProject.name ||
+            t.projectId === targetProject.code ||
+            (t.projectName && t.projectName.trim().toLowerCase() === targetProject.name.trim().toLowerCase())
+          ));
+
+        if (!isMatchingProject) {
+          return false;
+        }
       }
       return true;
     });
 
     return safeAccounts.map((acc) => {
       const entries: GeneralLedgerEntry[] = [];
-      let runningBalance = acc.initialBalance || 0;
+      // Site projects do not carry corporate opening balances
+      let runningBalance = isProjectSpecific ? 0 : (acc.initialBalance || 0);
       let totalDebit = 0;
       let totalCredit = 0;
 
       filteredTrx.forEach((t) => {
-        // Look for matching journal lines
-        const lines = (t.journalEntries || []).filter((j) => j.accountCode === acc.code);
+        // Synthesize journal lines if empty or missing
+        let lines = (t.journalEntries || []).filter((j) => j && j.accountCode === acc.code);
+        if (lines.length === 0 && (!t.journalEntries || t.journalEntries.length === 0)) {
+          if (t.type === 'IN') {
+            if (acc.code === (t.primaryAccountCode || '1120')) {
+              lines = [{ id: `syn-${t.id}-1`, accountCode: acc.code, accountName: acc.name, debit: t.amount, credit: 0, notes: t.title }];
+            } else if (acc.code === (t.contraAccountCode || '4110')) {
+              lines = [{ id: `syn-${t.id}-2`, accountCode: acc.code, accountName: acc.name, debit: 0, credit: t.amount, notes: t.title }];
+            }
+          } else if (t.type === 'OUT') {
+            if (acc.code === (t.contraAccountCode || '5110')) {
+              lines = [{ id: `syn-${t.id}-1`, accountCode: acc.code, accountName: acc.name, debit: t.amount, credit: 0, notes: t.title }];
+            } else if (acc.code === (t.primaryAccountCode || '1120')) {
+              lines = [{ id: `syn-${t.id}-2`, accountCode: acc.code, accountName: acc.name, debit: 0, credit: t.amount, notes: t.title }];
+            }
+          }
+        }
+
         lines.forEach((l) => {
           totalDebit += l.debit;
           totalCredit += l.credit;
@@ -162,7 +198,7 @@ export const financeService = {
 
       return {
         account: acc,
-        initialBalance: acc.initialBalance || 0,
+        initialBalance: isProjectSpecific ? 0 : (acc.initialBalance || 0),
         totalDebit,
         totalCredit,
         endingBalance: runningBalance,
@@ -229,14 +265,16 @@ export const financeService = {
     transactions: FinanceTransaction[],
     startDate?: string,
     endDate?: string,
-    projectId?: string
+    projectId?: string,
+    projects?: Project[]
   ): ProfitLossStatement {
     const ledgers = this.generateGeneralLedger(
       accounts,
       transactions,
       startDate,
       endDate,
-      projectId
+      projectId,
+      projects
     );
 
     const getAccountSum = (prefix: string) => {
@@ -250,7 +288,7 @@ export const financeService = {
         .filter((item) => item.amount > 0);
     };
 
-    // Revenue (41xx, 42xx)
+    // Revenue (41xx)
     const revenueAccounts = getAccountSum('41').map((a) => ({
       code: a.code,
       accountCode: a.code,
@@ -258,7 +296,44 @@ export const financeService = {
       accountName: a.name,
       amount: a.amount
     }));
-    const totalRevenue = revenueAccounts.reduce((sum, item) => sum + item.amount, 0);
+    let totalRevenue = revenueAccounts.reduce((sum, item) => sum + item.amount, 0);
+
+    // If viewing a specific project, ensure any direct Cash In (BKM) tagged with this project
+    // is reflected in contract revenue even if contra account wasn't starting with 41xx (e.g. 1140 Piutang)
+    if (projectId && projectId !== 'ALL') {
+      const targetProj = projects?.find((p) => p.id === projectId || p.name === projectId || p.code === projectId);
+      const projTrx = (transactions || []).filter((t) => {
+        if (!t) return false;
+        if (startDate && t.date < startDate) return false;
+        if (endDate && t.date > endDate) return false;
+        return (
+          t.projectId === projectId ||
+          (t.projectName && t.projectName === projectId) ||
+          (targetProj && (
+            t.projectId === targetProj.id ||
+            t.projectId === targetProj.name ||
+            t.projectId === targetProj.code ||
+            (t.projectName && t.projectName.trim().toLowerCase() === targetProj.name.trim().toLowerCase())
+          ))
+        );
+      });
+
+      const directCashIn = projTrx
+        .filter((t) => t.type === 'IN')
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+      if (directCashIn > totalRevenue) {
+        const diff = directCashIn - totalRevenue;
+        revenueAccounts.push({
+          code: '4110',
+          accountCode: '4110',
+          name: 'Pendapatan Jasa Kontrak (Penerimaan Kas & Bank)',
+          accountName: 'Pendapatan Jasa Kontrak (Penerimaan Kas & Bank)',
+          amount: diff
+        });
+        totalRevenue = directCashIn;
+      }
+    }
 
     // COGS (51xx)
     const cogsAccounts = getAccountSum('51').map((a) => ({
@@ -268,7 +343,44 @@ export const financeService = {
       accountName: a.name,
       amount: a.amount
     }));
-    const totalCogs = cogsAccounts.reduce((sum, item) => sum + item.amount, 0);
+    let totalCogs = cogsAccounts.reduce((sum, item) => sum + item.amount, 0);
+
+    // If viewing a specific project, ensure any direct Cash Out (BKK / Uang Keluar) tagged with this project
+    // is reflected in direct cost / COGS (Beban Langsung HPP)
+    if (projectId && projectId !== 'ALL') {
+      const targetProj = projects?.find((p) => p.id === projectId || p.name === projectId || p.code === projectId);
+      const projTrx = (transactions || []).filter((t) => {
+        if (!t) return false;
+        if (startDate && t.date < startDate) return false;
+        if (endDate && t.date > endDate) return false;
+        return (
+          t.projectId === projectId ||
+          (t.projectName && t.projectName === projectId) ||
+          (targetProj && (
+            t.projectId === targetProj.id ||
+            t.projectId === targetProj.name ||
+            t.projectId === targetProj.code ||
+            (t.projectName && t.projectName.trim().toLowerCase() === targetProj.name.trim().toLowerCase())
+          ))
+        );
+      });
+
+      const directCashOut = projTrx
+        .filter((t) => t.type === 'OUT')
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+      if (directCashOut > totalCogs) {
+        const diff = directCashOut - totalCogs;
+        cogsAccounts.push({
+          code: '5110',
+          accountCode: '5110',
+          name: 'Beban Langsung Operasional Site (Pengeluaran Kas & Bank)',
+          accountName: 'Beban Langsung Operasional Site (Pengeluaran Kas & Bank)',
+          amount: diff
+        });
+        totalCogs = directCashOut;
+      }
+    }
 
     const grossProfit = totalRevenue - totalCogs;
     const grossMarginPct = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
@@ -355,9 +467,10 @@ export const financeService = {
     transactions: FinanceTransaction[],
     startDate?: string,
     endDate?: string,
-    projectId?: string
+    projectId?: string,
+    projects?: Project[]
   ): ProfitLossStatement {
-    return this.generateProfitLoss(accounts, transactions, startDate, endDate, projectId);
+    return this.generateProfitLoss(accounts, transactions, startDate, endDate, projectId, projects);
   },
 
   // 4. GENERATE NERACA (BALANCE SHEET)
@@ -722,7 +835,14 @@ export const financeService = {
     transactions: FinanceTransaction[]
   ): CostCenterReport[] {
     return projects.map((p) => {
-      const pTrx = transactions.filter((t) => t.projectId === p.id);
+      const pTrx = transactions.filter(
+        (t) =>
+          t.projectId === p.id ||
+          (t.projectId !== 'ALL' && t.projectName === p.name) ||
+          t.projectId === p.name ||
+          t.projectId === p.code ||
+          (t.projectName && t.projectName.trim().toLowerCase() === p.name.trim().toLowerCase() && t.projectId !== 'ALL')
+      );
 
       let revenue = 0;
       let cogsLabor = 0;

@@ -13,7 +13,7 @@ import {
   getVpsState,
   getAllVpsStates,
   bulkSaveVpsStates
-} from './server/vpsDatabase';
+} from './server/vpsDatabase.ts';
 
 dotenv.config();
 
