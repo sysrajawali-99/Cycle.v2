@@ -23,7 +23,7 @@ export interface Project {
   id: string;
   code: string;
   name: string;
-  type: 'Mall' | 'Rumah Sakit' | 'Perkantoran' | 'Apartemen' | 'Pabrik / Industri' | 'Hotel' | 'Universitas' | 'Lainnya';
+  type: 'Mall' | 'Rumah Sakit' | 'Perkantoran' | 'Apartemen' | 'Pabrik / Industri' | 'Hotel' | 'Universitas' | 'Lainnya' | (string & {});
   address: string;
   siteSupervisor: string;
   phone: string;
