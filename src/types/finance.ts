@@ -58,11 +58,12 @@ export type PaymentMethod =
 
 export type DivisionType = 
   | 'Cleaning Service'
-  | 'Gondola & Facade'
-  | 'Gardening & Landscape'
-  | 'Sanitation & Pest Control'
-  | 'Logistik & Chemical'
-  | 'HQ Management & Operasional';
+  | 'Labor Supply'
+  | 'Marketing'
+  | 'Parking Service'
+  | 'Investment'
+  | 'Lain - Lain'
+  | (string & {});
 
 export interface JournalEntryLine {
   id: string;

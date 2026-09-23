@@ -6,7 +6,8 @@ export type EmployeePosition =
   | 'Floor Specialist'
   | 'Gardener'
   | 'Gondola / Facade Cleaner'
-  | 'Supervisor';
+  | 'Supervisor'
+  | (string & {});
 
 export type ShiftType = 
   | 'Pagi (06:00 - 14:00)'

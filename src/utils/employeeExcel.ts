@@ -443,8 +443,7 @@ export async function parseEmployeeFile(
     else if (posVal.includes('spv') || posVal.includes('supervis')) matchedPosition = 'Supervisor';
     else if (posVal.includes('cleaner') || posVal.includes('petugas') || posVal === '') matchedPosition = 'Cleaner';
     else {
-      matchedPosition = 'Cleaner';
-      warnings.push(`Posisi '${rawPos}' tidak dikenal, dialihkan ke Cleaner.`);
+      matchedPosition = rawPos.trim() || 'Cleaner';
     }
 
     // 5. Column E (4): Lokasi Proyek

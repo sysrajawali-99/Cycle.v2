@@ -556,7 +556,7 @@ export const RajawaliBoard: React.FC<RajawaliBoardProps> = ({
               <KanbanSquare className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <h1 className="text-xl font-bold text-white tracking-tight">
                   Rajawali Boards (Area Cleaning Management)
                 </h1>

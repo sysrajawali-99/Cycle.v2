@@ -60,6 +60,16 @@ interface EmployeeManagementProps {
   userRole: UserRole;
 }
 
+// Standard predefined positions
+const STANDARD_POSITIONS: EmployeePosition[] = [
+  'Cleaner',
+  'Team Leader',
+  'Floor Specialist',
+  'Gardener',
+  'Gondola / Facade Cleaner',
+  'Supervisor'
+];
+
 export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   projects = [],
   employees = [],
@@ -91,6 +101,9 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form State for Add / Edit
+  const [isCustomPosition, setIsCustomPosition] = useState<boolean>(false);
+  const [customPositionText, setCustomPositionText] = useState<string>('');
+
   const [formData, setFormData] = useState<{
     name: string;
     nik: string;
@@ -238,6 +251,9 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   // Open Edit Modal
   const handleOpenEdit = (emp: Employee) => {
     setEditingEmployee(emp);
+    const isCustom = !STANDARD_POSITIONS.includes(emp.position as EmployeePosition);
+    setIsCustomPosition(isCustom);
+    setCustomPositionText(isCustom ? emp.position : '');
     setFormData({
       name: emp.name,
       nik: emp.nik,
@@ -274,6 +290,15 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
       return;
     }
 
+    if (isCustomPosition && !customPositionText.trim()) {
+      alert('Silakan ketik nama posisi / jabatan manual terlebih dahulu!');
+      return;
+    }
+
+    const finalPosition = isCustomPosition
+      ? (customPositionText.trim() || 'Lainnya')
+      : formData.position;
+
     const finalDailyRate = Number(formData.dailyRate) || 0;
 
     if (editingEmployee) {
@@ -283,6 +308,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
           return {
             ...emp,
             ...formData,
+            position: finalPosition,
             dailyRate: finalDailyRate
           };
         }
@@ -290,16 +316,21 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
       });
       onUpdateEmployees(updated);
       setEditingEmployee(null);
+      setIsCustomPosition(false);
+      setCustomPositionText('');
     } else {
       // Add new
       const newEmp: Employee = {
         id: `emp-${Date.now()}`,
         ...formData,
+        position: finalPosition,
         dailyRate: finalDailyRate,
         nik: formData.nik || `RC-${new Date().getFullYear()}${Math.floor(1000 + Math.random() * 9000)}`
       };
       onUpdateEmployees([newEmp, ...employees]);
       setShowAddModal(false);
+      setIsCustomPosition(false);
+      setCustomPositionText('');
     }
   };
 
@@ -382,7 +413,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
               <Users className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <h1 className="text-xl font-bold text-white tracking-tight">
                   Data Karyawan & Penempatan Lokasi
                 </h1>
@@ -451,6 +482,8 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
             <button
               id="add-employee-btn"
               onClick={() => {
+                setIsCustomPosition(false);
+                setCustomPositionText('');
                 setFormData({
                   name: '',
                   nik: `RC-${new Date().getFullYear()}${Math.floor(1000 + Math.random() * 9000)}`,
@@ -587,6 +620,13 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 <option value="Gardener" className="bg-slate-900">Gardener</option>
                 <option value="Gondola / Facade Cleaner" className="bg-slate-900">Gondola Cleaner</option>
                 <option value="Supervisor" className="bg-slate-900">Supervisor</option>
+                {Array.from(new Set(employees.map((e) => e.position)))
+                  .filter((pos) => !STANDARD_POSITIONS.includes(pos as EmployeePosition))
+                  .map((customPos) => (
+                    <option key={customPos} value={customPos} className="bg-slate-900">
+                      {customPos} (Kustom)
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -1278,6 +1318,8 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 onClick={() => {
                   setShowAddModal(false);
                   setEditingEmployee(null);
+                  setIsCustomPosition(false);
+                  setCustomPositionText('');
                 }}
                 className="text-slate-400 hover:text-white p-1 rounded-lg"
               >
@@ -1316,11 +1358,16 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                   <label className="block text-slate-300 font-semibold mb-1">Posisi / Jabatan:</label>
                   <select
                     id="modal-emp-position"
-                    value={formData.position}
-                    onChange={(e) =>
-                      setFormData({ ...formData, position: e.target.value as EmployeePosition })
-                    }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                    value={isCustomPosition ? 'Lainnya' : formData.position}
+                    onChange={(e) => {
+                      if (e.target.value === 'Lainnya') {
+                        setIsCustomPosition(true);
+                      } else {
+                        setIsCustomPosition(false);
+                        setFormData({ ...formData, position: e.target.value as EmployeePosition });
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     <option value="Cleaner">Cleaner (Petugas Kebersihan)</option>
                     <option value="Team Leader">Team Leader</option>
@@ -1328,8 +1375,30 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                     <option value="Gardener">Gardener (Taman)</option>
                     <option value="Gondola / Facade Cleaner">Gondola Cleaner (Kaca Gedung)</option>
                     <option value="Supervisor">Supervisor</option>
+                    <option value="Lainnya">Lainnya (Isi Manual...)</option>
                   </select>
                 </div>
+
+                {isCustomPosition && (
+                  <div className="sm:col-span-2 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/40 rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-amber-400 font-bold text-xs">
+                        ✏️ Masukkan Nama Posisi / Jabatan Manual:
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-medium">Bisa diisi jabatan apa saja</span>
+                    </div>
+                    <input
+                      id="modal-emp-custom-position"
+                      type="text"
+                      required={isCustomPosition}
+                      value={customPositionText}
+                      onChange={(e) => setCustomPositionText(e.target.value)}
+                      className="w-full bg-slate-950 border border-amber-500/70 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 text-xs"
+                      placeholder="Contoh: Staff Gudang / Teknisi MEP / Admin Proyek / Driver / Quality Control"
+                      autoFocus
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">Lokasi Proyek Penempatan:</label>
@@ -1453,6 +1522,8 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                   onClick={() => {
                     setShowAddModal(false);
                     setEditingEmployee(null);
+                    setIsCustomPosition(false);
+                    setCustomPositionText('');
                   }}
                   className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl"
                 >

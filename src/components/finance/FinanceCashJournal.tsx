@@ -2140,7 +2140,9 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                               <Building2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                               <span className="truncate">{trx.projectName || 'Seluruh Site (HQ)'}</span>
                             </div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">{trx.division}</div>
+                            <div className="text-[10px] text-amber-500/80 font-medium mt-0.5">
+                              Unit: {trx.division || 'Cleaning Service'}
+                            </div>
                           </td>
 
                           <td className="p-3.5 text-right font-mono font-bold">
@@ -3428,17 +3430,18 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Divisi Layanan</label>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Unit</label>
                   <select
                     value={formData.division}
                     onChange={(e) => setFormData({ ...formData, division: e.target.value as DivisionType })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
                   >
                     <option value="Cleaning Service">Cleaning Service</option>
-                    <option value="Gondola & Facade">Gondola & Facade</option>
-                    <option value="Gardening & Landscape">Gardening & Landscape</option>
-                    <option value="Sanitation & Pest Control">Sanitation & Pest Control</option>
-                    <option value="HQ Management & Operasional">HQ Management & Operasional</option>
+                    <option value="Labor Supply">Labor Supply</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Parking Service">Parking Service</option>
+                    <option value="Investment">Investment</option>
+                    <option value="Lain - Lain">Lain - Lain</option>
                   </select>
                 </div>
               </div>
@@ -3703,16 +3706,18 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Divisi Pemohon</label>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Unit</label>
                   <select
                     value={formData.division}
                     onChange={(e) => setFormData({ ...formData, division: e.target.value as DivisionType })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500 cursor-pointer"
                   >
                     <option value="Cleaning Service">Cleaning Service</option>
-                    <option value="Logistik & Chemical">Logistik & Chemical</option>
-                    <option value="Gondola & Facade">Gondola & Facade</option>
-                    <option value="HQ Management & Operasional">HQ Management & Operasional</option>
+                    <option value="Labor Supply">Labor Supply</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Parking Service">Parking Service</option>
+                    <option value="Investment">Investment</option>
+                    <option value="Lain - Lain">Lain - Lain</option>
                   </select>
                 </div>
               </div>
@@ -4126,6 +4131,10 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
               <div>
                 <span className="text-slate-500 text-[10px]">Cost Center / Site:</span>
                 <div className="text-slate-200">{viewTransactionDetail.projectName || 'HQ'}</div>
+              </div>
+              <div>
+                <span className="text-slate-500 text-[10px]">Unit:</span>
+                <div className="text-amber-400 font-semibold">{viewTransactionDetail.division || 'Cleaning Service'}</div>
               </div>
               {viewTransactionDetail.referenceNumber && (
                 <div>
@@ -5446,21 +5455,31 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
 
                 <div>
                   <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                    Divisi Operasional
+                    Unit
                   </label>
                   <select
                     value={editFormData.division}
                     onChange={(e) =>
                       setEditFormData({ ...editFormData, division: e.target.value as DivisionType })
                     }
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     <option value="Cleaning Service">Cleaning Service</option>
-                    <option value="Logistik & Chemical">Logistik & Chemical</option>
-                    <option value="Gondola & Facade">Gondola & Facade</option>
-                    <option value="Gardening & Landscape">Gardening & Landscape</option>
-                    <option value="Sanitation & Pest Control">Sanitation & Pest Control</option>
-                    <option value="HQ Management & Operasional">HQ Management & Operasional</option>
+                    <option value="Labor Supply">Labor Supply</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Parking Service">Parking Service</option>
+                    <option value="Investment">Investment</option>
+                    <option value="Lain - Lain">Lain - Lain</option>
+                    {editFormData.division && ![
+                      'Cleaning Service',
+                      'Labor Supply',
+                      'Marketing',
+                      'Parking Service',
+                      'Investment',
+                      'Lain - Lain'
+                    ].includes(editFormData.division) && (
+                      <option value={editFormData.division}>{editFormData.division}</option>
+                    )}
                   </select>
                 </div>
 

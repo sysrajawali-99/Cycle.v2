@@ -64,7 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto px-2.5 sm:px-4 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16 gap-1.5 sm:gap-3">
           {/* Left: Hamburger & Brand Logo */}
-          <div className="flex items-center space-x-1.5 sm:space-x-3 min-w-0">
+          <div className="flex items-center space-x-1.5 sm:space-x-3 min-w-0 flex-1 sm:flex-initial">
             <button
               id="navbar-toggle-sidebar-btn"
               onClick={onToggleSidebar}
@@ -76,22 +76,22 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={() => onSelectView?.('dashboard')}
-              className="flex items-center space-x-2 sm:space-x-3 min-w-0 text-left cursor-pointer group"
+              className="flex items-center space-x-2 sm:space-x-3 min-w-0 text-left cursor-pointer group flex-1 sm:flex-initial"
               title="Dashboard Utama"
             >
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-md shadow-amber-500/20 ring-2 ring-amber-400/40 shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
                 {companyProfile.logoUrl ? (
-                  <img src={companyProfile.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                  <img src={companyProfile.logoUrl} alt="Logo" className="w-full h-full object-contain p-0.5 sm:p-1" />
                 ) : (
                   <span className="text-base sm:text-xl font-black text-slate-950 tracking-tighter">🦅</span>
                 )}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center space-x-1 sm:space-x-2">
-                  <span className="text-xs sm:text-base md:text-lg font-extrabold tracking-tight text-slate-900 truncate max-w-[110px] sm:max-w-[190px] md:max-w-none group-hover:text-amber-600 transition-colors">
+                  <span className="text-xs sm:text-base md:text-lg font-extrabold tracking-tight text-slate-900 group-hover:text-amber-600 transition-colors leading-tight break-words line-clamp-2 sm:line-clamp-none sm:whitespace-nowrap">
                     {companyProfile.brandName || companyProfile.name || 'RAJAWALI CYCLE'}
                   </span>
-                  <span className="bg-amber-100 text-amber-800 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-amber-300 hidden sm:inline-block">
+                  <span className="bg-amber-100 text-amber-800 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-amber-300 hidden sm:inline-block shrink-0">
                     PRO
                   </span>
                 </div>
@@ -108,12 +108,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isLocationLocked ? (
               // LOCKED SITE VIEW (For Admin Lokasi 1 / 2)
               <div
-                className="flex items-center space-x-1 bg-emerald-50 border border-emerald-300 px-2 sm:px-3 py-1.5 rounded-xl text-xs max-w-[110px] sm:max-w-[210px] md:max-w-none text-emerald-900"
+                className="flex items-center space-x-1 bg-emerald-50 border border-emerald-300 px-2 sm:px-3 py-1.5 rounded-xl text-xs max-w-[115px] sm:max-w-[210px] md:max-w-none text-emerald-900 shrink min-w-0"
                 title={`Akses lokasi Anda terkunci pada ${currentProject?.name || 'Site Ini'}`}
               >
                 <Lock className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
                 <span className="font-semibold text-slate-900 truncate text-xs">
-                  📍 {currentProject ? currentProject.name : 'Lokasi Terkunci'}
+                  {currentProject ? currentProject.name : 'Lokasi Terkunci'}
                 </span>
                 <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded border border-emerald-300 hidden sm:inline-block font-bold">
                   Terkunci
@@ -121,7 +121,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             ) : (
               // UNLOCKED SITE SELECTOR (For Super Admin & General Admin)
-              <div className="flex items-center space-x-1 sm:space-x-1.5 bg-slate-50 border border-slate-300 px-1.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm max-w-[105px] sm:max-w-[190px] md:max-w-none shrink min-w-0">
+              <div className="flex items-center space-x-1 sm:space-x-1.5 bg-slate-50 border border-slate-300 px-1.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm max-w-[105px] xs:max-w-[130px] sm:max-w-[210px] md:max-w-none shrink min-w-0">
                 <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 shrink-0" />
                 <select
                   id="navbar-site-selector"
@@ -131,7 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   title="Pilih Lokasi Gedung (Semua Lokasi / Spesifik)"
                 >
                   <option value="ALL" className="bg-white text-slate-900">
-                    🌐 Semua Lokasi (HQ)
+                    🌐 Semua Lokasi
                   </option>
                   {projects.map((proj) => (
                     <option key={proj.id} value={proj.id} className="bg-white text-slate-900">
