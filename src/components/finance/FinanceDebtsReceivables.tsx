@@ -43,8 +43,9 @@ import {
   AuditTrailItem,
   InvestmentRecord
 } from '../../types/finance';
-import { Project, UserAccount } from '../../types';
+import { Project, UserAccount, CompanyProfile, CompanyBankAccount } from '../../types';
 import { financeService } from '../../services/financeService';
+import { storageService } from '../../services/storageService';
 import { formatCurrency, downloadCSV } from '../../utils/formatters';
 
 interface FinanceDebtsReceivablesProps {
@@ -54,6 +55,7 @@ interface FinanceDebtsReceivablesProps {
   accounts: ChartOfAccount[];
   projects: Project[];
   currentUser?: UserAccount | null;
+  companyProfile?: CompanyProfile;
   onAddDebt?: (debt: DebtRecord) => void;
   onUpdateDebt?: (debt: DebtRecord) => void;
   onDeleteDebt?: (id: string, reason: string, pin: string) => void;
@@ -76,6 +78,7 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
   accounts = [],
   projects = [],
   currentUser,
+  companyProfile,
   onAddDebt,
   onUpdateDebt,
   onDeleteDebt,
@@ -134,11 +137,38 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
     notes: ''
   });
 
+  // Registered Company Bank Accounts from CompanySettings (Rekening Bank Operasional & Catatan Dokumen)
+  const currentCompanyProfile = companyProfile || storageService.getCompanyProfile();
+  const registeredBankAccounts = useMemo<CompanyBankAccount[]>(() => {
+    const list: CompanyBankAccount[] = [];
+    if (Array.isArray(currentCompanyProfile?.bankAccounts) && currentCompanyProfile.bankAccounts.length > 0) {
+      currentCompanyProfile.bankAccounts.forEach((b) => {
+        if (b.status !== 'Nonaktif') {
+          list.push(b);
+        }
+      });
+    }
+    if (list.length === 0 && currentCompanyProfile?.bankName) {
+      list.push({
+        id: 'default-primary',
+        bankName: currentCompanyProfile.bankName,
+        accountNumber: currentCompanyProfile.bankAccountNo || '-',
+        accountHolder: currentCompanyProfile.bankAccountHolder || currentCompanyProfile.name || 'Perusahaan',
+        role: 'Rekening Operasional',
+        isPrimary: true,
+        status: 'Aktif'
+      });
+    }
+    return list;
+  }, [currentCompanyProfile]);
+
   // Form States - Pay Debt
   const [payAmount, setPayAmount] = useState<number>(0);
   const [payDate, setPayDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [payAccountCode, setPayAccountCode] = useState<string>('1120');
-  const [payMethod, setPayMethod] = useState<string>('Bank BCA (123-456-7890)');
+  const [payMethod, setPayMethod] = useState<string>('');
+  const [payIsManual, setPayIsManual] = useState<boolean>(false);
+  const [payManualText, setPayManualText] = useState<string>('');
   const [payRef, setPayRef] = useState<string>('');
   const [payNotes, setPayNotes] = useState<string>('');
 
@@ -162,7 +192,9 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
   const [receiveAmount, setReceiveAmount] = useState<number>(0);
   const [receiveDate, setReceiveDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [receiveAccountCode, setReceiveAccountCode] = useState<string>('1120');
-  const [receiveMethod, setReceiveMethod] = useState<string>('Bank BCA (123-456-7890)');
+  const [receiveMethod, setReceiveMethod] = useState<string>('');
+  const [receiveIsManual, setReceiveIsManual] = useState<boolean>(false);
+  const [receiveManualText, setReceiveManualText] = useState<string>('');
   const [receiveRef, setReceiveRef] = useState<string>('');
   const [receiveNotes, setReceiveNotes] = useState<string>('');
   const [debtCategoryFilter, setDebtCategoryFilter] = useState<'ALL' | 'VENDOR' | 'INVESTOR'>('ALL');
@@ -512,6 +544,12 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
     setPayDate(new Date().toISOString().split('T')[0]);
     setPayRef(`TRF-PAY-${Date.now().toString().slice(-5)}`);
     setPayNotes(`Pembayaran kewajiban hutang ${debt.creditorName} No. ${debt.invoiceNumber}`);
+    const defaultBank = registeredBankAccounts[0]
+      ? `${registeredBankAccounts[0].bankName} (${registeredBankAccounts[0].accountNumber})`
+      : 'Kas Operasional Lapangan';
+    setPayMethod(defaultBank);
+    setPayIsManual(false);
+    setPayManualText('');
     setIsPayDebtModalOpen(true);
   };
 
@@ -527,6 +565,17 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
       return;
     }
 
+    let effectivePayMethod = payMethod;
+    if (payIsManual) {
+      if (!payManualText.trim()) {
+        alert('Mohon tuliskan nama metode pembayaran manual.');
+        return;
+      }
+      effectivePayMethod = payManualText.trim();
+    } else if (!effectivePayMethod && registeredBankAccounts[0]) {
+      effectivePayMethod = `${registeredBankAccounts[0].bankName} (${registeredBankAccounts[0].accountNumber})`;
+    }
+
     const newPaid = selectedDebtForPayment.paidAmount + payAmount;
     const newRemaining = selectedDebtForPayment.totalAmount - newPaid;
     const newStatus: DebtStatus = newRemaining <= 0 ? 'PAID' : 'PARTIAL';
@@ -535,7 +584,7 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
       id: `dp-${Date.now()}`,
       date: payDate,
       amount: payAmount,
-      paymentMethod: payMethod,
+      paymentMethod: effectivePayMethod,
       accountCode: payAccountCode,
       referenceNumber: payRef,
       notes: payNotes,
@@ -604,7 +653,7 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
       };
       const primaryAcc = accounts.find((a) => a.code === payAccountCode) || {
         code: payAccountCode || '1120',
-        name: payMethod
+        name: effectivePayMethod
       };
 
       onAddTransaction({
@@ -616,10 +665,10 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
           ? `Pembayaran Bagi Hasil Investor: ${selectedDebtForPayment.creditorName}`
           : `Pembayaran Hutang Vendor: ${selectedDebtForPayment.creditorName}`,
         description: isInvestor
-          ? `Realisasi dividen/bagi hasil investasi ${selectedDebtForPayment.notes} via ${payMethod}. Ref: ${payRef || '-'}`
-          : `Pelunasan/cicilan faktur ${selectedDebtForPayment.invoiceNumber} (${selectedDebtForPayment.category || 'Operasional'}) via ${payMethod}. Ref: ${payRef || '-'}`,
+          ? `Realisasi dividen/bagi hasil investasi ${selectedDebtForPayment.notes} via ${effectivePayMethod}. Ref: ${payRef || '-'}`
+          : `Pelunasan/cicilan faktur ${selectedDebtForPayment.invoiceNumber} (${selectedDebtForPayment.category || 'Operasional'}) via ${effectivePayMethod}. Ref: ${payRef || '-'}`,
         amount: payAmount,
-        paymentMethod: payMethod as PaymentMethod,
+        paymentMethod: effectivePayMethod,
         primaryAccountCode: payAccountCode || '1120',
         contraAccountCode: selectedDebtForPayment.accountCode || (isInvestor ? '2120' : '2110'),
         journalEntries: [
@@ -811,6 +860,12 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
     setReceiveDate(new Date().toISOString().split('T')[0]);
     setReceiveRef(`TRF-RCV-${Date.now().toString().slice(-5)}`);
     setReceiveNotes(`Penerimaan pelunasan invoice ${rec.invoiceNumber} dari ${rec.customerName}`);
+    const defaultBank = registeredBankAccounts[0]
+      ? `${registeredBankAccounts[0].bankName} (${registeredBankAccounts[0].accountNumber})`
+      : 'Kas Operasional Lapangan';
+    setReceiveMethod(defaultBank);
+    setReceiveIsManual(false);
+    setReceiveManualText('');
     setIsReceivePaymentModalOpen(true);
   };
 
@@ -826,6 +881,17 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
       return;
     }
 
+    let effectiveReceiveMethod = receiveMethod;
+    if (receiveIsManual) {
+      if (!receiveManualText.trim()) {
+        alert('Mohon tuliskan nama metode pembayaran manual.');
+        return;
+      }
+      effectiveReceiveMethod = receiveManualText.trim();
+    } else if (!effectiveReceiveMethod && registeredBankAccounts[0]) {
+      effectiveReceiveMethod = `${registeredBankAccounts[0].bankName} (${registeredBankAccounts[0].accountNumber})`;
+    }
+
     const newPaid = selectedReceivableForPayment.paidAmount + receiveAmount;
     const newRemaining = selectedReceivableForPayment.totalAmount - newPaid;
     const newStatus: ReceivableStatus = newRemaining <= 0 ? 'PAID' : 'PARTIAL';
@@ -834,7 +900,7 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
       id: `rp-${Date.now()}`,
       date: receiveDate,
       amount: receiveAmount,
-      paymentMethod: receiveMethod,
+      paymentMethod: effectiveReceiveMethod,
       accountCode: receiveAccountCode,
       referenceNumber: receiveRef,
       notes: receiveNotes,
@@ -865,7 +931,7 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
       };
       const primaryAcc = accounts.find((a) => a.code === receiveAccountCode) || {
         code: receiveAccountCode || '1120',
-        name: receiveMethod
+        name: effectiveReceiveMethod
       };
 
       onAddTransaction({
@@ -874,9 +940,9 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
         date: receiveDate || nowStr,
         type: 'IN',
         title: `Penerimaan Pembayaran Piutang: ${selectedReceivableForPayment.customerName}`,
-        description: `Penerimaan pelunasan/termin invoice ${selectedReceivableForPayment.invoiceNumber} (${selectedReceivableForPayment.projectName || 'Proyek'}) via ${receiveMethod}. Ref: ${receiveRef || '-'}`,
+        description: `Penerimaan pelunasan/termin invoice ${selectedReceivableForPayment.invoiceNumber} (${selectedReceivableForPayment.projectName || 'Proyek'}) via ${effectiveReceiveMethod}. Ref: ${receiveRef || '-'}`,
         amount: receiveAmount,
-        paymentMethod: receiveMethod as PaymentMethod,
+        paymentMethod: effectiveReceiveMethod,
         primaryAccountCode: receiveAccountCode || '1120',
         contraAccountCode: selectedReceivableForPayment.accountCode || '1140',
         journalEntries: [
@@ -886,7 +952,7 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
             accountName: primaryAcc.name,
             debit: receiveAmount,
             credit: 0,
-            notes: `Debit Kas/Bank: ${receiveMethod}`
+            notes: `Debit Kas/Bank: ${effectiveReceiveMethod}`
           },
           {
             id: `je-c-${Date.now()}`,
@@ -1892,17 +1958,51 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
               </div>
 
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Sumber Rekening Kas / Bank</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-400 font-semibold">Sumber Rekening Kas / Bank *</label>
+                  <span className="text-[10px] text-amber-400 font-medium">
+                    {payIsManual ? 'Manual' : 'Rekening Resmi'}
+                  </span>
+                </div>
                 <select
-                  value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value)}
+                  value={payIsManual ? '__MANUAL__' : payMethod}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '__MANUAL__') {
+                      setPayIsManual(true);
+                    } else {
+                      setPayIsManual(false);
+                      setPayMethod(val);
+                    }
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
                 >
-                  <option value="Bank BCA (123-456-7890)">Bank BCA (123-456-7890)</option>
-                  <option value="Bank Mandiri (987-654-3210)">Bank Mandiri (987-654-3210)</option>
-                  <option value="Bank BNI (555-444-333)">Bank BNI (555-444-333)</option>
-                  <option value="Kas Tunai / Petty Cash HQ">Kas Tunai / Petty Cash HQ</option>
+                  {registeredBankAccounts.length > 0 ? (
+                    registeredBankAccounts.map((b) => (
+                      <option key={b.id} value={`${b.bankName} (${b.accountNumber})`}>
+                        {b.bankName} - {b.accountNumber} ({b.role}){b.isPrimary ? ' ★' : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>
+                      -- Tidak ada rekening terdaftar di Pengaturan Perusahaan --
+                    </option>
+                  )}
+                  <option value="__MANUAL__">+ Lainnya (Tulis / Ketik Manual...)</option>
                 </select>
+
+                {payIsManual && (
+                  <div className="mt-2 space-y-1 animate-in fade-in slide-in-from-top-1">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: Kas Tunai HQ, Kas Operasional Lapangan, Cek/Giro, dll."
+                      value={payManualText}
+                      onChange={(e) => setPayManualText(e.target.value)}
+                      className="w-full bg-slate-900 border border-amber-500/50 rounded-xl px-3 py-2 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-amber-400 font-medium"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -2171,17 +2271,51 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
               </div>
 
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Rekening Tujuan Masuk Kas / Bank</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-400 font-semibold">Rekening Tujuan Masuk Kas / Bank *</label>
+                  <span className="text-[10px] text-cyan-400 font-medium">
+                    {receiveIsManual ? 'Manual' : 'Rekening Resmi'}
+                  </span>
+                </div>
                 <select
-                  value={receiveMethod}
-                  onChange={(e) => setReceiveMethod(e.target.value)}
+                  value={receiveIsManual ? '__MANUAL__' : receiveMethod}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '__MANUAL__') {
+                      setReceiveIsManual(true);
+                    } else {
+                      setReceiveIsManual(false);
+                      setReceiveMethod(val);
+                    }
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white"
                 >
-                  <option value="Bank BCA (123-456-7890)">Bank BCA (123-456-7890)</option>
-                  <option value="Bank Mandiri (987-654-3210)">Bank Mandiri (987-654-3210)</option>
-                  <option value="Bank BNI (555-444-333)">Bank BNI (555-444-333)</option>
-                  <option value="Kas Tunai / Petty Cash HQ">Kas Tunai / Petty Cash HQ</option>
+                  {registeredBankAccounts.length > 0 ? (
+                    registeredBankAccounts.map((b) => (
+                      <option key={b.id} value={`${b.bankName} (${b.accountNumber})`}>
+                        {b.bankName} - {b.accountNumber} ({b.role}){b.isPrimary ? ' ★' : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>
+                      -- Tidak ada rekening terdaftar di Pengaturan Perusahaan --
+                    </option>
+                  )}
+                  <option value="__MANUAL__">+ Lainnya (Tulis / Ketik Manual...)</option>
                 </select>
+
+                {receiveIsManual && (
+                  <div className="mt-2 space-y-1 animate-in fade-in slide-in-from-top-1">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: Kas Tunai HQ, Kas Operasional Lapangan, Cek/Giro, dll."
+                      value={receiveManualText}
+                      onChange={(e) => setReceiveManualText(e.target.value)}
+                      className="w-full bg-slate-900 border border-cyan-500/50 rounded-xl px-3 py-2 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-medium"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

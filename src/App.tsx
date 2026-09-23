@@ -821,6 +821,7 @@ export default function App() {
                 projects={projects}
                 currentUser={currentUser}
                 periodClosings={periodClosings}
+                companyProfile={companyProfile}
                 onAddTransaction={handleAddFinanceTransaction}
                 onUpdateTransaction={handleUpdateFinanceTransaction}
                 onDeleteTransaction={handleDeleteFinanceTransaction}
@@ -843,6 +844,7 @@ export default function App() {
                 accounts={accounts}
                 projects={projects}
                 currentUser={currentUser}
+                companyProfile={companyProfile}
                 onAddDebt={handleAddDebt}
                 onUpdateDebt={handleUpdateDebt}
                 onDeleteDebt={handleDeleteDebt}

@@ -53,7 +53,8 @@ export type PaymentMethod =
   | 'Bank BNI (555-444-333)'
   | 'Bank BRI (888-999-000)'
   | 'Kas Tunai / Petty Cash HQ'
-  | 'Kas Operasional Lapangan';
+  | 'Kas Operasional Lapangan'
+  | (string & {});
 
 export type DivisionType = 
   | 'Cleaning Service'

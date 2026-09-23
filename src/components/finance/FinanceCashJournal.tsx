@@ -45,8 +45,9 @@ import {
   AccountType,
   AccountCategory
 } from '../../types/finance';
-import { Project, UserAccount } from '../../types';
+import { Project, UserAccount, CompanyProfile, CompanyBankAccount } from '../../types';
 import { financeService } from '../../services/financeService';
+import { storageService } from '../../services/storageService';
 import { SecurityPinModal } from '../common/SecurityPinModal';
 
 interface FinanceCashJournalProps {
@@ -55,6 +56,7 @@ interface FinanceCashJournalProps {
   projects: Project[];
   currentUser?: UserAccount | null;
   periodClosings: PeriodClosing[];
+  companyProfile?: CompanyProfile;
   onAddTransaction: (trx: FinanceTransaction) => void;
   onUpdateTransaction?: (trx: FinanceTransaction) => void;
   onDeleteTransaction?: (trxId: string) => void;
@@ -72,6 +74,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
   projects,
   currentUser,
   periodClosings,
+  companyProfile,
   onAddTransaction,
   onUpdateTransaction,
   onDeleteTransaction,
@@ -112,12 +115,49 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
   const [viewTransactionDetail, setViewTransactionDetail] = useState<FinanceTransaction | null>(null);
   const [transactionToEdit, setTransactionToEdit] = useState<FinanceTransaction | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Registered Company Bank Accounts from CompanySettings (Rekening Bank Operasional & Catatan Dokumen)
+  const currentCompanyProfile = companyProfile || storageService.getCompanyProfile();
+  const registeredBankAccounts = useMemo<CompanyBankAccount[]>(() => {
+    const list: CompanyBankAccount[] = [];
+    if (Array.isArray(currentCompanyProfile?.bankAccounts) && currentCompanyProfile.bankAccounts.length > 0) {
+      currentCompanyProfile.bankAccounts.forEach((b) => {
+        if (b.status !== 'Nonaktif') {
+          list.push(b);
+        }
+      });
+    }
+    // Fallback to primary company profile bank info if no multi-bank is registered
+    if (list.length === 0 && currentCompanyProfile?.bankName) {
+      list.push({
+        id: 'default-primary',
+        bankName: currentCompanyProfile.bankName,
+        accountNumber: currentCompanyProfile.bankAccountNo || '-',
+        accountHolder: currentCompanyProfile.bankAccountHolder || currentCompanyProfile.name || 'Perusahaan',
+        role: 'Rekening Operasional',
+        isPrimary: true,
+        status: 'Aktif'
+      });
+    }
+    return list;
+  }, [currentCompanyProfile]);
+
+  // Edit Modal Payment Method States (Support Registered Banks & Manual)
+  const [editPaymentMethodSelection, setEditPaymentMethodSelection] = useState<string>('');
+  const [editIsManualPayment, setEditIsManualPayment] = useState<boolean>(false);
+  const [editManualPaymentMethod, setEditManualPaymentMethod] = useState<string>('');
+
+  // Create Modal Payment Method States (Support Registered Banks & Manual)
+  const [createPaymentMethodSelection, setCreatePaymentMethodSelection] = useState<string>('');
+  const [createIsManualPayment, setCreateIsManualPayment] = useState<boolean>(false);
+  const [createManualPaymentMethod, setCreateManualPaymentMethod] = useState<string>('');
+
   const [editFormData, setEditFormData] = useState({
     date: '',
     title: '',
     description: '',
     amount: '',
-    paymentMethod: 'Bank BCA (123-456-7890)' as PaymentMethod,
+    paymentMethod: '' as PaymentMethod,
     primaryAccountCode: '1120',
     contraAccountCode: '4110',
     projectId: 'ALL',
@@ -253,19 +293,56 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
   // Open Edit Modal for a Transaction
   const handleOpenEditTransaction = (trx: FinanceTransaction) => {
     setTransactionToEdit(trx);
-    setEditFormData({
-      date: trx.date,
-      title: trx.title,
-      description: trx.description || '',
-      amount: String(trx.amount),
-      paymentMethod: trx.paymentMethod,
-      primaryAccountCode: trx.primaryAccountCode,
-      contraAccountCode: trx.contraAccountCode,
-      projectId: trx.projectId,
-      division: trx.division,
-      referenceNumber: trx.referenceNumber || '',
-      payeeOrPayer: trx.payeeOrPayer || ''
+
+    // Check if trx.paymentMethod matches any registered company bank account
+    const matchedBank = registeredBankAccounts.find((b) => {
+      const standardFormat = `${b.bankName} (${b.accountNumber})`;
+      const dashFormat = `${b.bankName} - ${b.accountNumber}`;
+      return (
+        trx.paymentMethod === standardFormat ||
+        trx.paymentMethod === dashFormat ||
+        trx.paymentMethod === b.bankName ||
+        trx.paymentMethod === `${b.bankName} - ${b.accountNumber} (${b.role})` ||
+        trx.paymentMethod === b.accountNumber
+      );
     });
+
+    if (matchedBank) {
+      const standardVal = `${matchedBank.bankName} (${matchedBank.accountNumber})`;
+      setEditPaymentMethodSelection(standardVal);
+      setEditIsManualPayment(false);
+      setEditManualPaymentMethod('');
+      setEditFormData({
+        date: trx.date,
+        title: trx.title,
+        description: trx.description || '',
+        amount: String(trx.amount),
+        paymentMethod: standardVal,
+        primaryAccountCode: trx.primaryAccountCode,
+        contraAccountCode: trx.contraAccountCode,
+        projectId: trx.projectId,
+        division: trx.division,
+        referenceNumber: trx.referenceNumber || '',
+        payeeOrPayer: trx.payeeOrPayer || ''
+      });
+    } else {
+      setEditPaymentMethodSelection('__MANUAL__');
+      setEditIsManualPayment(true);
+      setEditManualPaymentMethod(trx.paymentMethod || '');
+      setEditFormData({
+        date: trx.date,
+        title: trx.title,
+        description: trx.description || '',
+        amount: String(trx.amount),
+        paymentMethod: trx.paymentMethod || '',
+        primaryAccountCode: trx.primaryAccountCode,
+        contraAccountCode: trx.contraAccountCode,
+        projectId: trx.projectId,
+        division: trx.division,
+        referenceNumber: trx.referenceNumber || '',
+        payeeOrPayer: trx.payeeOrPayer || ''
+      });
+    }
 
     if (trx.journalEntries && trx.journalEntries.length > 0) {
       setEditJournalLines(
@@ -297,6 +374,18 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
       return;
     }
 
+    // Determine final effective payment method
+    let effectivePaymentMethod = editFormData.paymentMethod;
+    if (editIsManualPayment) {
+      if (!editManualPaymentMethod.trim()) {
+        alert('Mohon tuliskan nama metode pembayaran manual.');
+        return;
+      }
+      effectivePaymentMethod = editManualPaymentMethod.trim();
+    } else if (editPaymentMethodSelection && editPaymentMethodSelection !== '__MANUAL__') {
+      effectivePaymentMethod = editPaymentMethodSelection;
+    }
+
     const selectedProj = projects.find((p) => p.id === editFormData.projectId);
     const primaryAcc = accounts.find((a) => a.code === editFormData.primaryAccountCode);
     const contraAcc = accounts.find((a) => a.code === editFormData.contraAccountCode);
@@ -316,7 +405,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
         title: editFormData.title || `Penerimaan Kas/Bank - ${contraAcc?.name || 'Pendapatan'}`,
         description: editFormData.description,
         amount: amountNum,
-        paymentMethod: editFormData.paymentMethod,
+        paymentMethod: effectivePaymentMethod,
         primaryAccountCode: editFormData.primaryAccountCode,
         contraAccountCode: editFormData.contraAccountCode,
         journalEntries: [
@@ -326,7 +415,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
             accountName: primaryAcc?.name || 'Kas & Bank',
             debit: amountNum,
             credit: 0,
-            notes: `Penerimaan kas ${editFormData.paymentMethod}`
+            notes: `Penerimaan kas ${effectivePaymentMethod}`
           },
           {
             id: transactionToEdit.journalEntries?.[1]?.id || `j-${Date.now()}-2`,
@@ -357,7 +446,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
         title: editFormData.title || `Pengeluaran Kas/Bank - ${contraAcc?.name || 'Beban Operasional'}`,
         description: editFormData.description,
         amount: amountNum,
-        paymentMethod: editFormData.paymentMethod,
+        paymentMethod: effectivePaymentMethod,
         primaryAccountCode: editFormData.primaryAccountCode,
         contraAccountCode: editFormData.contraAccountCode,
         journalEntries: [
@@ -375,7 +464,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
             accountName: primaryAcc?.name || 'Kas & Bank',
             debit: 0,
             credit: amountNum,
-            notes: `Pembayaran via ${editFormData.paymentMethod}`
+            notes: `Pembayaran via ${effectivePaymentMethod}`
           }
         ],
         projectId: editFormData.projectId,
@@ -475,6 +564,20 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
     const contraAcc = accounts.find((a) => a.code === formData.contraAccountCode);
     const selectedProj = projects.find((p) => p.id === formData.projectId);
 
+    // Determine final effective payment method for creation
+    let effectivePaymentMethod = formData.paymentMethod;
+    if (createIsManualPayment) {
+      if (!createManualPaymentMethod.trim()) {
+        alert('Mohon tuliskan nama metode pembayaran manual.');
+        return;
+      }
+      effectivePaymentMethod = createManualPaymentMethod.trim();
+    } else if (createPaymentMethodSelection && createPaymentMethodSelection !== '__MANUAL__') {
+      effectivePaymentMethod = createPaymentMethodSelection;
+    } else if (registeredBankAccounts[0]) {
+      effectivePaymentMethod = `${registeredBankAccounts[0].bankName} (${registeredBankAccounts[0].accountNumber})`;
+    }
+
     const now = new Date();
     const code = `BKM-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${String(
       transactions.length + 1
@@ -488,7 +591,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
       title: formData.title || `Penerimaan Kas/Bank - ${contraAcc?.name || 'Pendapatan'}`,
       description: formData.description,
       amount: amountNum,
-      paymentMethod: formData.paymentMethod,
+      paymentMethod: effectivePaymentMethod,
       primaryAccountCode: formData.primaryAccountCode,
       contraAccountCode: formData.contraAccountCode,
       journalEntries: [
@@ -498,7 +601,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
           accountName: primaryAcc?.name || 'Kas & Bank',
           debit: amountNum,
           credit: 0,
-          notes: `Penerimaan kas ${formData.paymentMethod}`
+          notes: `Penerimaan kas ${effectivePaymentMethod}`
         },
         {
           id: `j-${Date.now()}-2`,
@@ -560,6 +663,20 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
     const contraAcc = accounts.find((a) => a.code === formData.contraAccountCode);
     const selectedProj = projects.find((p) => p.id === formData.projectId);
 
+    // Determine final effective payment method for creation
+    let effectivePaymentMethod = formData.paymentMethod;
+    if (createIsManualPayment) {
+      if (!createManualPaymentMethod.trim()) {
+        alert('Mohon tuliskan nama metode pembayaran manual.');
+        return;
+      }
+      effectivePaymentMethod = createManualPaymentMethod.trim();
+    } else if (createPaymentMethodSelection && createPaymentMethodSelection !== '__MANUAL__') {
+      effectivePaymentMethod = createPaymentMethodSelection;
+    } else if (registeredBankAccounts[0]) {
+      effectivePaymentMethod = `${registeredBankAccounts[0].bankName} (${registeredBankAccounts[0].accountNumber})`;
+    }
+
     const now = new Date();
     const code = `BKK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${String(
       transactions.length + 1
@@ -573,7 +690,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
       title: formData.title || `Pengeluaran Kas/Bank - ${contraAcc?.name || 'Beban Operasional'}`,
       description: formData.description,
       amount: amountNum,
-      paymentMethod: formData.paymentMethod,
+      paymentMethod: effectivePaymentMethod,
       primaryAccountCode: formData.primaryAccountCode,
       contraAccountCode: formData.contraAccountCode,
       journalEntries: [
@@ -591,7 +708,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
           accountName: primaryAcc?.name || 'Kas & Bank',
           debit: 0,
           credit: amountNum,
-          notes: `Pembayaran via ${formData.paymentMethod}`
+          notes: `Pembayaran via ${effectivePaymentMethod}`
         }
       ],
       projectId: formData.projectId,
@@ -779,11 +896,17 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
   };
 
   const resetFormData = () => {
+    const defaultBank = registeredBankAccounts[0]
+      ? `${registeredBankAccounts[0].bankName} (${registeredBankAccounts[0].accountNumber})`
+      : 'Kas Operasional Lapangan';
+    setCreatePaymentMethodSelection(defaultBank);
+    setCreateIsManualPayment(false);
+    setCreateManualPaymentMethod('');
     setFormData({
       title: '',
       description: '',
       amount: '',
-      paymentMethod: 'Bank BCA (123-456-7890)',
+      paymentMethod: defaultBank,
       primaryAccountCode: '1120',
       contraAccountCode: '4110',
       projectId: 'ALL',
@@ -3238,6 +3361,61 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-slate-300">
+                      Metode Rekening Pembayaran *
+                    </label>
+                    <span className="text-[10px] text-emerald-400 font-medium">
+                      {createIsManualPayment ? 'Manual' : 'Rekening Resmi'}
+                    </span>
+                  </div>
+                  <select
+                    value={
+                      createPaymentMethodSelection ||
+                      (registeredBankAccounts[0]
+                        ? `${registeredBankAccounts[0].bankName} (${registeredBankAccounts[0].accountNumber})`
+                        : '')
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCreatePaymentMethodSelection(val);
+                      if (val === '__MANUAL__') {
+                        setCreateIsManualPayment(true);
+                      } else {
+                        setCreateIsManualPayment(false);
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    {registeredBankAccounts.length > 0 ? (
+                      registeredBankAccounts.map((b) => (
+                        <option key={b.id} value={`${b.bankName} (${b.accountNumber})`}>
+                          {b.bankName} - {b.accountNumber} ({b.role}){b.isPrimary ? ' ★' : ''}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="" disabled>
+                        -- Tidak ada rekening terdaftar di Pengaturan Perusahaan --
+                      </option>
+                    )}
+                    <option value="__MANUAL__">+ Lainnya (Tulis / Ketik Manual...)</option>
+                  </select>
+
+                  {createIsManualPayment && (
+                    <div className="mt-2 space-y-1 animate-in fade-in slide-in-from-top-1">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Contoh: Kas Tunai HQ, Kas Operasional Lapangan, dll."
+                        value={createManualPaymentMethod}
+                        onChange={(e) => setCreateManualPaymentMethod(e.target.value)}
+                        className="w-full bg-slate-950 border border-amber-500/50 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 font-medium"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div>
                   <label className="text-[11px] font-bold text-slate-300 block mb-1">
                     Diterima Dari (Klien / Pihak Ketiga)
                   </label>
@@ -3249,19 +3427,19 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                    No Faktur / Invoice / Kuitansi
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. INV/2026/08/MGC-01"
-                    value={formData.referenceNumber}
-                    onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  No Faktur / Invoice / Kuitansi
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. INV/2026/08/MGC-01"
+                  value={formData.referenceNumber}
+                  onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                />
               </div>
 
               <div>
@@ -3457,6 +3635,61 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-slate-300">
+                      Metode Rekening Pembayaran *
+                    </label>
+                    <span className="text-[10px] text-rose-400 font-medium">
+                      {createIsManualPayment ? 'Manual' : 'Rekening Resmi'}
+                    </span>
+                  </div>
+                  <select
+                    value={
+                      createPaymentMethodSelection ||
+                      (registeredBankAccounts[0]
+                        ? `${registeredBankAccounts[0].bankName} (${registeredBankAccounts[0].accountNumber})`
+                        : '')
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCreatePaymentMethodSelection(val);
+                      if (val === '__MANUAL__') {
+                        setCreateIsManualPayment(true);
+                      } else {
+                        setCreateIsManualPayment(false);
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500"
+                  >
+                    {registeredBankAccounts.length > 0 ? (
+                      registeredBankAccounts.map((b) => (
+                        <option key={b.id} value={`${b.bankName} (${b.accountNumber})`}>
+                          {b.bankName} - {b.accountNumber} ({b.role}){b.isPrimary ? ' ★' : ''}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="" disabled>
+                        -- Tidak ada rekening terdaftar di Pengaturan Perusahaan --
+                      </option>
+                    )}
+                    <option value="__MANUAL__">+ Lainnya (Tulis / Ketik Manual...)</option>
+                  </select>
+
+                  {createIsManualPayment && (
+                    <div className="mt-2 space-y-1 animate-in fade-in slide-in-from-top-1">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Contoh: Kas Tunai HQ, Kas Operasional Lapangan, dll."
+                        value={createManualPaymentMethod}
+                        onChange={(e) => setCreateManualPaymentMethod(e.target.value)}
+                        className="w-full bg-slate-950 border border-amber-500/50 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-400 font-medium"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div>
                   <label className="text-[11px] font-bold text-slate-300 block mb-1">
                     Dibayarkan Kepada (Vendor / Personil)
                   </label>
@@ -3468,19 +3701,19 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                    No Referensi / Kuitansi / PO
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. PO-CHEM-8842"
-                    value={formData.referenceNumber}
-                    onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-rose-500"
-                  />
-                </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  No Referensi / Kuitansi / PO
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. PO-CHEM-8842"
+                  value={formData.referenceNumber}
+                  onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-rose-500"
+                />
               </div>
 
               <div>
@@ -4520,23 +4753,79 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                        Metode Pembayaran
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold text-slate-300">
+                          Metode Pembayaran *
+                        </label>
+                        <span className="text-[10px] text-amber-400 font-medium">
+                          {editIsManualPayment ? 'Manual' : 'Rekening Resmi'}
+                        </span>
+                      </div>
                       <select
-                        value={editFormData.paymentMethod}
-                        onChange={(e) =>
-                          setEditFormData({ ...editFormData, paymentMethod: e.target.value as PaymentMethod })
-                        }
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                        value={editPaymentMethodSelection}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditPaymentMethodSelection(val);
+                          if (val === '__MANUAL__') {
+                            setEditIsManualPayment(true);
+                            setEditFormData({
+                              ...editFormData,
+                              paymentMethod: editManualPaymentMethod
+                            });
+                          } else {
+                            setEditIsManualPayment(false);
+                            setEditFormData({
+                              ...editFormData,
+                              paymentMethod: val
+                            });
+                          }
+                        }}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-medium"
                       >
-                        <option value="Bank BCA (123-456-7890)">Bank BCA (123-456-7890)</option>
-                        <option value="Bank Mandiri (987-654-3210)">Bank Mandiri (987-654-3210)</option>
-                        <option value="Bank BNI (555-444-333)">Bank BNI (555-444-333)</option>
-                        <option value="Bank BRI (888-999-000)">Bank BRI (888-999-000)</option>
-                        <option value="Kas Tunai / Petty Cash HQ">Kas Tunai / Petty Cash HQ</option>
-                        <option value="Kas Operasional Lapangan">Kas Operasional Lapangan</option>
+                        {registeredBankAccounts.length > 0 ? (
+                          registeredBankAccounts.map((b) => {
+                            const optVal = `${b.bankName} (${b.accountNumber})`;
+                            return (
+                              <option key={b.id} value={optVal}>
+                                {b.bankName} - {b.accountNumber} ({b.role}){b.isPrimary ? ' ★' : ''}
+                              </option>
+                            );
+                          })
+                        ) : (
+                          <option value="" disabled>
+                            -- Tidak ada rekening terdaftar di Pengaturan Perusahaan --
+                          </option>
+                        )}
+                        <option value="__MANUAL__">
+                          + Lainnya (Tulis / Ketik Manual...)
+                        </option>
                       </select>
+
+                      {editIsManualPayment && (
+                        <div className="mt-2 space-y-1 animate-in fade-in slide-in-from-top-1">
+                          <label className="text-[10px] font-bold text-amber-400 block">
+                            Tulis Metode Pembayaran Manual *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Contoh: Kas Tunai HQ, Petty Cash Site, Cek Giro No. 123, dll."
+                            value={editManualPaymentMethod}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditManualPaymentMethod(val);
+                              setEditFormData({
+                                ...editFormData,
+                                paymentMethod: val
+                              });
+                            }}
+                            className="w-full bg-slate-950 border border-amber-500/50 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-medium"
+                          />
+                          <p className="text-[10px] text-slate-400">
+                            Pilihan manual di luar rekening bank operasional yang telah didaftarkan di Pengaturan Perusahaan.
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     <div>
