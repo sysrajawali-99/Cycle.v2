@@ -1756,7 +1756,7 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="font-bold text-white text-base">Katalog Master Chemical, Alat & APD</h3>
-                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full text-xs font-bold font-mono">
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 rounded-full text-xs font-black font-mono">
                   {inventoryItems.length} Item
                 </span>
               </div>
@@ -1771,10 +1771,10 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                 <button
                   id="btn-download-inv-template-xlsx"
                   onClick={handleDownloadTemplateXLSX}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white font-bold text-xs rounded-lg border border-emerald-500/40 transition cursor-pointer"
+                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-black text-xs rounded-lg border border-emerald-300 transition cursor-pointer"
                   title="Unduh Template Excel (.xlsx) dengan kolom terpisah A-H"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-950" />
                   <span>Template Excel (.xlsx)</span>
                 </button>
                 <button
@@ -1808,9 +1808,9 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                   setBulkParsedList([]);
                   setBulkErrorMessage(null);
                 }}
-                className="flex items-center space-x-1.5 px-3.5 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white font-bold text-xs rounded-xl border border-blue-500/40 shadow-sm transition cursor-pointer"
+                className="flex items-center space-x-1.5 px-3.5 py-2 bg-blue-100 hover:bg-blue-200 text-blue-950 font-black text-xs rounded-xl border border-blue-300 shadow-sm transition cursor-pointer"
               >
-                <Upload className="w-4 h-4 text-blue-400" />
+                <Upload className="w-4 h-4 text-blue-950" />
                 <span>Upload Massal (Excel / CSV)</span>
               </button>
 

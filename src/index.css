@@ -276,11 +276,9 @@ table tr:hover td {
   background-color: #f1f5f9 !important;
 }
 
-/* Buttons with white text */
+/* Buttons with solid dark background */
 .bg-blue-600,
 .bg-blue-700,
-.bg-emerald-600,
-.bg-emerald-700,
 .bg-rose-600,
 .bg-rose-700,
 .bg-purple-600,
@@ -294,6 +292,275 @@ table tr:hover td {
 .bg-amber-500 {
   color: #1e293b !important;
   font-weight: 700;
+}
+
+/* =========================================================================
+   LIGHT BACKGROUND CONTRAST SYSTEM (WCAG AAA)
+   Whenever a light background is used (pastels, /10, /20, /30 opacity, or 
+   100/200 shades), text and child elements MUST be dark or black.
+   ========================================================================= */
+
+/* Amber / Yellow / Orange Light Backgrounds -> Dark Brown/Amber Text */
+[class*="bg-amber-500/"],
+[class*="bg-amber-400/"],
+[class*="bg-amber-600/20"],
+[class*="bg-amber-600/10"],
+[class*="bg-amber-100"],
+[class*="bg-amber-50"],
+[class*="bg-yellow-500/"],
+[class*="bg-yellow-400/"],
+[class*="bg-yellow-100"],
+[class*="bg-yellow-50"],
+[class*="bg-orange-500/"],
+[class*="bg-orange-100"] {
+  color: #451a03 !important;
+  font-weight: 700;
+}
+[class*="bg-amber-500/"] *,
+[class*="bg-amber-400/"] *,
+[class*="bg-amber-600/20"] *,
+[class*="bg-amber-600/10"] *,
+[class*="bg-amber-100"] *,
+[class*="bg-amber-50"] *,
+[class*="bg-yellow-500/"] *,
+[class*="bg-yellow-400/"] *,
+[class*="bg-yellow-100"] *,
+[class*="bg-yellow-50"] *,
+[class*="bg-orange-500/"] *,
+[class*="bg-orange-100"] * {
+  color: #451a03 !important;
+}
+
+/* Emerald / Green / Teal Light Backgrounds -> Dark Emerald/Green Text */
+[class*="bg-emerald-500/"],
+[class*="bg-emerald-400/"],
+[class*="bg-emerald-600/20"],
+[class*="bg-emerald-600/30"],
+[class*="bg-emerald-600/10"],
+[class*="bg-emerald-100"],
+[class*="bg-emerald-50"],
+[class*="bg-teal-500/"],
+[class*="bg-teal-400/"],
+[class*="bg-teal-100"],
+[class*="bg-teal-50"],
+[class*="bg-green-500/"],
+[class*="bg-green-400/"],
+[class*="bg-green-100"],
+[class*="bg-green-50"] {
+  color: #022c22 !important;
+  font-weight: 700;
+}
+[class*="bg-emerald-500/"] *,
+[class*="bg-emerald-400/"] *,
+[class*="bg-emerald-600/20"] *,
+[class*="bg-emerald-600/30"] *,
+[class*="bg-emerald-600/10"] *,
+[class*="bg-emerald-100"] *,
+[class*="bg-emerald-50"] *,
+[class*="bg-teal-500/"] *,
+[class*="bg-teal-400/"] *,
+[class*="bg-teal-100"] *,
+[class*="bg-teal-50"] *,
+[class*="bg-green-500/"] *,
+[class*="bg-green-400/"] *,
+[class*="bg-green-100"] *,
+[class*="bg-green-50"] * {
+  color: #022c22 !important;
+}
+
+/* Purple / Violet Light Backgrounds -> Dark Purple Text */
+[class*="bg-purple-500/"],
+[class*="bg-purple-400/"],
+[class*="bg-purple-600/20"],
+[class*="bg-purple-600/10"],
+[class*="bg-purple-100"],
+[class*="bg-purple-50"],
+[class*="bg-violet-500/"],
+[class*="bg-violet-400/"],
+[class*="bg-violet-100"],
+[class*="bg-violet-50"] {
+  color: #3b0764 !important;
+  font-weight: 700;
+}
+[class*="bg-purple-500/"] *,
+[class*="bg-purple-400/"] *,
+[class*="bg-purple-600/20"] *,
+[class*="bg-purple-600/10"] *,
+[class*="bg-purple-100"] *,
+[class*="bg-purple-50"] *,
+[class*="bg-violet-500/"] *,
+[class*="bg-violet-400/"] *,
+[class*="bg-violet-100"] *,
+[class*="bg-violet-50"] * {
+  color: #3b0764 !important;
+}
+
+/* Blue / Sky / Cyan Light Backgrounds -> Dark Blue Text */
+[class*="bg-blue-500/"],
+[class*="bg-blue-400/"],
+[class*="bg-blue-600/20"],
+[class*="bg-blue-600/30"],
+[class*="bg-blue-600/10"],
+[class*="bg-blue-100"],
+[class*="bg-blue-50"],
+[class*="bg-sky-500/"],
+[class*="bg-sky-400/"],
+[class*="bg-sky-100"],
+[class*="bg-sky-50"],
+[class*="bg-cyan-500/"],
+[class*="bg-cyan-400/"],
+[class*="bg-cyan-100"],
+[class*="bg-cyan-50"] {
+  color: #172554 !important;
+  font-weight: 700;
+}
+[class*="bg-blue-500/"] *,
+[class*="bg-blue-400/"] *,
+[class*="bg-blue-600/20"] *,
+[class*="bg-blue-600/30"] *,
+[class*="bg-blue-600/10"] *,
+[class*="bg-blue-100"] *,
+[class*="bg-blue-50"] *,
+[class*="bg-sky-500/"] *,
+[class*="bg-sky-400/"] *,
+[class*="bg-sky-100"] *,
+[class*="bg-sky-50"] *,
+[class*="bg-cyan-500/"] *,
+[class*="bg-cyan-400/"] *,
+[class*="bg-cyan-100"] *,
+[class*="bg-cyan-50"] * {
+  color: #172554 !important;
+}
+
+/* Rose / Red Light Backgrounds -> Dark Rose/Red Text */
+[class*="bg-rose-500/"],
+[class*="bg-rose-400/"],
+[class*="bg-rose-600/20"],
+[class*="bg-rose-600/10"],
+[class*="bg-rose-100"],
+[class*="bg-rose-50"],
+[class*="bg-red-500/"],
+[class*="bg-red-400/"],
+[class*="bg-red-100"],
+[class*="bg-red-50"] {
+  color: #4c0519 !important;
+  font-weight: 700;
+}
+[class*="bg-rose-500/"] *,
+[class*="bg-rose-400/"] *,
+[class*="bg-rose-600/20"] *,
+[class*="bg-rose-600/10"] *,
+[class*="bg-rose-100"] *,
+[class*="bg-rose-50"] *,
+[class*="bg-red-500/"] *,
+[class*="bg-red-400/"] *,
+[class*="bg-red-100"] *,
+[class*="bg-red-50"] * {
+  color: #4c0519 !important;
+}
+
+/* Indigo Light Backgrounds -> Dark Indigo Text */
+[class*="bg-indigo-500/"],
+[class*="bg-indigo-400/"],
+[class*="bg-indigo-600/20"],
+[class*="bg-indigo-100"],
+[class*="bg-indigo-50"] {
+  color: #1e1b4b !important;
+  font-weight: 700;
+}
+[class*="bg-indigo-500/"] *,
+[class*="bg-indigo-400/"] *,
+[class*="bg-indigo-600/20"] *,
+[class*="bg-indigo-100"] *,
+[class*="bg-indigo-50"] * {
+  color: #1e1b4b !important;
+}
+
+/* =========================================================================
+   REMAP NEON/PASTEL TEXT TO DARK, HIGH-CONTRAST COLORS (LIGHT THEME)
+   ========================================================================= */
+.text-amber-300,
+.text-amber-400,
+.text-amber-500 {
+  color: #78350f !important; /* amber-900 */
+}
+
+.text-yellow-300,
+.text-yellow-400,
+.text-yellow-500 {
+  color: #713f12 !important; /* yellow-900 */
+}
+
+.text-emerald-300,
+.text-emerald-400,
+.text-emerald-500 {
+  color: #064e3b !important; /* emerald-900 */
+}
+
+.text-green-300,
+.text-green-400,
+.text-green-500 {
+  color: #14532d !important; /* green-900 */
+}
+
+.text-teal-300,
+.text-teal-400,
+.text-teal-500 {
+  color: #134e4a !important; /* teal-900 */
+}
+
+.text-cyan-300,
+.text-cyan-400,
+.text-cyan-500 {
+  color: #164e63 !important; /* cyan-900 */
+}
+
+.text-purple-300,
+.text-purple-400,
+.text-purple-500 {
+  color: #581c87 !important; /* purple-900 */
+}
+
+.text-violet-300,
+.text-violet-400,
+.text-violet-500 {
+  color: #4c1d95 !important; /* violet-900 */
+}
+
+.text-blue-300,
+.text-blue-400,
+.text-blue-500 {
+  color: #1e3a8a !important; /* blue-900 */
+}
+
+.text-sky-300,
+.text-sky-400,
+.text-sky-500 {
+  color: #0c4a6e !important; /* sky-900 */
+}
+
+.text-rose-300,
+.text-rose-400,
+.text-rose-500 {
+  color: #881337 !important; /* rose-900 */
+}
+
+.text-red-300,
+.text-red-400,
+.text-red-500 {
+  color: #7f1d1d !important; /* red-900 */
+}
+
+.text-indigo-300,
+.text-indigo-400,
+.text-indigo-500 {
+  color: #312e81 !important; /* indigo-900 */
+}
+
+.text-orange-300,
+.text-orange-400,
+.text-orange-500 {
+  color: #7c2d12 !important; /* orange-900 */
 }
 
 /* Modals & Backdrop */
@@ -311,6 +578,77 @@ table tr:hover td {
 }
 
 /* Print Specific Rules */
+/* =========================================================================
+   RESPONSIVE SCALING & PROPORTIONAL TYPOGRAPHY
+   Mobile view: prevents words/sentences from being cut off, ensures clear 
+   proportional layout.
+   Desktop/Laptop view: ensures elements do NOT shrink or become smaller.
+   ========================================================================= */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Mobile Phones (< 640px) */
+@media (max-width: 639px) {
+  /* Prevent text and sentences from clipping prematurely */
+  h1, h2, h3, h4, h5, h6, p, label {
+    overflow-wrap: break-word;
+    word-break: normal;
+    hyphens: manual;
+  }
+
+  /* Ensure card headings wrap gracefully without truncating essential info */
+  .card-header-wrap {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* Prevent table column text squishing by enabling fluid touch scroll */
+  table {
+    min-width: 580px;
+  }
+
+  /* Fluid touch scrolling for all table containers */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Form inputs & selects easily readable on mobile */
+  input, select, textarea {
+    font-size: 13px !important;
+  }
+}
+
+/* Tablets, Laptops & PC Desktop (>= 640px and >= 1024px) */
+/* Guarantees that PC / laptop view never shrinks or appears smaller */
+@media (min-width: 640px) {
+  body {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
+
+@media (min-width: 1024px) {
+  body {
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .text-xs {
+    font-size: 0.75rem; /* 12px */
+  }
+
+  .text-sm {
+    font-size: 0.875rem; /* 14px */
+  }
+
+  .text-base {
+    font-size: 1rem; /* 16px */
+  }
+}
+
 @media print {
   @page {
     size: landscape;

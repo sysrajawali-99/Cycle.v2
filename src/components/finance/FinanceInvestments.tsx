@@ -516,7 +516,7 @@ export const FinanceInvestments: React.FC<FinanceInvestmentsProps> = ({
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+            <span className="px-2.5 py-1 rounded-full text-xs font-black bg-purple-100 text-purple-950 border border-purple-300">
               Penyertaan Modal & Bagi Hasil
             </span>
             <span className="text-xs text-slate-400">Auto Generate 12 Baris Jadwal</span>
@@ -896,8 +896,8 @@ export const FinanceInvestments: React.FC<FinanceInvestmentsProps> = ({
                               <span
                                 className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
                                   sch.status === 'DI Realisasikan'
-                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                    ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
+                                    : 'bg-amber-100 text-amber-950 border border-amber-300'
                                 }`}
                               >
                                 {sch.status === 'DI Realisasikan' ? 'DI Realisasikan' : 'Ditunda'}

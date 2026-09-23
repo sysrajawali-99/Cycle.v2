@@ -1877,23 +1877,23 @@ export const FinanceBankReconcile: React.FC<FinanceBankReconcileProps> = ({
               <span>+ Upload Rekening Koran</span>
             </button>
 
-            <div className="inline-flex rounded-xl shadow-lg shadow-emerald-900/30">
+            <div className="inline-flex rounded-xl shadow-md border border-emerald-300 bg-emerald-100">
               <button
                 onClick={handleRunAutoMatch}
                 disabled={!activeStatement || activeStatement.items.length === 0}
-                className="flex items-center space-x-2 px-3.5 py-2.5 rounded-l-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-bold transition-all cursor-pointer border-r border-emerald-500/50"
+                className="flex items-center space-x-2 px-3.5 py-2.5 rounded-l-xl bg-emerald-100 hover:bg-emerald-200 disabled:opacity-50 disabled:pointer-events-none text-emerald-950 text-xs font-black transition-all cursor-pointer border-r border-emerald-300"
                 title="Jalankan Auto-Match Otomatis Cerdas sekarang"
               >
-                <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-                <span>Auto-Match Otomatis Masal</span>
+                <Sparkles className="w-4 h-4 text-emerald-900 animate-pulse" />
+                <span className="text-emerald-950 font-black">Auto-Match Otomatis Masal</span>
               </button>
               <button
                 onClick={() => setIsAutoMatchModalOpen(true)}
                 disabled={!activeStatement || activeStatement.items.length === 0}
-                className="px-2.5 py-2.5 rounded-r-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-bold transition-all cursor-pointer"
+                className="px-2.5 py-2.5 rounded-r-xl bg-emerald-100 hover:bg-emerald-200 disabled:opacity-50 disabled:pointer-events-none text-emerald-950 text-xs font-black transition-all cursor-pointer"
                 title="Buka opsi & pengaturan parameter Auto-Match"
               >
-                <Filter className="w-3.5 h-3.5" />
+                <Filter className="w-3.5 h-3.5 text-emerald-950" />
               </button>
             </div>
 

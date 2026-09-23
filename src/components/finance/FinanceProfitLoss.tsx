@@ -395,7 +395,7 @@ export const FinanceProfitLoss: React.FC<FinanceProfitLossProps> = ({
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <span className="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-950 border border-emerald-300">
               Laporan Keuangan Resmi
             </span>
             <span className="text-xs text-slate-400">PSAK & Standar Akuntansi Indonesia</span>

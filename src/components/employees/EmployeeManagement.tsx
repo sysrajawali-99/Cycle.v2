@@ -417,7 +417,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 <h1 className="text-xl font-bold text-white tracking-tight">
                   Data Karyawan & Penempatan Lokasi
                 </h1>
-                <span className="bg-amber-500/20 text-amber-300 text-xs font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                <span className="bg-amber-100 text-amber-950 text-xs font-black px-2.5 py-0.5 rounded-full border border-amber-300">
                   {employees.filter((e) => e.status !== 'Resign').length} Personil Aktif
                 </span>
               </div>
@@ -434,10 +434,10 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
               <button
                 id="download-template-excel-btn"
                 onClick={handleDownloadTemplateXLSX}
-                className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white font-bold text-xs rounded-lg border border-emerald-500/40 transition cursor-pointer"
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-black text-xs rounded-lg border border-emerald-300 transition cursor-pointer"
                 title="Unduh Template Excel (.xlsx) resmi dengan kolom terpisah otomatis"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-950" />
                 <span>Template Excel (.xlsx)</span>
               </button>
               <button
@@ -472,9 +472,9 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 setBulkSuccessMsg(null);
                 setShowBulkModal(true);
               }}
-              className="flex items-center space-x-1.5 px-3.5 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white font-bold text-xs rounded-xl border border-blue-500/40 shadow-sm transition cursor-pointer"
+              className="flex items-center space-x-1.5 px-3.5 py-2 bg-blue-100 hover:bg-blue-200 text-blue-950 font-black text-xs rounded-xl border border-blue-300 shadow-sm transition cursor-pointer"
             >
-              <Upload className="w-4 h-4 text-blue-400" />
+              <Upload className="w-4 h-4 text-blue-950" />
               <span>Upload Massal (Excel / CSV)</span>
             </button>
 

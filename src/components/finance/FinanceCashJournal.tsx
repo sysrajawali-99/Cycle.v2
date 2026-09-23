@@ -1811,71 +1811,71 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
       )}
 
       {/* Sub-Navigation Tabs */}
-      <div className="flex items-center space-x-2 border-b border-slate-800 pb-1 overflow-x-auto">
+      <div className="flex items-center space-x-2 border-b border-slate-200 pb-1 overflow-x-auto">
         <button
           onClick={() => setActiveSubTab('transactions')}
-          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
             activeSubTab === 'transactions'
-              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              ? 'bg-amber-100 text-amber-950 border border-amber-300 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Receipt className="w-4 h-4" />
-          <span>Daftar Transaksi Kas & Bank</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300">
+          <Receipt className="w-4 h-4 text-amber-950" />
+          <span className="text-amber-950 font-black">Daftar Transaksi Kas & Bank</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-950 font-black">
             {transactions.length}
           </span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('journals')}
-          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
             activeSubTab === 'journals'
-              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              ? 'bg-amber-100 text-amber-950 border border-amber-300 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <BookOpen className="w-4 h-4" />
-          <span>Jurnal Umum (General Journal)</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300">
+          <BookOpen className="w-4 h-4 text-amber-950" />
+          <span className="text-amber-950 font-black">Jurnal Umum (General Journal)</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-950 font-black">
             {transactions.length}
           </span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('ledger')}
-          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
             activeSubTab === 'ledger'
-              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              ? 'bg-amber-100 text-amber-950 border border-amber-300 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Layers className="w-4 h-4" />
-          <span>Buku Besar (General Ledger)</span>
+          <Layers className="w-4 h-4 text-amber-950" />
+          <span className="text-amber-950 font-black">Buku Besar (General Ledger)</span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('trial_balance')}
-          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
             activeSubTab === 'trial_balance'
-              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              ? 'bg-amber-100 text-amber-950 border border-amber-300 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Scale className="w-4 h-4" />
-          <span>Neraca Saldo (Trial Balance)</span>
+          <Scale className="w-4 h-4 text-amber-950" />
+          <span className="text-amber-950 font-black">Neraca Saldo (Trial Balance)</span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('coa')}
-          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
             activeSubTab === 'coa'
-              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              ? 'bg-amber-100 text-amber-950 border border-amber-300 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          <Layers className="w-4 h-4" />
-          <span>Bagan Akun (COA Standar)</span>
+          <Layers className="w-4 h-4 text-amber-950" />
+          <span className="text-amber-950 font-black">Bagan Akun (COA Standar)</span>
         </button>
       </div>
 

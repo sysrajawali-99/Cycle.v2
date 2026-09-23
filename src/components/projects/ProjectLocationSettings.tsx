@@ -620,44 +620,50 @@ export const ProjectLocationSettings: React.FC<ProjectLocationSettingsProps> = (
             <div
               key={project.id}
               id={`project-card-${project.id}`}
-              className="bg-slate-900 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-5 space-y-4 shadow-lg transition duration-150 flex flex-col justify-between"
+              className="bg-slate-900 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-4 sm:p-5 space-y-3 sm:space-y-4 shadow-lg transition duration-150 flex flex-col justify-between"
             >
               {/* Header Box */}
               <div>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center space-x-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm shrink-0">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  {/* Left: Location Icon & Name Details */}
+                  <div className="flex items-start space-x-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-300 text-amber-950 flex items-center justify-center font-black text-xs sm:text-sm shrink-0 mt-0.5 shadow-sm">
                       {project.code.slice(0, 3)}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <h3 className="text-base font-bold text-white truncate">{project.name}</h3>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <h3 className="text-sm sm:text-base font-bold text-white break-words leading-snug">
+                          {project.name}
+                        </h3>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-200 shrink-0 whitespace-nowrap">
                           {project.code}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-2 text-xs text-slate-400 mt-0.5 truncate">
-                        <span className="font-semibold text-amber-400">{project.type}</span>
-                        <span>•</span>
-                        <span>SPV: {project.siteSupervisor}</span>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400 mt-1">
+                        <span className="font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded text-[11px]">
+                          {project.type}
+                        </span>
+                        <span className="text-slate-500">•</span>
+                        <span className="text-slate-300">SPV: {project.siteSupervisor || '-'}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-1.5 shrink-0">
+                  {/* Right: Actions Toolbar (stacks nicely on mobile, horizontal on desktop) */}
+                  <div className="flex items-center space-x-2 shrink-0 self-stretch sm:self-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80 justify-end">
                     <button
                       id={`print-project-${project.id}-btn`}
                       onClick={() => setPrintProject(project)}
-                      className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 border border-amber-500/30 transition cursor-pointer text-xs font-semibold"
+                      className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition cursor-pointer text-xs font-black shadow-sm"
                       title={`Cetak Form Spesifikasi ${project.name}`}
                     >
-                      <Printer className="w-3.5 h-3.5" />
+                      <Printer className="w-3.5 h-3.5 text-amber-950" />
                       <span>Cetak Form</span>
                     </button>
                     <button
                       id={`edit-project-${project.id}-btn`}
                       onClick={() => handleOpenEditModal(project)}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                      className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition cursor-pointer border border-slate-700"
                       title="Edit Spesifikasi Lokasi"
                     >
                       <Edit3 className="w-4 h-4" />
@@ -665,17 +671,17 @@ export const ProjectLocationSettings: React.FC<ProjectLocationSettingsProps> = (
                     <button
                       id={`delete-project-${project.id}-btn`}
                       onClick={() => handleDeleteProject(project)}
-                      className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 transition cursor-pointer"
+                      className="p-2 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-950 border border-rose-300 transition cursor-pointer shadow-sm"
                       title={`Hapus Lokasi Project ${project.name}`}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4 text-rose-950" />
                     </button>
                   </div>
                 </div>
 
-                <div className="mt-2.5 text-xs text-slate-400 flex items-start space-x-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
-                  <span className="truncate">{project.address}</span>
+                <div className="mt-2.5 text-xs text-slate-400 flex items-start space-x-1.5 bg-slate-950/40 p-2 rounded-lg border border-slate-800/50">
+                  <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <span className="break-words leading-relaxed text-slate-300">{project.address || 'Alamat belum diisi'}</span>
                 </div>
               </div>
 
@@ -778,9 +784,9 @@ export const ProjectLocationSettings: React.FC<ProjectLocationSettingsProps> = (
                     </div>
                   </div>
 
-                  <div className="bg-slate-900/90 px-3 py-2 rounded-lg border border-slate-800 flex items-center justify-between text-xs">
-                    <span className="text-[11px] text-slate-400">o. Titik Toilet Per Lantai (P/W):</span>
-                    <span className="font-semibold text-slate-200 text-right truncate max-w-[200px]">
+                  <div className="bg-slate-900/90 px-3 py-2 rounded-lg border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-1">
+                    <span className="text-[11px] text-slate-400 shrink-0">o. Titik Toilet Per Lantai (P/W):</span>
+                    <span className="font-semibold text-slate-200 text-left sm:text-right break-words">
                       {project.toiletPointsPerFloorPW || '-'}
                     </span>
                   </div>
