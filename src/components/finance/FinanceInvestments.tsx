@@ -27,7 +27,8 @@ import {
   X,
   FileCheck,
   DollarSign,
-  Info
+  Info,
+  RotateCcw
 } from 'lucide-react';
 import {
   InvestmentRecord,
@@ -64,6 +65,17 @@ export const FinanceInvestments: React.FC<FinanceInvestmentsProps> = ({
   const [expandedInvestmentId, setExpandedInvestmentId] = useState<string | null>(
     investments.length > 0 ? investments[0].id : null
   );
+
+  // Reminder & Reference Date Settings (Default: H-7 Sesuai Jadwal)
+  const [referenceDate, setReferenceDate] = useState<string>(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+  const [reminderFilter, setReminderFilter] = useState<'H7' | 'H3' | 'H0' | 'OVERDUE' | 'ALL'>('H7');
+  const [showAllReminders, setShowAllReminders] = useState<boolean>(false);
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -194,7 +206,23 @@ export const FinanceInvestments: React.FC<FinanceInvestmentsProps> = ({
     });
   }, [investments, selectedInvestorFilter, statusFilter, searchQuery]);
 
+  // Total count of pending schedules across all active investments
+  const totalPendingSchedulesCount = useMemo(() => {
+    let count = 0;
+    investments.forEach((inv) => {
+      if (inv.status === 'ACTIVE') {
+        inv.schedules.forEach((sch) => {
+          if (sch.status === 'Ditunda') {
+            count++;
+          }
+        });
+      }
+    });
+    return count;
+  }, [investments]);
+
   // Reminders for Upcoming / Overdue Profit Sharing Payouts
+  // Default window: H-7 (jadwal bagi hasil akan terlihat mulai H-7 s/d hari-H jatuh tempo dan lewat jatuh tempo; sebelum H-7 maka tidak terlihat)
   const reminders = useMemo(() => {
     const list: Array<{
       investment: InvestmentRecord;
@@ -203,16 +231,34 @@ export const FinanceInvestments: React.FC<FinanceInvestmentsProps> = ({
       daysRemaining: number;
     }> = [];
 
-    const today = new Date('2026-08-29');
+    // Parse referenceDate into midnight local Date
+    const parts = referenceDate.split('-').map(Number);
+    const today = parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0) : new Date();
 
     investments.forEach((inv) => {
       if (inv.status === 'ACTIVE') {
         inv.schedules.forEach((sch) => {
           if (sch.status === 'Ditunda') {
-            const due = new Date(sch.dueDate);
-            const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-            // Show if overdue or due in next 14 days
-            if (diffDays <= 14) {
+            const dueParts = sch.dueDate.split('-').map(Number);
+            const due = dueParts.length === 3 ? new Date(dueParts[0], dueParts[1] - 1, dueParts[2], 0, 0, 0, 0) : new Date(sch.dueDate);
+            const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+            // Filter logic:
+            // 'H7': Sesuai aturan user, jadwal bagi hasil terlihat mulai H-7 (diffDays <= 7). Jika diffDays > 7 (sebelum H-7) maka tidak terlihat.
+            let isIncluded = false;
+            if (reminderFilter === 'H7') {
+              isIncluded = diffDays <= 7;
+            } else if (reminderFilter === 'H3') {
+              isIncluded = diffDays <= 3;
+            } else if (reminderFilter === 'H0') {
+              isIncluded = diffDays <= 0;
+            } else if (reminderFilter === 'OVERDUE') {
+              isIncluded = diffDays < 0;
+            } else if (reminderFilter === 'ALL') {
+              isIncluded = true;
+            }
+
+            if (isIncluded) {
               list.push({
                 investment: inv,
                 schedule: sch,
@@ -226,7 +272,17 @@ export const FinanceInvestments: React.FC<FinanceInvestmentsProps> = ({
     });
 
     return list.sort((a, b) => a.daysRemaining - b.daysRemaining);
-  }, [investments]);
+  }, [investments, referenceDate, reminderFilter]);
+
+  // Current month label dynamically based on referenceDate
+  const currentMonthLabel = useMemo(() => {
+    const parts = referenceDate.split('-').map(Number);
+    if (parts.length === 3) {
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+    }
+    return 'Bulan Ini';
+  }, [referenceDate]);
 
   // KPI Metrics Calculation
   const stats = useMemo(() => {
@@ -234,6 +290,7 @@ export const FinanceInvestments: React.FC<FinanceInvestmentsProps> = ({
     let totalRealizedProfit = 0;
     let totalPendingProfit = 0;
     let thisMonthDueProfit = 0;
+    const currentMonthPrefix = referenceDate.slice(0, 7);
 
     investments.forEach((inv) => {
       totalCapital += inv.capitalAmount;
@@ -243,8 +300,8 @@ export const FinanceInvestments: React.FC<FinanceInvestmentsProps> = ({
           totalRealizedProfit += profit;
         } else {
           totalPendingProfit += profit;
-          // Check if due in August 2026
-          if (sch.dueDate.startsWith('2026-08')) {
+          // Check if due in active month
+          if (sch.dueDate.startsWith(currentMonthPrefix)) {
             thisMonthDueProfit += profit;
           }
         }
@@ -258,7 +315,7 @@ export const FinanceInvestments: React.FC<FinanceInvestmentsProps> = ({
       thisMonthDueProfit,
       activeInvestorsCount: investments.filter((i) => i.status === 'ACTIVE').length
     };
-  }, [investments]);
+  }, [investments, referenceDate]);
 
   // Open Add Investment Modal
   const handleOpenAdd = () => {
@@ -724,86 +781,249 @@ export const FinanceInvestments: React.FC<FinanceInvestmentsProps> = ({
           </div>
           <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 border-t border-slate-100 pt-2 font-medium">
             <span>Periode Berjalan:</span>
-            <span className="font-bold text-blue-900">Agustus 2026</span>
+            <span className="font-bold text-blue-900">{currentMonthLabel}</span>
           </div>
         </div>
       </div>
 
-      {/* Reminder Notification Box */}
-      {reminders.length > 0 && (
-        <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <div className="flex items-center space-x-2.5">
-              <span className="p-1.5 rounded-xl bg-purple-600 text-white shadow-xs">
-                <Bell className="w-4 h-4 !text-white" />
-              </span>
-              <div>
+      {/* Reminder Notification Box - Fitur H-7 Pembagian Bagi Hasil */}
+      <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-2 border-b border-purple-200/70">
+          <div className="flex items-center space-x-2.5">
+            <span className="p-2 rounded-xl bg-purple-600 text-white shadow-xs">
+              <Bell className="w-4 h-4 !text-white" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-xs sm:text-sm font-black text-purple-950">
                   Reminder Pembagian Bagi Hasil Investor ({reminders.length} Jadwal Jatuh Tempo / Ditunda)
                 </h3>
-                <span className="text-[11px] text-purple-900 font-semibold">Pengingat Rekening & Tanggal Bagi Hasil</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-300">
+                  {reminderFilter === 'H7'
+                    ? 'Aturan H-7 Aktif'
+                    : reminderFilter === 'H3'
+                    ? 'Filter H-3 Aktif'
+                    : reminderFilter === 'H0'
+                    ? 'Hari Ini / Lewat'
+                    : reminderFilter === 'OVERDUE'
+                    ? 'Khusus Overdue'
+                    : 'Semua Jadwal Ditunda'}
+                </span>
               </div>
+              <span className="text-[11px] text-purple-900 font-semibold">
+                Pengingat Rekening & Tanggal Pembagian Bagi Hasil • Menampilkan {reminders.length} dari total {totalPendingSchedulesCount} jadwal berstatus Ditunda
+              </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {reminders.slice(0, 6).map((item, idx) => {
-              const profitTotal = item.schedule.totalProfitCombined ?? (item.schedule.profitAmount + (item.schedule.secondaryProfitAmount || 0));
-              const hasSplit = item.investment.hasSplitProfit || (item.schedule.secondaryProfitAmount && item.schedule.secondaryProfitAmount > 0);
+          {/* Filter & Tanggal Acuan Controls */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Filter Jendela Pengingat */}
+            <div className="flex items-center space-x-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-purple-200 text-xs shadow-2xs">
+              <Filter className="w-3.5 h-3.5 text-purple-600" />
+              <span className="text-[11px] font-bold text-slate-700 hidden sm:inline">Filter:</span>
+              <select
+                value={reminderFilter}
+                onChange={(e) => setReminderFilter(e.target.value as any)}
+                className="bg-transparent font-bold text-xs text-purple-950 focus:outline-none cursor-pointer"
+              >
+                <option value="H7">Jadwal H-7 s/d Jatuh Tempo & Terlewat (Standar)</option>
+                <option value="H3">Mendesak H-3 s/d Jatuh Tempo</option>
+                <option value="H0">Jatuh Tempo Hari Ini (H-0) & Terlewat</option>
+                <option value="OVERDUE">Khusus Lewat Jatuh Tempo (Overdue)</option>
+                <option value="ALL">Semua Jadwal Ditunda ({totalPendingSchedulesCount})</option>
+              </select>
+            </div>
 
-              return (
-                <div
-                  key={idx}
-                  className={`p-3.5 rounded-xl border text-xs flex items-center justify-between shadow-xs transition-all ${
-                    item.isOverdue
-                      ? 'bg-rose-50 border-rose-300 text-rose-950'
-                      : 'bg-white border-slate-200 text-slate-900 hover:border-purple-300'
-                  }`}
-                >
-                  <div className="min-w-0 pr-2 space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <div className="font-black text-slate-900 truncate text-xs sm:text-sm">{item.investment.investorName}</div>
-                      {hasSplit && (
-                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-purple-100 text-purple-900 border border-purple-200 shrink-0">
-                          Split
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-slate-600 font-medium truncate">
-                      {item.schedule.monthLabel} • <span className={item.isOverdue ? 'text-rose-700 font-bold' : 'text-slate-700'}>Due: {item.schedule.dueDate}</span>
-                    </div>
-
-                    <div className="text-[10px] text-purple-950 font-bold font-mono truncate bg-purple-100/70 px-1.5 py-0.5 rounded border border-purple-200">
-                      Rek. Utama: {item.investment.bankName}: {item.investment.bankAccountNumber}
-                    </div>
-
-                    {hasSplit && item.investment.secondaryBankAccountNumber && (
-                      <div className="text-[10px] text-amber-950 font-bold font-mono truncate bg-amber-100/70 px-1.5 py-0.5 rounded border border-amber-200">
-                        Rek. Imbalan: {item.investment.secondaryBankName}: {item.investment.secondaryBankAccountNumber}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <div className="font-black text-purple-900 text-sm">{formatCurrency(profitTotal)}</div>
-                    {hasSplit && (
-                      <div className="text-[10px] text-slate-500 font-medium">
-                        Utama: {formatCurrency(item.schedule.profitAmount)} | Imb: {formatCurrency(item.schedule.secondaryProfitAmount || 0)}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => handleQuickRealize(item.investment, item.schedule)}
-                      className="mt-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 !text-white rounded-lg text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
-                    >
-                      <span className="!text-white">Realisasikan</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            {/* Input Tanggal Acuan (Simulator / Real Time) */}
+            <div className="flex items-center space-x-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-purple-200 text-xs shadow-2xs">
+              <Calendar className="w-3.5 h-3.5 text-purple-600" />
+              <span className="text-[11px] font-bold text-slate-700 hidden sm:inline">Acuan:</span>
+              <input
+                type="date"
+                value={referenceDate}
+                onChange={(e) => setReferenceDate(e.target.value)}
+                className="bg-transparent text-xs font-bold text-slate-900 focus:outline-none cursor-pointer"
+                title="Sesuaikan tanggal acuan untuk simulasi reminder"
+              />
+              <button
+                onClick={() => {
+                  const d = new Date();
+                  const y = d.getFullYear();
+                  const m = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  setReferenceDate(`${y}-${m}-${day}`);
+                }}
+                className="p-1 text-slate-500 hover:text-purple-700 rounded hover:bg-purple-50 transition-colors"
+                title="Kembalikan ke Tanggal Hari Ini"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         </div>
-      )}
+
+        {/* Info Banner Aturan H-7 */}
+        <div className="bg-white/80 border border-purple-200 rounded-xl p-2.5 sm:p-3 text-[11px] text-purple-950 flex items-start gap-2 shadow-2xs">
+          <Info className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <p className="font-bold text-purple-950">
+              Kebijakan Pengingat H-7 Pembagian Bagi Hasil (Tanggal Acuan:{' '}
+              <span className="underline font-black text-purple-800">{referenceDate}</span>):
+            </p>
+            <p className="text-slate-600 leading-relaxed">
+              Jadwal pembayaran bagi hasil otomatis terlihat pada menu pengingat ini saat memasuki{' '}
+              <strong>H-7 (7 hari sebelum tanggal jadwal ditentukan)</strong> hingga hari jatuh tempo (H-0) dan jadwal yang terlewat transfer. Jadwal sebelum H-7 (H-8 ke atas) <strong>tidak terlihat</strong> agar antrean pembayaran bagi hasil tetap fokus dan terkontrol.
+            </p>
+          </div>
+        </div>
+
+        {/* Empty State vs List Cards */}
+        {reminders.length === 0 ? (
+          <div className="bg-white border border-slate-200 rounded-xl p-5 text-center shadow-xs space-y-2">
+            <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-200">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div className="text-xs sm:text-sm font-bold text-slate-800">
+              Tidak Ada Jadwal Jatuh Tempo dalam Jendela{' '}
+              {reminderFilter === 'H7' ? 'H-7' : reminderFilter}
+            </div>
+            <p className="text-[11px] text-slate-500 max-w-lg mx-auto">
+              Berdasarkan tanggal acuan <strong>{referenceDate}</strong>, seluruh jadwal bagi hasil lainnya ({totalPendingSchedulesCount} jadwal berstatus Ditunda) masih berjarak lebih dari 7 hari sebelum jatuh tempo (&gt; H-7) atau sudah direalisasikan.
+            </p>
+            {totalPendingSchedulesCount > 0 && reminderFilter !== 'ALL' && (
+              <div className="pt-1">
+                <button
+                  onClick={() => setReminderFilter('ALL')}
+                  className="text-xs text-purple-700 hover:text-purple-900 font-bold underline cursor-pointer"
+                >
+                  Lihat Semua {totalPendingSchedulesCount} Jadwal Ditunda Tanpa Batas H-7
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {(showAllReminders ? reminders : reminders.slice(0, 6)).map((item, idx) => {
+                const profitTotal =
+                  item.schedule.totalProfitCombined ??
+                  item.schedule.profitAmount + (item.schedule.secondaryProfitAmount || 0);
+                const hasSplit =
+                  item.investment.hasSplitProfit ||
+                  (item.schedule.secondaryProfitAmount && item.schedule.secondaryProfitAmount > 0);
+
+                // Badge Tagging
+                let badgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
+                let badgeLabel = `H-${item.daysRemaining} (${item.daysRemaining} Hari Lagi)`;
+                if (item.daysRemaining < 0) {
+                  badgeClass = 'bg-rose-100 text-rose-800 border-rose-300 font-black';
+                  badgeLabel = `Terlambat ${Math.abs(item.daysRemaining)} Hari`;
+                } else if (item.daysRemaining === 0) {
+                  badgeClass = 'bg-amber-100 text-amber-900 border-amber-300 font-black animate-pulse';
+                  badgeLabel = 'Jatuh Tempo Hari Ini (H-0)';
+                } else if (item.daysRemaining === 7) {
+                  badgeClass = 'bg-indigo-100 text-indigo-900 border-indigo-300 font-black';
+                  badgeLabel = 'H-7 (Mulai Terlihat)';
+                } else if (item.daysRemaining > 7) {
+                  badgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+                  badgeLabel = `H-${item.daysRemaining} (> H-7)`;
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    className={`p-3.5 rounded-xl border text-xs flex items-center justify-between shadow-xs transition-all ${
+                      item.isOverdue
+                        ? 'bg-rose-50/70 border-rose-300 text-rose-950'
+                        : 'bg-white border-slate-200 text-slate-900 hover:border-purple-300'
+                    }`}
+                  >
+                    <div className="min-w-0 pr-2 space-y-1.5 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="font-black text-slate-900 truncate text-xs sm:text-sm">
+                          {item.investment.investorName}
+                        </div>
+                        {hasSplit && (
+                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-purple-100 text-purple-900 border border-purple-200 shrink-0">
+                            Split
+                          </span>
+                        )}
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded border shrink-0 ${badgeClass}`}
+                        >
+                          {badgeLabel}
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] text-slate-600 font-medium truncate">
+                        {item.schedule.monthLabel} •{' '}
+                        <span
+                          className={
+                            item.isOverdue ? 'text-rose-700 font-bold' : 'text-slate-800 font-semibold'
+                          }
+                        >
+                          Jadwal: {item.schedule.dueDate}
+                        </span>
+                      </div>
+
+                      <div className="text-[10px] text-purple-950 font-bold font-mono truncate bg-purple-100/70 px-1.5 py-0.5 rounded border border-purple-200">
+                        Rek. Utama: {item.investment.bankName}: {item.investment.bankAccountNumber}
+                      </div>
+
+                      {hasSplit && item.investment.secondaryBankAccountNumber && (
+                        <div className="text-[10px] text-amber-950 font-bold font-mono truncate bg-amber-100/70 px-1.5 py-0.5 rounded border border-amber-200">
+                          Rek. Imbalan: {item.investment.secondaryBankName}:{' '}
+                          {item.investment.secondaryBankAccountNumber}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-right shrink-0 ml-2">
+                      <div className="font-black text-purple-900 text-sm">
+                        {formatCurrency(profitTotal)}
+                      </div>
+                      {hasSplit && (
+                        <div className="text-[10px] text-slate-500 font-medium">
+                          Utama: {formatCurrency(item.schedule.profitAmount)} | Imb:{' '}
+                          {formatCurrency(item.schedule.secondaryProfitAmount || 0)}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => handleQuickRealize(item.investment, item.schedule)}
+                        className="mt-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 !text-white rounded-lg text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
+                      >
+                        <span className="!text-white">Realisasikan</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Expand / Collapse Button if more than 6 reminders */}
+            {reminders.length > 6 && (
+              <div className="flex justify-center pt-1">
+                <button
+                  onClick={() => setShowAllReminders(!showAllReminders)}
+                  className="px-3.5 py-1.5 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                >
+                  <span>
+                    {showAllReminders
+                      ? 'Tampilkan Lebih Sedikit (6 Jadwal)'
+                      : `Tampilkan Semua (${reminders.length} Jadwal Jatuh Tempo)`}
+                  </span>
+                  {showAllReminders ? (
+                    <ChevronUp className="w-3.5 h-3.5 text-purple-700" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-purple-700" />
+                  )}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Filter & Investor Selector Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
