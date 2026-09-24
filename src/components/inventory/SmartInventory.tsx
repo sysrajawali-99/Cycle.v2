@@ -42,6 +42,7 @@ import {
 import { storageService } from '../../services/storageService';
 import { MaterialRequestTab } from './MaterialRequestTab';
 import { ConfirmModal } from '../common/ConfirmModal';
+import { notifyRealtimeChange } from '../common/RealtimeToast';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 import { generateInventoryUsagePDF } from '../../utils/pdfExport';
 import {
@@ -165,10 +166,12 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage((prev) => (prev === msg ? null : prev));
-    }, 3500);
+    notifyRealtimeChange({
+      module: 'inventory',
+      title: 'Smart Inventory & Chemical',
+      message: msg,
+      type: 'update'
+    });
   };
 
   // Stock Action Form State
@@ -958,6 +961,12 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
       endDate: recapEndDate,
       categoryFilter: recapCategoryFilter
     });
+    notifyRealtimeChange({
+      module: 'inventory',
+      title: 'Rekap Pemakaian Harian (PDF)',
+      message: 'Dokumen PDF rekapitulasi pemakaian chemical & alat berhasil diekspor.',
+      type: 'success'
+    });
   };
 
   const pendingRequestsCount = useMemo(() => {
@@ -969,14 +978,6 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 bg-slate-900 text-white border border-amber-500/50 px-4 py-3 rounded-xl shadow-2xl shadow-amber-500/10 flex items-center space-x-3 text-xs animate-in slide-in-from-top duration-200">
-          <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-          <span className="font-semibold text-slate-200">{toastMessage}</span>
-        </div>
-      )}
-
       {/* Header & Site Selector */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">

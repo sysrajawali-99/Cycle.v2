@@ -57,6 +57,7 @@ import { FinanceProfitLoss } from './components/finance/FinanceProfitLoss';
 import { FinanceBankReconcile } from './components/finance/FinanceBankReconcile';
 import { FinanceStatements } from './components/finance/FinanceStatements';
 import { FinanceAnalyticsAudit } from './components/finance/FinanceAnalyticsAudit';
+import { RealtimeToastContainer, notifyRealtimeChange } from './components/common/RealtimeToast';
 import { INITIAL_USERS } from './data/initialData';
 
 export default function App() {
@@ -165,6 +166,27 @@ export default function App() {
 
     let reloadTimeout: ReturnType<typeof setTimeout> | null = null;
     const handleDataReload = (e?: any) => {
+      // Check if it's an external/system update to inventory or reports
+      const key = e?.detail?.key;
+      const source = e?.detail?.source;
+      if (source !== 'user_action') {
+        if (['project_stocks', 'inventory_items', 'inventory_logs', 'material_requests'].includes(key)) {
+          notifyRealtimeChange({
+            module: 'inventory',
+            title: 'Stok & Data Inventory Diperbarui',
+            message: 'Perubahan inventaris disinkronkan secara real-time ke sistem.',
+            isRealtimeSync: true
+          });
+        } else if (['timesheets', 'employees'].includes(key)) {
+          notifyRealtimeChange({
+            module: 'reports',
+            title: 'Rekap Laporan & Payroll Diperbarui',
+            message: 'Data timesheet kehadiran disinkronkan ke rekapitulasi laporan.',
+            isRealtimeSync: true
+          });
+        }
+      }
+
       // Ignore local user actions since local state is updated directly by handler
       if (e?.detail?.source === 'user_action') {
         return;
@@ -177,10 +199,20 @@ export default function App() {
       }, 50);
     };
 
+    const handleCutoffUpdated = () => {
+      notifyRealtimeChange({
+        module: 'reports',
+        title: 'Periode Cut-Off Laporan Diperbarui',
+        message: 'Pengaturan rentang cut-off & kalkulasi payroll disinkronkan secara real-time.',
+        type: 'update'
+      });
+    };
+
     window.addEventListener('app_data_reset', handleDataReload);
     window.addEventListener('rajawali_remote_update', handleDataReload);
     window.addEventListener('rajawali_data_synced', handleDataReload);
     window.addEventListener('rajawali_startup_sync_completed', handleDataReload);
+    window.addEventListener('timesheet_cutoff_updated', handleCutoffUpdated);
     window.addEventListener('storage', handleDataReload);
 
     return () => {
@@ -191,6 +223,7 @@ export default function App() {
       window.removeEventListener('rajawali_remote_update', handleDataReload);
       window.removeEventListener('rajawali_data_synced', handleDataReload);
       window.removeEventListener('rajawali_startup_sync_completed', handleDataReload);
+      window.removeEventListener('timesheet_cutoff_updated', handleCutoffUpdated);
       window.removeEventListener('storage', handleDataReload);
     };
   }, []);
@@ -209,16 +242,34 @@ export default function App() {
   const handleUpdateEmployees = (updated: Employee[]) => {
     setEmployees(updated);
     storageService.saveEmployees(updated);
+    notifyRealtimeChange({
+      module: 'reports',
+      title: 'Basis Data Karyawan Diperbarui',
+      message: 'Perubahan data personil disinkronkan ke Rekap Laporan & Payroll.',
+      type: 'update'
+    });
   };
 
   const handleUpdateTimesheets = (updated: TimesheetMonthRecord[]) => {
     setTimesheets(updated);
     storageService.saveTimesheets(updated);
+    notifyRealtimeChange({
+      module: 'reports',
+      title: 'Rekap Laporan & Absensi Diperbarui',
+      message: 'Data rekaman timesheet & presensi telah disinkronkan secara real-time.',
+      type: 'update'
+    });
   };
 
   const handleUpdateStocks = (updated: ProjectStock[]) => {
     setProjectStocks(updated);
     storageService.saveProjectStocks(updated);
+    notifyRealtimeChange({
+      module: 'inventory',
+      title: 'Stok Inventory Diperbarui',
+      message: 'Perubahan stok fisik dan kuota barang disimpan secara real-time.',
+      type: 'update'
+    });
   };
 
   const handleAddInventoryLog = (log: InventoryLog) => {
@@ -226,6 +277,14 @@ export default function App() {
       const nextLogs = [log, ...prev];
       storageService.saveInventoryLogs(nextLogs);
       return nextLogs;
+    });
+    const matchedItem = inventoryItems.find((i) => i.id === log.itemId);
+    const matchedProject = projects.find((p) => p.id === log.projectId);
+    notifyRealtimeChange({
+      module: 'inventory',
+      title: 'Log Penggunaan Dicatat',
+      message: `${matchedItem?.name || 'Barang'}: ${log.type === 'IN' ? 'Stok Masuk' : 'Pemakaian'} ${log.quantity} ${matchedItem?.unit || 'unit'} di ${matchedProject?.name || 'Lokasi Proyek'}.`,
+      type: 'update'
     });
   };
 
@@ -235,16 +294,34 @@ export default function App() {
       storageService.saveInventoryItems(nextItems);
       return nextItems;
     });
+    notifyRealtimeChange({
+      module: 'inventory',
+      title: 'Master Barang Ditambahkan',
+      message: `Item "${item.name}" berhasil terdaftar di katalog master chemical & alat.`,
+      type: 'success'
+    });
   };
 
   const handleUpdateInventoryItems = (updatedItems: InventoryItem[]) => {
     setInventoryItems(updatedItems);
     storageService.saveInventoryItems(updatedItems);
+    notifyRealtimeChange({
+      module: 'inventory',
+      title: 'Katalog Master Diperbarui',
+      message: 'Data katalog master chemical, alat & APD telah diperbarui secara real-time.',
+      type: 'update'
+    });
   };
 
   const handleUpdateMaterialRequests = (updated: MaterialRequest[]) => {
     setMaterialRequests(updated);
     storageService.saveMaterialRequests(updated);
+    notifyRealtimeChange({
+      module: 'inventory',
+      title: 'Material Request Diperbarui',
+      message: 'Status dan data pengajuan permintaan barang berhasil disinkronkan.',
+      type: 'update'
+    });
   };
 
   const handleUpdateTasks = (updated: CleaningTask[]) => {
@@ -1031,6 +1108,9 @@ export default function App() {
         activeTasksCount={activeTasksCount}
         unreadBlastCount={unreadBlastCount}
       />
+
+      {/* Global Mini Toast Notification for Real-time Inventory & Reports Updates */}
+      <RealtimeToastContainer />
     </div>
   );
 }

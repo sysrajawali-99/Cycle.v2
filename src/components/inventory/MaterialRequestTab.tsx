@@ -47,6 +47,7 @@ import { formatCurrency, formatNumber, formatDateDDMMYYYY } from '../../utils/fo
 import { generateMaterialRequestPDF } from '../../utils/pdfExport';
 import { OfficialLetterhead } from '../common/OfficialLetterhead';
 import { ConfirmModal } from '../common/ConfirmModal';
+import { notifyRealtimeChange } from '../common/RealtimeToast';
 import { storageService } from '../../services/storageService';
 
 interface MaterialRequestTabProps {
@@ -97,10 +98,13 @@ export const MaterialRequestTab: React.FC<MaterialRequestTabProps> = ({
   const [isApproverConfigModalOpen, setIsApproverConfigModalOpen] = useState(false);
 
   // Success / notification toast
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    notifyRealtimeChange({
+      module: 'inventory',
+      title: 'Material Request Tracker',
+      message: msg,
+      type: 'update'
+    });
   };
 
   // Determine current user permissions
@@ -251,14 +255,6 @@ export const MaterialRequestTab: React.FC<MaterialRequestTabProps> = ({
 
   return (
     <div className="space-y-5 animate-in fade-in duration-200">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 bg-slate-900 text-white border border-amber-500/50 px-4 py-3 rounded-xl shadow-2xl shadow-amber-500/10 flex items-center space-x-3 text-xs animate-in slide-in-from-top duration-200">
-          <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-          <span className="font-semibold text-slate-200">{toastMessage}</span>
-        </div>
-      )}
-
       {/* Top Banner: Feature Description & User Authorization Indicator */}
       <div className="bg-slate-900/90 border border-slate-800 p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-start space-x-3.5">

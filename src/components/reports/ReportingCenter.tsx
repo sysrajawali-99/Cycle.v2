@@ -41,6 +41,7 @@ import {
 import { storageService, TimesheetCutoffSettings } from '../../services/storageService';
 import { OfficialLetterhead } from '../common/OfficialLetterhead';
 import { calculatePayrollSummary } from '../../utils/payrollCalculator';
+import { notifyRealtimeChange } from '../common/RealtimeToast';
 
 interface ReportingCenterProps {
   projects: Project[];
@@ -290,6 +291,12 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
       ? `Rekap_Payroll_Cutoff_${pad2(startDay)}${pad2(startMonth)}${startYear}_sd_${pad2(endDay)}${pad2(endMonth)}${endYear}.csv`
       : `Rekap_Payroll_Rajawali_${getMonthName(reportMonth)}_${reportYear}.csv`;
     downloadCSV(filename, rows);
+    notifyRealtimeChange({
+      module: 'reports',
+      title: 'Rekap CSV Berhasil Diunduh',
+      message: `File rekapitulasi payroll (${payrollRows.length} personil) berhasil diekspor.`,
+      type: 'success'
+    });
   };
 
   return (
@@ -330,6 +337,12 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
                     year: p.year,
                     label: p.shortLabel
                   }))
+                });
+                notifyRealtimeChange({
+                  module: 'reports',
+                  title: 'Rekap PDF Berhasil Dibuat',
+                  message: `Dokumen PDF Rekapitulasi Periode ${periodLabel} berhasil diunduh.`,
+                  type: 'success'
                 });
               }}
               className="flex items-center space-x-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/25 transition cursor-pointer"
