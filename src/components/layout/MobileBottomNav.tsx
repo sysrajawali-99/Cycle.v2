@@ -20,7 +20,8 @@ import {
   LogOut,
   Briefcase,
   Layers,
-  Trash2
+  Trash2,
+  FileText
 } from 'lucide-react';
 import { AppView, Project, UserAccount } from '../../types';
 
@@ -165,6 +166,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   ].filter((item) => isViewAllowed(item.id));
 
   const financeSheetItems = [
+    {
+      id: 'finance_client_contracts_invoices' as AppView,
+      label: 'Kontrak & Invoice Klien',
+      description: 'Kontrak, invoice, pajak & margin',
+      icon: <FileText className="w-4 h-4 text-amber-600" />
+    },
     {
       id: 'finance_cash_journal' as AppView,
       label: 'Buku Kas & Jurnal Umum',

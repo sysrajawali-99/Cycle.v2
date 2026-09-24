@@ -30,7 +30,8 @@ import {
   TrendingUp,
   CreditCard,
   Trash2,
-  Send
+  Send,
+  FileText
 } from 'lucide-react';
 import { AppView, UserAccount } from '../../types';
 
@@ -138,6 +139,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Finance & Accounting Submenus
   const financeMenuItems: MenuItemConfig[] = [
+    {
+      id: 'finance_client_contracts_invoices',
+      label: 'Kontrak & Invoice Klien',
+      description: 'Kontrak, Invoice, Pajak & Margin',
+      icon: <FileText className="w-4 h-4 text-amber-500" />
+    },
     {
       id: 'finance_cash_journal',
       label: 'Buku Kas & Jurnal Umum',

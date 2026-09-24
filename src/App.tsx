@@ -29,7 +29,9 @@ import {
 import {
   DebtRecord,
   ReceivableRecord,
-  InvestmentRecord
+  InvestmentRecord,
+  ClientContract,
+  ClientInvoice
 } from './types/finance';
 import { storageService } from './services/storageService';
 import { financeService } from './services/financeService';
@@ -49,6 +51,7 @@ import { AccessControl } from './components/access/AccessControl';
 import { CompanySettings } from './components/company/CompanySettings';
 import { ProjectLocationSettings } from './components/projects/ProjectLocationSettings';
 import { LoginPage } from './components/auth/LoginPage';
+import { FinanceClientContractsInvoices } from './components/finance/FinanceClientContractsInvoices';
 import { FinanceCashJournal } from './components/finance/FinanceCashJournal';
 import { FinanceDebtsReceivables } from './components/finance/FinanceDebtsReceivables';
 import { FinanceInvestments } from './components/finance/FinanceInvestments';
@@ -92,6 +95,8 @@ export default function App() {
   const [debts, setDebts] = useState<DebtRecord[]>([]);
   const [receivables, setReceivables] = useState<ReceivableRecord[]>([]);
   const [investments, setInvestments] = useState<InvestmentRecord[]>([]);
+  const [clientContracts, setClientContracts] = useState<ClientContract[]>([]);
+  const [clientInvoices, setClientInvoices] = useState<ClientInvoice[]>([]);
 
   // Company Profile Master State
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(() => storageService.getCompanyProfile());
@@ -129,6 +134,8 @@ export default function App() {
     setDebts(storageService.getDebts());
     setReceivables(storageService.getReceivables());
     setInvestments(storageService.getInvestments());
+    setClientContracts(storageService.getClientContracts());
+    setClientInvoices(storageService.getClientInvoices());
 
     if (activeUser) {
       // Find latest updated version of user from users list
@@ -567,6 +574,43 @@ export default function App() {
     }
   };
 
+  // Client Contracts & Invoices Handlers
+  const handleAddContract = (contract: ClientContract) => {
+    const updated = [contract, ...clientContracts];
+    setClientContracts(updated);
+    storageService.saveClientContracts(updated);
+  };
+
+  const handleUpdateContract = (contract: ClientContract) => {
+    const updated = clientContracts.map((c) => (c.id === contract.id ? contract : c));
+    setClientContracts(updated);
+    storageService.saveClientContracts(updated);
+  };
+
+  const handleDeleteContract = (id: string, reason: string) => {
+    const updated = clientContracts.filter((c) => c.id !== id);
+    setClientContracts(updated);
+    storageService.saveClientContracts(updated);
+  };
+
+  const handleAddInvoice = (invoice: ClientInvoice) => {
+    const updated = [invoice, ...clientInvoices];
+    setClientInvoices(updated);
+    storageService.saveClientInvoices(updated);
+  };
+
+  const handleUpdateInvoice = (invoice: ClientInvoice) => {
+    const updated = clientInvoices.map((inv) => (inv.id === invoice.id ? invoice : inv));
+    setClientInvoices(updated);
+    storageService.saveClientInvoices(updated);
+  };
+
+  const handleDeleteInvoice = (id: string, reason: string) => {
+    const updated = clientInvoices.filter((inv) => inv.id !== id);
+    setClientInvoices(updated);
+    storageService.saveClientInvoices(updated);
+  };
+
   // User Management Handlers
   const handleUpdateUsers = (updatedUsers: UserAccount[]) => {
     setUsers(updatedUsers);
@@ -926,6 +970,33 @@ export default function App() {
                 inventoryItems={inventoryItems}
                 selectedProjectId={selectedProjectId}
                 userRole={currentUser.role}
+              />
+            )}
+
+            {/* Divisi Finance: Kontrak & Invoice Klien */}
+            {currentView === 'finance_client_contracts_invoices' && (
+              <FinanceClientContractsInvoices
+                contracts={clientContracts}
+                invoices={clientInvoices}
+                receivables={receivables}
+                accounts={accounts}
+                projects={projects}
+                employees={employees}
+                inventoryItems={inventoryItems}
+                inventoryLogs={inventoryLogs}
+                timesheets={timesheets}
+                currentUser={currentUser}
+                companyProfile={companyProfile}
+                onAddContract={handleAddContract}
+                onUpdateContract={handleUpdateContract}
+                onDeleteContract={handleDeleteContract}
+                onAddInvoice={handleAddInvoice}
+                onUpdateInvoice={handleUpdateInvoice}
+                onDeleteInvoice={handleDeleteInvoice}
+                onAddReceivable={handleAddReceivable}
+                onUpdateReceivable={handleUpdateReceivable}
+                onAddTransaction={handleAddFinanceTransaction}
+                onLogAudit={handleAddAuditLog}
               />
             )}
 

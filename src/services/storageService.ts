@@ -21,6 +21,8 @@ import {
   DebtRecord,
   ReceivableRecord,
   InvestmentRecord,
+  ClientContract,
+  ClientInvoice,
   DashboardWidgetsState,
   DashboardWidgetId
 } from '../types';
@@ -48,7 +50,9 @@ import {
   INITIAL_CURRENCY_RATES,
   INITIAL_DEBTS,
   INITIAL_RECEIVABLES,
-  INITIAL_INVESTMENTS
+  INITIAL_INVESTMENTS,
+  INITIAL_CLIENT_CONTRACTS,
+  INITIAL_CLIENT_INVOICES
 } from '../data/initialFinanceData';
 
 export interface TimesheetCutoffSettings {
@@ -101,6 +105,8 @@ const STORAGE_KEYS = {
   DEBTS: 'rajawali_finance_debts',
   RECEIVABLES: 'rajawali_finance_receivables',
   INVESTMENTS: 'rajawali_finance_investments',
+  CLIENT_CONTRACTS: 'rajawali_client_contracts',
+  CLIENT_INVOICES: 'rajawali_client_invoices',
   DASHBOARD_WIDGETS: 'rajawali_dashboard_widgets',
   TIMESHEET_CUTOFF: 'rajawali_timesheet_cutoff_settings'
 };
@@ -130,7 +136,9 @@ export type StorageActionType =
   | 'period_closings'
   | 'audit_trails'
   | 'currency_rates'
-  | 'investments';
+  | 'investments'
+  | 'client_contracts'
+  | 'client_invoices';
 
 export const ACTION_TO_STORAGE_KEY_MAP: Record<StorageActionType, string> = {
   projects: STORAGE_KEYS.PROJECTS,
@@ -154,7 +162,9 @@ export const ACTION_TO_STORAGE_KEY_MAP: Record<StorageActionType, string> = {
   period_closings: STORAGE_KEYS.PERIOD_CLOSINGS,
   audit_trails: STORAGE_KEYS.AUDIT_TRAILS,
   currency_rates: STORAGE_KEYS.CURRENCY_RATES,
-  investments: STORAGE_KEYS.INVESTMENTS
+  investments: STORAGE_KEYS.INVESTMENTS,
+  client_contracts: STORAGE_KEYS.CLIENT_CONTRACTS,
+  client_invoices: STORAGE_KEYS.CLIENT_INVOICES
 };
 
 export interface StorageMiddlewareContext<T = any> {
@@ -797,6 +807,48 @@ export const storageService = {
   },
 
   // -------------------------------------------------------------------------
+  // CLIENT CONTRACTS (KONTRAK KERJASAMA KLIEN)
+  // -------------------------------------------------------------------------
+  getClientContracts(): ClientContract[] {
+    const raw = localStorage.getItem(STORAGE_KEYS.CLIENT_CONTRACTS);
+    if (raw === null) {
+      initStorageQuietly(STORAGE_KEYS.CLIENT_CONTRACTS, INITIAL_CLIENT_CONTRACTS);
+      return INITIAL_CLIENT_CONTRACTS;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : INITIAL_CLIENT_CONTRACTS;
+    } catch {
+      return INITIAL_CLIENT_CONTRACTS;
+    }
+  },
+
+  saveClientContracts(data: ClientContract[]) {
+    applyStorageUpdate('client_contracts', STORAGE_KEYS.CLIENT_CONTRACTS, data);
+  },
+
+  // -------------------------------------------------------------------------
+  // CLIENT INVOICES (INVOICE BULANAN & PEKERJAAN EKSTRA)
+  // -------------------------------------------------------------------------
+  getClientInvoices(): ClientInvoice[] {
+    const raw = localStorage.getItem(STORAGE_KEYS.CLIENT_INVOICES);
+    if (raw === null) {
+      initStorageQuietly(STORAGE_KEYS.CLIENT_INVOICES, INITIAL_CLIENT_INVOICES);
+      return INITIAL_CLIENT_INVOICES;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : INITIAL_CLIENT_INVOICES;
+    } catch {
+      return INITIAL_CLIENT_INVOICES;
+    }
+  },
+
+  saveClientInvoices(data: ClientInvoice[]) {
+    applyStorageUpdate('client_invoices', STORAGE_KEYS.CLIENT_INVOICES, data);
+  },
+
+  // -------------------------------------------------------------------------
   // SYSTEM RESET & BULK DELETE PER DIVISI (KHUSUS SUPER ADMIN)
   // -------------------------------------------------------------------------
   // 1. Hapus Data Masal Divisi Keuangan & Akuntansi
@@ -806,6 +858,8 @@ export const storageService = {
     this.saveDebts([]);
     this.saveReceivables([]);
     this.saveInvestments([]);
+    this.saveClientContracts([]);
+    this.saveClientInvoices([]);
     this.savePeriodClosings([]);
     this.saveAuditTrails([]);
 
@@ -1009,7 +1063,9 @@ export const storageService = {
       currency_rates: STORAGE_KEYS.CURRENCY_RATES,
       debts: STORAGE_KEYS.DEBTS,
       receivables: STORAGE_KEYS.RECEIVABLES,
-      investments: STORAGE_KEYS.INVESTMENTS
+      investments: STORAGE_KEYS.INVESTMENTS,
+      client_contracts: STORAGE_KEYS.CLIENT_CONTRACTS,
+      client_invoices: STORAGE_KEYS.CLIENT_INVOICES
     };
     const storageKey = keyMap[key];
     if (storageKey) {

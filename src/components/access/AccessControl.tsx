@@ -43,7 +43,8 @@ import {
   TrendingUp,
   Receipt,
   Scale,
-  PieChart
+  PieChart,
+  FileText
 } from 'lucide-react';
 import { UserAccount, AppView, Project, UserRole } from '../../types';
 import { ConfirmModal } from '../common/ConfirmModal';
@@ -130,6 +131,13 @@ const AVAILABLE_MENUS: {
     icon: <KanbanSquare className="w-4 h-4 text-teal-400" />
   },
   // 4. Divisi Finance & Accounting
+  {
+    id: 'finance_client_contracts_invoices',
+    label: 'Kontrak & Invoice Klien',
+    category: 'Divisi Finance & Accounting',
+    description: 'Manajemen kontrak klien, pembuatan invoice bulanan, pajak, dan analisis margin profitabilitas',
+    icon: <FileText className="w-4 h-4 text-amber-500" />
+  },
   {
     id: 'finance_cash_journal',
     label: 'Buku Kas & Jurnal Umum',

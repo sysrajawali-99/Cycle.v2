@@ -388,6 +388,7 @@ export const INITIAL_USERS: UserAccount[] = [
     isLocationLocked: false,
     allowedViews: [
       'dashboard',
+      'finance_client_contracts_invoices',
       'finance_cash_journal',
       'finance_debts_receivables',
       'finance_investments',
@@ -425,6 +426,7 @@ export const INITIAL_USERS: UserAccount[] = [
       'blast',
       'sops',
       'reports',
+      'finance_client_contracts_invoices',
       'finance_cash_journal',
       'finance_debts_receivables',
       'finance_investments',
@@ -529,6 +531,7 @@ export const INITIAL_USERS: UserAccount[] = [
     isLocationLocked: false,
     allowedViews: [
       'dashboard',
+      'finance_client_contracts_invoices',
       'finance_statements',
       'finance_analytics_audit',
       'reports',

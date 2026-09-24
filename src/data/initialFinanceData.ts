@@ -9,7 +9,9 @@ import {
   ReceivableRecord,
   InvestmentRecord,
   InvestmentScheduleRow,
-  ProfitSharingStatus
+  ProfitSharingStatus,
+  ClientContract,
+  ClientInvoice
 } from '../types/finance';
 
 export const INITIAL_CHART_OF_ACCOUNTS: ChartOfAccount[] = [
@@ -481,3 +483,238 @@ export function generateInvestmentSchedule(
 // INITIAL INVESTMENTS (PENCATATAN INVESTASI & BAGI HASIL INVESTOR)
 // ---------------------------------------------------------------------------
 export const INITIAL_INVESTMENTS: InvestmentRecord[] = [];
+
+// ---------------------------------------------------------------------------
+// INITIAL CLIENT CONTRACTS & INVOICES (KONTRAK & INVOICE KLIEN)
+// ---------------------------------------------------------------------------
+export const INITIAL_CLIENT_CONTRACTS: ClientContract[] = [
+  {
+    id: 'ktr-001',
+    contractNumber: 'KTR/RC/2026/01/001',
+    clientName: 'PT Pakuwon Jati Tbk - Gandaria City',
+    clientAddress: 'Jl. Sultan Iskandar Muda No. 8, Kebayoran Lama, Jakarta Selatan 12240',
+    clientTaxId: '01.234.567.8-012.000',
+    projectId: 'proj-1',
+    projectName: 'Mall Gandaria City',
+    manpowerAllocations: [
+      { id: 'mpa-1', position: 'Cleaner', count: 18, monthlyRatePerPerson: 3200000 },
+      { id: 'mpa-2', position: 'Supervisor', count: 2, monthlyRatePerPerson: 5500000 },
+      { id: 'mpa-3', position: 'Team Leader', count: 2, monthlyRatePerPerson: 4200000 }
+    ],
+    monthlyContractValue: 88500000,
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    paymentTermDays: 30,
+    status: 'Aktif',
+    addendumNotes: 'Addendum No. 01/ADD/RC-GC/VI/2026 terkait penambahan area food court & toilet UG.',
+    addendumHistory: [
+      {
+        id: 'add-001',
+        date: '2026-06-01',
+        reason: 'Penambahan 2 personil cleaner area perluasan Food Society & East Lobby',
+        previousMonthlyValue: 80000000,
+        newMonthlyValue: 88500000,
+        differenceAmount: 8500000,
+        notes: 'Disepakati oleh Building Management & Direktur Operasional',
+        recordedBy: 'Dewi Lestari, S.Ak'
+      }
+    ],
+    createdAt: '2026-01-05T08:30:00Z',
+    createdBy: 'Dewi Lestari, S.Ak'
+  },
+  {
+    id: 'ktr-002',
+    contractNumber: 'KTR/RC/2025/11/002',
+    clientName: 'PT Medika Utama Husada - RS Medika',
+    clientAddress: 'Jl. Margonda Raya No. 100, Beji, Depok, Jawa Barat 16423',
+    clientTaxId: '01.345.678.9-412.000',
+    projectId: 'proj-2',
+    projectName: 'RS Medika Utama',
+    manpowerAllocations: [
+      { id: 'mpa-4', position: 'Cleaner (Hospital Trained)', count: 14, monthlyRatePerPerson: 3300000 },
+      { id: 'mpa-5', position: 'Supervisor', count: 1, monthlyRatePerPerson: 5500000 },
+      { id: 'mpa-6', position: 'Team Leader', count: 1, monthlyRatePerPerson: 4300000 }
+    ],
+    monthlyContractValue: 64000000,
+    startDate: '2025-11-01',
+    endDate: '2026-10-31', // Berakhir dalam < 60 hari!
+    paymentTermDays: 30,
+    status: 'Akan Berakhir',
+    addendumNotes: 'Draft perpanjangan kontrak tahun 2026-2027 sedang tahap review legal.',
+    addendumHistory: [],
+    createdAt: '2025-10-25T10:00:00Z',
+    createdBy: 'Dewi Lestari, S.Ak'
+  },
+  {
+    id: 'ktr-003',
+    contractNumber: 'KTR/RC/2026/03/003',
+    clientName: 'Bintang Capital Management',
+    clientAddress: 'Gedung Menara Bintang Lt. 8, Jl. H.R. Rasuna Said Kav. C-17, Kuningan, Jakarta Selatan 12940',
+    clientTaxId: '02.456.789.0-014.000',
+    projectId: 'proj-3',
+    projectName: 'Menara Bintang Kuningan',
+    manpowerAllocations: [
+      { id: 'mpa-7', position: 'Cleaner', count: 12, monthlyRatePerPerson: 3200000 },
+      { id: 'mpa-8', position: 'Supervisor', count: 1, monthlyRatePerPerson: 5500000 },
+      { id: 'mpa-9', position: 'Floor Specialist', count: 1, monthlyRatePerPerson: 4500000 }
+    ],
+    monthlyContractValue: 55000000,
+    startDate: '2026-03-01',
+    endDate: '2027-02-28',
+    paymentTermDays: 30,
+    status: 'Aktif',
+    addendumNotes: 'Termasuk paket kristalisasi poles lantai marmer lobby tiap kuartal.',
+    addendumHistory: [],
+    createdAt: '2026-02-20T11:00:00Z',
+    createdBy: 'Dewi Lestari, S.Ak'
+  },
+  {
+    id: 'ktr-004',
+    contractNumber: 'KTR/RC/2025/09/004',
+    clientName: 'Perhimpunan Penghuni Senopati Park',
+    clientAddress: 'Jl. Senopati No. 88, Kebayoran Baru, Jakarta Selatan 12190',
+    clientTaxId: '03.567.890.1-015.000',
+    projectId: 'proj-4',
+    projectName: 'Senopati Park Residence',
+    manpowerAllocations: [
+      { id: 'mpa-10', position: 'Cleaner', count: 10, monthlyRatePerPerson: 3100000 },
+      { id: 'mpa-11', position: 'Supervisor', count: 1, monthlyRatePerPerson: 5200000 }
+    ],
+    monthlyContractValue: 42000000,
+    startDate: '2025-09-01',
+    endDate: '2026-08-31', // Telah berakhir
+    paymentTermDays: 15,
+    status: 'Berakhir',
+    addendumNotes: 'Kontrak telah selesai per 31 Agustus 2026.',
+    addendumHistory: [],
+    createdAt: '2025-08-15T14:00:00Z',
+    createdBy: 'Dewi Lestari, S.Ak'
+  }
+];
+
+export const INITIAL_CLIENT_INVOICES: ClientInvoice[] = [
+  {
+    id: 'cinv-001',
+    invoiceNumber: 'INV/2026/08/001',
+    contractId: 'ktr-001',
+    contractNumber: 'KTR/RC/2026/01/001',
+    clientName: 'PT Pakuwon Jati Tbk - Gandaria City',
+    clientAddress: 'Jl. Sultan Iskandar Muda No. 8, Kebayoran Lama, Jakarta Selatan 12240',
+    clientTaxId: '01.234.567.8-012.000',
+    projectId: 'proj-1',
+    projectName: 'Mall Gandaria City',
+    billingPeriod: 'Agustus 2026',
+    issueDate: '2026-08-01',
+    dueDate: '2026-08-31',
+    baseMonthlyAmount: 88500000,
+    extraItems: [
+      {
+        id: 'ext-1',
+        description: 'Special Deep Cleaning Area Skywalk pasca event festival',
+        quantity: 1,
+        unitPrice: 4500000,
+        subtotal: 4500000
+      }
+    ],
+    subtotalExtra: 4500000,
+    subtotalBeforeTax: 93000000,
+    isPpnEnabled: true,
+    ppnRatePercent: 11,
+    ppnAmount: 10230000,
+    isPph23Enabled: true,
+    pph23RatePercent: 2,
+    pph23Amount: 1860000,
+    totalAmount: 101370000,
+    paidAmount: 101370000,
+    remainingAmount: 0,
+    status: 'Lunas',
+    notes: 'Lunas via transfer BCA KCU Mega Kuningan ref TRF-BCA-889921',
+    payments: [
+      {
+        id: 'invp-1',
+        date: '2026-08-25',
+        amount: 101370000,
+        paymentMethod: 'Bank BCA (541-0988-771)',
+        accountCode: '1120',
+        referenceNumber: 'TRF-BCA-889921',
+        notes: 'Pelunasan tagihan invoice Agustus 2026',
+        recordedBy: 'Dewi Lestari, S.Ak'
+      }
+    ],
+    createdAt: '2026-08-01T09:00:00Z',
+    createdBy: 'Dewi Lestari, S.Ak'
+  },
+  {
+    id: 'cinv-002',
+    invoiceNumber: 'INV/2026/09/001',
+    contractId: 'ktr-001',
+    contractNumber: 'KTR/RC/2026/01/001',
+    clientName: 'PT Pakuwon Jati Tbk - Gandaria City',
+    clientAddress: 'Jl. Sultan Iskandar Muda No. 8, Kebayoran Lama, Jakarta Selatan 12240',
+    clientTaxId: '01.234.567.8-012.000',
+    projectId: 'proj-1',
+    projectName: 'Mall Gandaria City',
+    billingPeriod: 'September 2026',
+    issueDate: '2026-09-01',
+    dueDate: '2026-09-30',
+    baseMonthlyAmount: 88500000,
+    extraItems: [],
+    subtotalExtra: 0,
+    subtotalBeforeTax: 88500000,
+    isPpnEnabled: true,
+    ppnRatePercent: 11,
+    ppnAmount: 9735000,
+    isPph23Enabled: true,
+    pph23RatePercent: 2,
+    pph23Amount: 1770000,
+    totalAmount: 96465000,
+    paidAmount: 0,
+    remainingAmount: 96465000,
+    status: 'Terkirim',
+    notes: 'Invoice resmi telah dikirim ke Building Management Gandaria City.',
+    payments: [],
+    createdAt: '2026-09-01T08:30:00Z',
+    createdBy: 'Dewi Lestari, S.Ak'
+  },
+  {
+    id: 'cinv-003',
+    invoiceNumber: 'INV/2026/09/002',
+    contractId: 'ktr-002',
+    contractNumber: 'KTR/RC/2025/11/002',
+    clientName: 'PT Medika Utama Husada - RS Medika',
+    clientAddress: 'Jl. Margonda Raya No. 100, Beji, Depok, Jawa Barat 16423',
+    clientTaxId: '01.345.678.9-412.000',
+    projectId: 'proj-2',
+    projectName: 'RS Medika Utama',
+    billingPeriod: 'September 2026',
+    issueDate: '2026-09-01',
+    dueDate: '2026-09-30',
+    baseMonthlyAmount: 64000000,
+    extraItems: [
+      {
+        id: 'ext-2',
+        description: 'Fogging Disinfeksi Sterilisasi Kamar Operasi & ICU',
+        quantity: 2,
+        unitPrice: 2000000,
+        subtotal: 4000000
+      }
+    ],
+    subtotalExtra: 4000000,
+    subtotalBeforeTax: 68000000,
+    isPpnEnabled: true,
+    ppnRatePercent: 11,
+    ppnAmount: 7480000,
+    isPph23Enabled: true,
+    pph23RatePercent: 2,
+    pph23Amount: 1360000,
+    totalAmount: 74120000,
+    paidAmount: 0,
+    remainingAmount: 74120000,
+    status: 'Terkirim',
+    notes: 'Invoice periode September 2026 dikirimkan ke bagian Keuangan RS Medika.',
+    payments: [],
+    createdAt: '2026-09-01T09:15:00Z',
+    createdBy: 'Dewi Lestari, S.Ak'
+  }
+];
+

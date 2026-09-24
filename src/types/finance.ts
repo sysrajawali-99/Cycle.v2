@@ -623,3 +623,128 @@ export interface OutflowForecastMonthlySummary {
   }>;
 }
 
+// ---------------------------------------------------------------------------
+// 10. KONTRAK & INVOICE KLIEN (CLIENT CONTRACTS & BILLING)
+// ---------------------------------------------------------------------------
+
+export type ContractStatus = 'Aktif' | 'Akan Berakhir' | 'Berakhir';
+
+export interface ContractManpowerAllocation {
+  id: string;
+  position: string; // e.g. Cleaner, Supervisor, Team Leader, Floor Specialist, dll
+  count: number;
+  monthlyRatePerPerson?: number;
+}
+
+export interface ContractAddendum {
+  id: string;
+  date: string; // YYYY-MM-DD
+  reason: string;
+  previousMonthlyValue: number;
+  newMonthlyValue: number;
+  differenceAmount: number;
+  notes?: string;
+  recordedBy?: string;
+}
+
+export interface ClientContract {
+  id: string;
+  contractNumber: string; // e.g. KTR/RC/2026/01/001
+  clientName: string;
+  clientAddress: string;
+  clientTaxId: string; // NPWP Klien
+  projectId: string; // Ambil dari Pengaturan Lokasi
+  projectName?: string;
+  manpowerAllocations: ContractManpowerAllocation[];
+  monthlyContractValue: number; // Nilai kontrak per bulan (Rp)
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  paymentTermDays: number; // Termin pembayaran (hari), e.g. 15, 30, 45, 60
+  status: ContractStatus; // Aktif, Akan Berakhir, Berakhir
+  addendumNotes?: string;
+  addendumHistory: ContractAddendum[];
+  createdAt: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export type InvoiceStatus = 'Draft' | 'Terkirim' | 'Dibayar Sebagian' | 'Lunas' | 'Jatuh Tempo';
+
+export interface InvoiceExtraItem {
+  id: string;
+  description: string; // e.g. Special cleaning, Poles lantai marmer, Fogging disinfektan
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+}
+
+export interface InvoicePaymentRecord {
+  id: string;
+  date: string; // YYYY-MM-DD
+  amount: number;
+  paymentMethod: string;
+  accountCode: string;
+  referenceNumber?: string;
+  notes?: string;
+  recordedBy?: string;
+}
+
+export interface ClientInvoice {
+  id: string;
+  invoiceNumber: string; // Format: INV/TAHUN/BULAN/URUT, e.g. INV/2026/09/001
+  contractId: string;
+  contractNumber: string;
+  clientName: string;
+  clientAddress: string;
+  clientTaxId: string;
+  projectId: string;
+  projectName?: string;
+  billingPeriod: string; // e.g. "September 2026"
+  issueDate: string; // YYYY-MM-DD
+  dueDate: string; // YYYY-MM-DD
+  baseMonthlyAmount: number;
+  extraItems: InvoiceExtraItem[];
+  subtotalExtra: number;
+  subtotalBeforeTax: number; // baseMonthlyAmount + subtotalExtra
+  
+  // Pajak
+  isPpnEnabled: boolean; // default true
+  ppnRatePercent: number; // default 11%
+  ppnAmount: number;
+  
+  isPph23Enabled: boolean; // default true
+  pph23RatePercent: number; // default 2%
+  pph23Amount: number; // dipotong klien
+  
+  totalAmount: number; // subtotalBeforeTax + ppnAmount - pph23Amount (Total Piutang Tagihan Bersih)
+  paidAmount: number;
+  remainingAmount: number;
+  status: InvoiceStatus;
+  notes?: string;
+  bankAccountId?: string;
+  receivableRecordId?: string;
+  payments: InvoicePaymentRecord[];
+  createdAt: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface ContractProfitabilityRow {
+  contractId: string;
+  contractNumber: string;
+  clientName: string;
+  projectId: string;
+  projectName: string;
+  monthlyRevenue: number;
+  manpowerCost: number;
+  manpowerCount: number;
+  inventoryChemicalCost: number;
+  totalCost: number;
+  grossMarginAmount: number;
+  grossMarginPercentage: number;
+  status: ContractStatus;
+}
+
+

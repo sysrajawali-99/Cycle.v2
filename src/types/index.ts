@@ -304,6 +304,7 @@ export type AppView =
   | 'sop'
   | 'reports'
   | 'finance'
+  | 'finance_client_contracts_invoices'
   | 'finance_cash_journal'
   | 'finance_debts_receivables'
   | 'finance_investments'
