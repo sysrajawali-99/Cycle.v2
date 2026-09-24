@@ -29,7 +29,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
-  const compName = companyProfile?.name || 'PT RAJAWALI CYCLE INDONESIA';
   const tagline = companyProfile?.tagline || 'Integrated Facility Services & Enterprise Management';
 
   const handleLogin = (e: React.FormEvent) => {
@@ -199,7 +198,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
         {/* Footer */}
         <div className="text-center text-xs text-slate-500 pt-2 leading-relaxed font-medium">
-          © {new Date().getFullYear()} {compName}
+          © {new Date().getFullYear()} RTISYSTEM
         </div>
       </div>
     </div>
