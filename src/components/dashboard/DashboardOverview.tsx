@@ -47,7 +47,8 @@ import {
 } from '../../types';
 import { formatCurrency, formatNumber, getMonthName } from '../../utils/formatters';
 import { ComparativeCharts } from './ComparativeCharts';
-import { storageService } from '../../services/storageService';
+import { storageService, TimesheetCutoffSettings } from '../../services/storageService';
+import { calculatePayrollSummary } from '../../utils/payrollCalculator';
 import { UpdateBalanceModal } from './UpdateBalanceModal';
 import { DashboardWidgetModal } from './DashboardWidgetModal';
 
@@ -72,7 +73,7 @@ interface DashboardOverviewProps {
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   projects = [],
   employees = [],
-  timesheets = [],
+  timesheets: propTimesheets = [],
   projectStocks = [],
   inventoryItems = [],
   tasks = [],
@@ -94,6 +95,22 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const [internalAccounts, setInternalAccounts] = useState<ChartOfAccount[]>(() =>
     propAccounts && propAccounts.length > 0 ? propAccounts : storageService.getChartOfAccounts()
   );
+
+  // Real-time synchronization dengan Rekap Laporan & Payroll Slip Center
+  const [cutoffSettings, setCutoffSettings] = useState<TimesheetCutoffSettings>(() =>
+    storageService.getTimesheetCutoffSettings()
+  );
+  const [internalTimesheets, setInternalTimesheets] = useState<TimesheetMonthRecord[]>(() =>
+    propTimesheets && propTimesheets.length > 0 ? propTimesheets : storageService.getTimesheets()
+  );
+
+  useEffect(() => {
+    if (propTimesheets && propTimesheets.length > 0) {
+      setInternalTimesheets(propTimesheets);
+    }
+  }, [propTimesheets]);
+
+  const activeTimesheets = propTimesheets && propTimesheets.length > 0 ? propTimesheets : internalTimesheets;
 
   // Directly derive active accounts: prefer props if provided, otherwise fallback to internal state
   const activeAccounts = propAccounts && propAccounts.length > 0 ? propAccounts : internalAccounts;
@@ -122,20 +139,46 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         setWidgetSettings(storageService.getDashboardWidgets());
       }
     };
+    const handleCutoffUpdate = (e?: any) => {
+      const s = e?.detail || storageService.getTimesheetCutoffSettings();
+      if (s) {
+        setCutoffSettings({ ...s });
+      }
+    };
+    const handleTimesheetsUpdate = (e?: any) => {
+      if (!e || e.detail?.key === 'timesheets' || e.type === 'rajawali_timesheets_updated' || e.type === 'app_data_reset') {
+        const fresh = storageService.getTimesheets();
+        setInternalTimesheets(fresh);
+      }
+    };
 
     window.addEventListener('company_profile_updated', handleProfileUpdate);
     window.addEventListener('chart_of_accounts_updated', handleCoaUpdate);
     window.addEventListener('dashboard_widgets_updated', handleWidgetsUpdate as EventListener);
+    window.addEventListener('timesheet_cutoff_updated', handleCutoffUpdate);
+    window.addEventListener('rajawali_data_synced', handleTimesheetsUpdate);
+    window.addEventListener('rajawali_timesheets_updated', handleTimesheetsUpdate);
+    window.addEventListener('app_data_reset', handleTimesheetsUpdate);
+    window.addEventListener('app_data_reset', handleCutoffUpdate);
     window.addEventListener('storage', handleProfileUpdate);
     window.addEventListener('storage', handleCoaUpdate);
     window.addEventListener('storage', handleWidgetsUpdate as EventListener);
+    window.addEventListener('storage', handleCutoffUpdate);
+    window.addEventListener('storage', handleTimesheetsUpdate);
     return () => {
       window.removeEventListener('company_profile_updated', handleProfileUpdate);
       window.removeEventListener('chart_of_accounts_updated', handleCoaUpdate);
       window.removeEventListener('dashboard_widgets_updated', handleWidgetsUpdate as EventListener);
+      window.removeEventListener('timesheet_cutoff_updated', handleCutoffUpdate);
+      window.removeEventListener('rajawali_data_synced', handleTimesheetsUpdate);
+      window.removeEventListener('rajawali_timesheets_updated', handleTimesheetsUpdate);
+      window.removeEventListener('app_data_reset', handleTimesheetsUpdate);
+      window.removeEventListener('app_data_reset', handleCutoffUpdate);
       window.removeEventListener('storage', handleProfileUpdate);
       window.removeEventListener('storage', handleCoaUpdate);
       window.removeEventListener('storage', handleWidgetsUpdate as EventListener);
+      window.removeEventListener('storage', handleCutoffUpdate);
+      window.removeEventListener('storage', handleTimesheetsUpdate);
     };
   }, []);
 
@@ -193,7 +236,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     let unrecorded = 0;
 
     filteredEmployees.forEach((emp) => {
-      const rec = timesheets.find(
+      const rec = activeTimesheets.find(
         (ts) =>
           ts.employeeId === emp.id &&
           ts.month === currentMonth &&
@@ -211,7 +254,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     const rate = Math.round((present / total) * 100);
 
     return { present, alpa, izin, off, unrecorded, rate };
-  }, [filteredEmployees, timesheets]);
+  }, [filteredEmployees, activeTimesheets]);
 
   // Critical stock items in projectStocks
   const criticalStockList = useMemo(() => {
@@ -264,27 +307,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   // Backward compatibility count
   const criticalStocks = criticalStockList;
 
-  // Total payroll estimation this month
-  const totalPayrollEst = useMemo(() => {
-    let sum = 0;
-    filteredEmployees.forEach((emp) => {
-      const rec = timesheets.find(
-        (ts) =>
-          ts.employeeId === emp.id &&
-          ts.month === currentMonth &&
-          ts.year === currentYear
-      );
-      if (!rec) return;
-      let hadir = 0;
-      Object.values(rec.days).forEach((st) => {
-        if (st === 'H') hadir++;
-      });
-      const gross = hadir * emp.dailyRate + (rec.bonusAmount || 0);
-      const net = Math.max(0, gross - (rec.deductionAmount || 0));
-      sum += net;
-    });
-    return sum;
-  }, [filteredEmployees, timesheets]);
+  // Total payroll estimation calculated in real-time identical to Rekap Laporan & Payroll Slip Center
+  const payrollSummary = useMemo(() => {
+    return calculatePayrollSummary(
+      employees,
+      activeTimesheets,
+      cutoffSettings,
+      selectedProjectId
+    );
+  }, [employees, activeTimesheets, cutoffSettings, selectedProjectId]);
+
+  const totalPayrollEst = payrollSummary.totalPayroll;
 
   // Filtered tasks
   const filteredTasks = useMemo(() => {
@@ -620,25 +653,34 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
           )}
 
-          {/* Estimasi Payroll Bulan Ini */}
+          {/* Estimasi Payroll (Periode) - Real-time sync dengan Rekap Laporan & Payroll Slip Center */}
           {widgetSettings.stat_payroll && (
             <div
               onClick={() => onNavigate('reports')}
               className="bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-4 shadow-sm transition-all cursor-pointer group"
+              title="Klik untuk membuka Rekap Laporan & Payroll Slip Center"
             >
-              <div className="flex items-center justify-between text-slate-600 text-xs font-bold">
-                <span>Estimasi Payroll ({getMonthName(currentMonth)})</span>
-                <div className="p-2 bg-slate-100 text-slate-700 rounded-xl group-hover:bg-slate-900 group-hover:text-white transition-colors">
+              <div className="flex items-center justify-between text-slate-600 text-xs font-bold gap-2">
+                <div className="flex items-center space-x-1.5 min-w-0">
+                  <span className="truncate">Estimasi Payroll (Periode)</span>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                    {payrollSummary.isCutoffMode ? 'Cut-Off' : 'Kalender'}
+                  </span>
+                </div>
+                <div className="p-2 bg-slate-100 text-slate-700 rounded-xl group-hover:bg-slate-900 group-hover:text-white transition-colors shrink-0">
                   <CreditCard className="w-4 h-4" />
                 </div>
               </div>
-              <div className="text-lg sm:text-xl font-black text-slate-950 mt-2 break-words">
-                {formatCurrency(totalPayrollEst)}
+              <div className="text-[11px] text-slate-500 font-medium mt-1 truncate" title={payrollSummary.periodLabel}>
+                Periode: <strong className="text-slate-800 font-bold">{payrollSummary.periodLabelShort}</strong> ({payrollSummary.activePeriodDays.length} Hari)
+              </div>
+              <div className="text-lg sm:text-xl font-black text-slate-950 mt-1.5 break-words">
+                {formatCurrency(payrollSummary.totalPayroll)}
               </div>
               <div className="flex items-center justify-between text-[11px] text-slate-600 mt-2 pt-2 border-t border-slate-100 font-medium">
-                <span>Auto-Calculated</span>
-                <span className="text-blue-600 font-bold flex items-center space-x-0.5">
-                  <span>Laporan</span>
+                <span className="truncate">{payrollSummary.personnelCount} Personil Penerima</span>
+                <span className="text-blue-600 font-bold flex items-center space-x-0.5 shrink-0 group-hover:text-blue-700">
+                  <span>Payroll Slip</span>
                   <ArrowRight className="w-3 h-3" />
                 </span>
               </div>
@@ -794,7 +836,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         <ComparativeCharts
           projects={projects}
           employees={employees}
-          timesheets={timesheets}
+          timesheets={activeTimesheets}
           currentMonth={currentMonth}
           currentYear={currentYear}
           selectedProjectId={selectedProjectId}

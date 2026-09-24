@@ -77,9 +77,9 @@ const WIDGET_ITEMS: WidgetItemMeta[] = [
   },
   {
     id: 'stat_payroll',
-    label: 'Kartu Metrik: Estimasi Payroll Berjalan',
+    label: 'Kartu Metrik: Estimasi Payroll (Periode)',
     category: 'Statistik Kunci',
-    description: 'Estimasi nilai pengeluaran gaji cut-off berjalan terhitung otomatis dari kehadiran hari kerja.',
+    description: 'Total pengeluaran payroll real-time tersinkronisasi langsung dari Rekap Laporan & Payroll Slip Center.',
     icon: CreditCard
   },
   {

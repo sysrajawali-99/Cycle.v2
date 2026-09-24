@@ -40,6 +40,7 @@ import {
 } from '../../utils/pdfExport';
 import { storageService, TimesheetCutoffSettings } from '../../services/storageService';
 import { OfficialLetterhead } from '../common/OfficialLetterhead';
+import { calculatePayrollSummary } from '../../utils/payrollCalculator';
 
 interface ReportingCenterProps {
   projects: Project[];
@@ -80,6 +81,11 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
 
   const [filterProject, setFilterProject] = useState<string>(selectedProjectId);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Sinkronisasi filter lokasi proyek dari navigasi global
+  useEffect(() => {
+    setFilterProject(selectedProjectId);
+  }, [selectedProjectId]);
 
   // Selected Employee for Slip Modal
   const [slipEmployee, setSlipEmployee] = useState<{
@@ -199,195 +205,39 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
 
   // Format Helpers
   const pad2 = (n: number) => String(n).padStart(2, '0');
-  const formatDMY = (d: number, m: number, y: number) => `${pad2(d)} - ${pad2(m)} - ${y}`;
 
-  // Period label dinamis
-  const periodLabel = useMemo(() => {
-    if (isCutoffMode) {
-      return `${formatDMY(startDay, startMonth, startYear)} s/d ${formatDMY(endDay, endMonth, endYear)}`;
-    }
-    return `${getMonthName(reportMonth)} ${reportYear}`;
-  }, [isCutoffMode, startDay, startMonth, startYear, endDay, endMonth, endYear, reportMonth, reportYear]);
+  // Pengaturan cut-off aktif untuk kalkulasi payroll
+  const currentCutoffSettings: TimesheetCutoffSettings = useMemo(() => ({
+    isCutoffMode,
+    startDay,
+    startMonth,
+    startYear,
+    endDay,
+    endMonth,
+    endYear,
+    calendarMonth: reportMonth,
+    calendarYear: reportYear
+  }), [isCutoffMode, startDay, startMonth, startYear, endDay, endMonth, endYear, reportMonth, reportYear]);
 
-  // Generate daftar hari lengkap dalam periode aktif (Cut-off range Buka-Tutup Buku atau 1 Bulan Kalender)
-  const activePeriodDays = useMemo(() => {
-    const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-
-    if (!isCutoffMode) {
-      const daysInM = getDaysInMonth(reportYear, reportMonth);
-      return Array.from({ length: daysInM }, (_, i) => {
-        const d = i + 1;
-        const dt = new Date(reportYear, reportMonth - 1, d);
-        const dayOfWeek = dt.getDay();
-        return {
-          day: d,
-          month: reportMonth,
-          year: reportYear,
-          dateKey: `${reportYear}-${pad2(reportMonth)}-${pad2(d)}`,
-          shortLabel: String(d),
-          dayName: dayNames[dayOfWeek]
-        };
-      });
-    }
-
-    // Cut-off Mode: Dari (startDay, startMonth, startYear) sampai (endDay, endMonth, endYear)
-    const list: Array<{
-      day: number;
-      month: number;
-      year: number;
-      dateKey: string;
-      shortLabel: string;
-      dayName: string;
-    }> = [];
-    const startDt = new Date(startYear, startMonth - 1, startDay);
-    const endDt = new Date(endYear, endMonth - 1, endDay);
-
-    let cur = startDt <= endDt ? new Date(startDt) : new Date(endDt);
-    const target = startDt <= endDt ? new Date(endDt) : new Date(startDt);
-
-    let safetyCount = 0;
-    while (cur <= target && safetyCount < 95) {
-      safetyCount++;
-      const d = cur.getDate();
-      const m = cur.getMonth() + 1;
-      const y = cur.getFullYear();
-      const dayOfWeek = cur.getDay();
-
-      list.push({
-        day: d,
-        month: m,
-        year: y,
-        dateKey: `${y}-${pad2(m)}-${pad2(d)}`,
-        shortLabel: `${d}/${m}`,
-        dayName: dayNames[dayOfWeek]
-      });
-
-      cur.setDate(cur.getDate() + 1);
-    }
-
-    return list;
-  }, [isCutoffMode, reportMonth, reportYear, startDay, startMonth, startYear, endDay, endMonth, endYear]);
-
-  // Helper membaca status presensi karyawan pada hari, bulan, dan tahun tertentu dari Eagle Timesheet
-  const getStatusForEmployeeDate = (
-    employeeId: string,
-    day: number,
-    month: number,
-    year: number
-  ): AttendanceStatus | '' => {
-    const rec = timesheets.find(
-      (ts) => ts.employeeId === employeeId && ts.month === month && ts.year === year
+  // Kalkulasi Payroll tersentralisasi & real-time (identik 100% dengan Dashboard)
+  const payrollSummary = useMemo(() => {
+    return calculatePayrollSummary(
+      employees,
+      timesheets,
+      currentCutoffSettings,
+      filterProject,
+      searchQuery
     );
-    return rec?.days[day] || '';
-  };
+  }, [employees, timesheets, currentCutoffSettings, filterProject, searchQuery]);
 
-  // Filtered employees
-  const filteredEmployees = useMemo(() => {
-    return employees.filter((emp) => {
-      if (emp.status === 'Resign') return false;
-      if (filterProject !== 'ALL' && emp.projectId !== filterProject) return false;
-      if (searchQuery.trim() !== '') {
-        const q = searchQuery.toLowerCase();
-        return (
-          emp.name.toLowerCase().includes(q) ||
-          emp.nik.toLowerCase().includes(q) ||
-          emp.position.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
-  }, [employees, filterProject, searchQuery]);
-
-  // Payroll records calculated secara terhubung langsung dengan Eagle Timesheet
-  const payrollRows = useMemo(() => {
-    return filteredEmployees.map((emp) => {
-      let hadirCount = 0;
-      let alpaCount = 0;
-      let izinCount = 0;
-      let offCount = 0;
-
-      // Akumulasi kehadiran tepat di dalam periode aktif Eagle Timesheet
-      activePeriodDays.forEach((pDay) => {
-        const st = getStatusForEmployeeDate(emp.id, pDay.day, pDay.month, pDay.year);
-        if (st === 'H') hadirCount++;
-        else if (st === 'A') alpaCount++;
-        else if (st === 'I') izinCount++;
-        else if (st === 'O') offCount++;
-      });
-
-      // Kumpulkan bulan unik dalam rentang periode untuk agregasi potongan & bonus
-      const distinctMonths = new Set<string>();
-      activePeriodDays.forEach((pDay) => {
-        distinctMonths.add(`${pDay.year}-${pDay.month}`);
-      });
-
-      let deductionAmount = 0;
-      let bonusAmount = 0;
-      const deductionReasons: string[] = [];
-
-      distinctMonths.forEach((key) => {
-        const [y, m] = key.split('-').map(Number);
-        const rec = timesheets.find(
-          (ts) => ts.employeeId === emp.id && ts.month === m && ts.year === y
-        );
-        if (rec) {
-          if (rec.deductionAmount) deductionAmount += rec.deductionAmount;
-          if (rec.bonusAmount) bonusAmount += rec.bonusAmount;
-          if (rec.deductionReason) deductionReasons.push(rec.deductionReason);
-        }
-      });
-
-      const grossPay = hadirCount * emp.dailyRate + bonusAmount;
-      const netPay = Math.max(0, grossPay - deductionAmount);
-
-      const representativeRec = timesheets.find(
-        (ts) => ts.employeeId === emp.id && ts.month === reportMonth && ts.year === reportYear
-      ) || {
-        id: `ts-${emp.id}`,
-        employeeId: emp.id,
-        projectId: emp.projectId,
-        month: reportMonth,
-        year: reportYear,
-        days: {},
-        deductionAmount,
-        deductionReason: deductionReasons.join('; '),
-        bonusAmount,
-        notes: ''
-      };
-
-      return {
-        employee: emp,
-        timesheet: {
-          ...representativeRec,
-          deductionAmount,
-          deductionReason: deductionReasons.join('; '),
-          bonusAmount
-        },
-        hadirCount,
-        alpaCount,
-        izinCount,
-        offCount,
-        grossPay,
-        netPay,
-        deductionAmount,
-        deductionReason: deductionReasons.join('; '),
-        bonusAmount
-      };
-    });
-  }, [filteredEmployees, timesheets, activePeriodDays, reportMonth, reportYear]);
-
-  // Aggregates
-  const totalPayroll = useMemo(() => {
-    return payrollRows.reduce((acc, row) => acc + row.netPay, 0);
-  }, [payrollRows]);
-
-  const totalDeductions = useMemo(() => {
-    return payrollRows.reduce((acc, row) => acc + row.deductionAmount, 0);
-  }, [payrollRows]);
-
-  const totalHadirDays = useMemo(() => {
-    return payrollRows.reduce((acc, row) => acc + row.hadirCount, 0);
-  }, [payrollRows]);
+  const {
+    activePeriodDays,
+    periodLabel,
+    payrollRows,
+    totalPayroll,
+    totalDeductions,
+    totalHadirDays
+  } = payrollSummary;
 
   // Export Payroll Recap CSV
   const handleExportPayrollCSV = () => {
