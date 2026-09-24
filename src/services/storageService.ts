@@ -51,6 +51,30 @@ import {
   INITIAL_INVESTMENTS
 } from '../data/initialFinanceData';
 
+export interface TimesheetCutoffSettings {
+  isCutoffMode: boolean;
+  startDay: number;
+  startMonth: number;
+  startYear: number;
+  endDay: number;
+  endMonth: number;
+  endYear: number;
+  calendarMonth: number;
+  calendarYear: number;
+}
+
+export const DEFAULT_CUTOFF_SETTINGS: TimesheetCutoffSettings = {
+  isCutoffMode: true,
+  startDay: 21,
+  startMonth: 8,
+  startYear: 2026,
+  endDay: 20,
+  endMonth: 9,
+  endYear: 2026,
+  calendarMonth: 8,
+  calendarYear: 2026
+};
+
 const STORAGE_KEYS = {
   COMPANY_PROFILE: 'rajawali_company_profile',
   PROJECTS: 'rajawali_projects',
@@ -77,7 +101,8 @@ const STORAGE_KEYS = {
   DEBTS: 'rajawali_finance_debts',
   RECEIVABLES: 'rajawali_finance_receivables',
   INVESTMENTS: 'rajawali_finance_investments',
-  DASHBOARD_WIDGETS: 'rajawali_dashboard_widgets'
+  DASHBOARD_WIDGETS: 'rajawali_dashboard_widgets',
+  TIMESHEET_CUTOFF: 'rajawali_timesheet_cutoff_settings'
 };
 
 // =============================================================================
@@ -306,6 +331,36 @@ export const storageService = {
 
   saveTimesheets(data: TimesheetMonthRecord[]) {
     applyStorageUpdate('timesheets', STORAGE_KEYS.TIMESHEETS, data);
+  },
+
+  getTimesheetCutoffSettings(): TimesheetCutoffSettings {
+    const raw = localStorage.getItem(STORAGE_KEYS.TIMESHEET_CUTOFF);
+    if (!raw) {
+      initStorageQuietly(STORAGE_KEYS.TIMESHEET_CUTOFF, DEFAULT_CUTOFF_SETTINGS);
+      return DEFAULT_CUTOFF_SETTINGS;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return { ...DEFAULT_CUTOFF_SETTINGS, ...parsed };
+      }
+      return DEFAULT_CUTOFF_SETTINGS;
+    } catch {
+      return DEFAULT_CUTOFF_SETTINGS;
+    }
+  },
+
+  saveTimesheetCutoffSettings(settings: TimesheetCutoffSettings) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.TIMESHEET_CUTOFF, JSON.stringify(settings));
+      window.dispatchEvent(
+        new CustomEvent('timesheet_cutoff_updated', {
+          detail: settings
+        })
+      );
+    } catch {
+      // ignore
+    }
   },
 
   getMutations(): MutationHistory[] {

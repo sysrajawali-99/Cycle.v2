@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   CalendarCheck2,
   CalendarRange,
@@ -75,22 +75,62 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
   onUpdateTimesheets,
   userRole
 }) => {
+  // Shared Cut-off Settings (Sinkronisasi dengan Rekap Laporan & Payroll Slip Center)
+  const initialCutoff = useMemo(() => storageService.getTimesheetCutoffSettings(), []);
+
   // Mode Periode: Buka-Tutup Buku (Cut-off) atau Standar Kalender (1-31)
-  const [isCutoffMode, setIsCutoffMode] = useState<boolean>(true);
+  const [isCutoffMode, setIsCutoffMode] = useState<boolean>(initialCutoff.isCutoffMode);
 
   // Filter Tanggal Buka Timesheet (dd - mm - yyyy): Default 21 - 8 - 2026
-  const [startDay, setStartDay] = useState<number>(21);
-  const [startMonth, setStartMonth] = useState<number>(8);
-  const [startYear, setStartYear] = useState<number>(2026);
+  const [startDay, setStartDay] = useState<number>(initialCutoff.startDay);
+  const [startMonth, setStartMonth] = useState<number>(initialCutoff.startMonth);
+  const [startYear, setStartYear] = useState<number>(initialCutoff.startYear);
 
   // Filter Tanggal Tutup Timesheet (dd - mm - yyyy): Default 20 - 9 - 2026
-  const [endDay, setEndDay] = useState<number>(20);
-  const [endMonth, setEndMonth] = useState<number>(9);
-  const [endYear, setEndYear] = useState<number>(2026);
+  const [endDay, setEndDay] = useState<number>(initialCutoff.endDay);
+  const [endMonth, setEndMonth] = useState<number>(initialCutoff.endMonth);
+  const [endYear, setEndYear] = useState<number>(initialCutoff.endYear);
 
   // Calendar month state (digunakan saat navigasi bulan atau non-cutoff mode)
-  const [currentMonth, setCurrentMonth] = useState<number>(8);
-  const [currentYear, setCurrentYear] = useState<number>(2026);
+  const [currentMonth, setCurrentMonth] = useState<number>(initialCutoff.calendarMonth);
+  const [currentYear, setCurrentYear] = useState<number>(initialCutoff.calendarYear);
+
+  // Sync cut-off settings to storageService for real-time connection with Payroll Slip Center
+  useEffect(() => {
+    storageService.saveTimesheetCutoffSettings({
+      isCutoffMode,
+      startDay,
+      startMonth,
+      startYear,
+      endDay,
+      endMonth,
+      endYear,
+      calendarMonth: currentMonth,
+      calendarYear: currentYear
+    });
+  }, [isCutoffMode, startDay, startMonth, startYear, endDay, endMonth, endYear, currentMonth, currentYear]);
+
+  // Listen to external cut-off updates from ReportingCenter
+  useEffect(() => {
+    const handleCutoffUpdate = (e: any) => {
+      const s = e.detail;
+      if (!s) return;
+      setIsCutoffMode(s.isCutoffMode);
+      setStartDay(s.startDay);
+      setStartMonth(s.startMonth);
+      setStartYear(s.startYear);
+      setEndDay(s.endDay);
+      setEndMonth(s.endMonth);
+      setEndYear(s.endYear);
+      if (s.calendarMonth) setCurrentMonth(s.calendarMonth);
+      if (s.calendarYear) setCurrentYear(s.calendarYear);
+    };
+
+    window.addEventListener('timesheet_cutoff_updated', handleCutoffUpdate);
+    return () => {
+      window.removeEventListener('timesheet_cutoff_updated', handleCutoffUpdate);
+    };
+  }, []);
 
   // Mobile / View Mode: 'daily' (Mobile-Friendly Roll-Call) or 'matrix' (Grid Table)
   const [viewMode, setViewMode] = useState<'daily' | 'matrix'>('daily');

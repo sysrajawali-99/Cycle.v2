@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   FileText,
   Download,
@@ -12,7 +12,12 @@ import {
   CreditCard,
   ShieldCheck,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  RefreshCw,
+  CalendarRange,
+  Clock,
+  ArrowRight,
+  Check
 } from 'lucide-react';
 import {
   Project,
@@ -20,7 +25,8 @@ import {
   TimesheetMonthRecord,
   ProjectStock,
   InventoryItem,
-  UserRole
+  UserRole,
+  AttendanceStatus
 } from '../../types';
 import {
   formatCurrency,
@@ -32,7 +38,7 @@ import {
   generateTimesheetPDF,
   generateIndividualPayslipPDF
 } from '../../utils/pdfExport';
-import { storageService } from '../../services/storageService';
+import { storageService, TimesheetCutoffSettings } from '../../services/storageService';
 import { OfficialLetterhead } from '../common/OfficialLetterhead';
 
 interface ReportingCenterProps {
@@ -54,8 +60,24 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
   selectedProjectId = 'ALL',
   userRole
 }) => {
-  const [reportMonth, setReportMonth] = useState<number>(8); // August
-  const [reportYear, setReportYear] = useState<number>(2026);
+  // Shared Cut-off Settings (Sinkronisasi dengan Eagle Timesheet)
+  const initialCutoff = useMemo(() => storageService.getTimesheetCutoffSettings(), []);
+  const [isCutoffMode, setIsCutoffMode] = useState<boolean>(initialCutoff.isCutoffMode);
+
+  // Tanggal Buka Buku (Mulai)
+  const [startDay, setStartDay] = useState<number>(initialCutoff.startDay);
+  const [startMonth, setStartMonth] = useState<number>(initialCutoff.startMonth);
+  const [startYear, setStartYear] = useState<number>(initialCutoff.startYear);
+
+  // Tanggal Tutup Buku (Selesai)
+  const [endDay, setEndDay] = useState<number>(initialCutoff.endDay);
+  const [endMonth, setEndMonth] = useState<number>(initialCutoff.endMonth);
+  const [endYear, setEndYear] = useState<number>(initialCutoff.endYear);
+
+  // Calendar Month (untuk mode non-cut-off)
+  const [reportMonth, setReportMonth] = useState<number>(initialCutoff.calendarMonth);
+  const [reportYear, setReportYear] = useState<number>(initialCutoff.calendarYear);
+
   const [filterProject, setFilterProject] = useState<string>(selectedProjectId);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -66,9 +88,198 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
     hadirCount: number;
     alpaCount: number;
     izinCount: number;
+    offCount?: number;
     grossPay: number;
     netPay: number;
+    deductionAmount: number;
+    deductionReason: string;
+    bonusAmount: number;
   } | null>(null);
+
+  // Sinkronisasi otomatis dari Eagle Timesheet saat tanggal cut-off berubah
+  useEffect(() => {
+    const handleCutoffUpdate = (e: any) => {
+      const s = e.detail;
+      if (!s) return;
+      setIsCutoffMode(s.isCutoffMode);
+      setStartDay(s.startDay);
+      setStartMonth(s.startMonth);
+      setStartYear(s.startYear);
+      setEndDay(s.endDay);
+      setEndMonth(s.endMonth);
+      setEndYear(s.endYear);
+      if (s.calendarMonth) setReportMonth(s.calendarMonth);
+      if (s.calendarYear) setReportYear(s.calendarYear);
+    };
+
+    window.addEventListener('timesheet_cutoff_updated', handleCutoffUpdate);
+    return () => {
+      window.removeEventListener('timesheet_cutoff_updated', handleCutoffUpdate);
+    };
+  }, []);
+
+  // Update dan simpan pengaturan cut-off secara tersinkronisasi
+  const handleUpdateCutoffSettings = (newSettings: Partial<TimesheetCutoffSettings>) => {
+    const nextSettings: TimesheetCutoffSettings = {
+      isCutoffMode: newSettings.isCutoffMode !== undefined ? newSettings.isCutoffMode : isCutoffMode,
+      startDay: newSettings.startDay !== undefined ? newSettings.startDay : startDay,
+      startMonth: newSettings.startMonth !== undefined ? newSettings.startMonth : startMonth,
+      startYear: newSettings.startYear !== undefined ? newSettings.startYear : startYear,
+      endDay: newSettings.endDay !== undefined ? newSettings.endDay : endDay,
+      endMonth: newSettings.endMonth !== undefined ? newSettings.endMonth : endMonth,
+      endYear: newSettings.endYear !== undefined ? newSettings.endYear : endYear,
+      calendarMonth: newSettings.calendarMonth !== undefined ? newSettings.calendarMonth : reportMonth,
+      calendarYear: newSettings.calendarYear !== undefined ? newSettings.calendarYear : reportYear
+    };
+
+    setIsCutoffMode(nextSettings.isCutoffMode);
+    setStartDay(nextSettings.startDay);
+    setStartMonth(nextSettings.startMonth);
+    setStartYear(nextSettings.startYear);
+    setEndDay(nextSettings.endDay);
+    setEndMonth(nextSettings.endMonth);
+    setEndYear(nextSettings.endYear);
+    setReportMonth(nextSettings.calendarMonth);
+    setReportYear(nextSettings.calendarYear);
+
+    storageService.saveTimesheetCutoffSettings(nextSettings);
+  };
+
+  // Helper sinkronisasi manual dari Eagle Timesheet
+  const handleManualSyncFromEagle = () => {
+    const s = storageService.getTimesheetCutoffSettings();
+    setIsCutoffMode(s.isCutoffMode);
+    setStartDay(s.startDay);
+    setStartMonth(s.startMonth);
+    setStartYear(s.startYear);
+    setEndDay(s.endDay);
+    setEndMonth(s.endMonth);
+    setEndYear(s.endYear);
+    setReportMonth(s.calendarMonth);
+    setReportYear(s.calendarYear);
+  };
+
+  // Preset Periode Cepat
+  const applyPreset21to20 = () => {
+    handleUpdateCutoffSettings({
+      isCutoffMode: true,
+      startDay: 21,
+      startMonth: 8,
+      startYear: 2026,
+      endDay: 20,
+      endMonth: 9,
+      endYear: 2026
+    });
+  };
+
+  const applyPreset26to25 = () => {
+    handleUpdateCutoffSettings({
+      isCutoffMode: true,
+      startDay: 26,
+      startMonth: 7,
+      startYear: 2026,
+      endDay: 25,
+      endMonth: 8,
+      endYear: 2026
+    });
+  };
+
+  const applyPresetFullMonth = () => {
+    const daysInM = getDaysInMonth(reportYear, reportMonth);
+    handleUpdateCutoffSettings({
+      isCutoffMode: false,
+      startDay: 1,
+      startMonth: reportMonth,
+      startYear: reportYear,
+      endDay: daysInM,
+      endMonth: reportMonth,
+      endYear: reportYear
+    });
+  };
+
+  // Format Helpers
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const formatDMY = (d: number, m: number, y: number) => `${pad2(d)} - ${pad2(m)} - ${y}`;
+
+  // Period label dinamis
+  const periodLabel = useMemo(() => {
+    if (isCutoffMode) {
+      return `${formatDMY(startDay, startMonth, startYear)} s/d ${formatDMY(endDay, endMonth, endYear)}`;
+    }
+    return `${getMonthName(reportMonth)} ${reportYear}`;
+  }, [isCutoffMode, startDay, startMonth, startYear, endDay, endMonth, endYear, reportMonth, reportYear]);
+
+  // Generate daftar hari lengkap dalam periode aktif (Cut-off range Buka-Tutup Buku atau 1 Bulan Kalender)
+  const activePeriodDays = useMemo(() => {
+    const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+
+    if (!isCutoffMode) {
+      const daysInM = getDaysInMonth(reportYear, reportMonth);
+      return Array.from({ length: daysInM }, (_, i) => {
+        const d = i + 1;
+        const dt = new Date(reportYear, reportMonth - 1, d);
+        const dayOfWeek = dt.getDay();
+        return {
+          day: d,
+          month: reportMonth,
+          year: reportYear,
+          dateKey: `${reportYear}-${pad2(reportMonth)}-${pad2(d)}`,
+          shortLabel: String(d),
+          dayName: dayNames[dayOfWeek]
+        };
+      });
+    }
+
+    // Cut-off Mode: Dari (startDay, startMonth, startYear) sampai (endDay, endMonth, endYear)
+    const list: Array<{
+      day: number;
+      month: number;
+      year: number;
+      dateKey: string;
+      shortLabel: string;
+      dayName: string;
+    }> = [];
+    const startDt = new Date(startYear, startMonth - 1, startDay);
+    const endDt = new Date(endYear, endMonth - 1, endDay);
+
+    let cur = startDt <= endDt ? new Date(startDt) : new Date(endDt);
+    const target = startDt <= endDt ? new Date(endDt) : new Date(startDt);
+
+    let safetyCount = 0;
+    while (cur <= target && safetyCount < 95) {
+      safetyCount++;
+      const d = cur.getDate();
+      const m = cur.getMonth() + 1;
+      const y = cur.getFullYear();
+      const dayOfWeek = cur.getDay();
+
+      list.push({
+        day: d,
+        month: m,
+        year: y,
+        dateKey: `${y}-${pad2(m)}-${pad2(d)}`,
+        shortLabel: `${d}/${m}`,
+        dayName: dayNames[dayOfWeek]
+      });
+
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    return list;
+  }, [isCutoffMode, reportMonth, reportYear, startDay, startMonth, startYear, endDay, endMonth, endYear]);
+
+  // Helper membaca status presensi karyawan pada hari, bulan, dan tahun tertentu dari Eagle Timesheet
+  const getStatusForEmployeeDate = (
+    employeeId: string,
+    day: number,
+    month: number,
+    year: number
+  ): AttendanceStatus | '' => {
+    const rec = timesheets.find(
+      (ts) => ts.employeeId === employeeId && ts.month === month && ts.year === year
+    );
+    return rec?.days[day] || '';
+  };
 
   // Filtered employees
   const filteredEmployees = useMemo(() => {
@@ -87,14 +298,50 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
     });
   }, [employees, filterProject, searchQuery]);
 
-  // Payroll records calculated
+  // Payroll records calculated secara terhubung langsung dengan Eagle Timesheet
   const payrollRows = useMemo(() => {
     return filteredEmployees.map((emp) => {
-      const rec = timesheets.find(
-        (ts) =>
-          ts.employeeId === emp.id &&
-          ts.month === reportMonth &&
-          ts.year === reportYear
+      let hadirCount = 0;
+      let alpaCount = 0;
+      let izinCount = 0;
+      let offCount = 0;
+
+      // Akumulasi kehadiran tepat di dalam periode aktif Eagle Timesheet
+      activePeriodDays.forEach((pDay) => {
+        const st = getStatusForEmployeeDate(emp.id, pDay.day, pDay.month, pDay.year);
+        if (st === 'H') hadirCount++;
+        else if (st === 'A') alpaCount++;
+        else if (st === 'I') izinCount++;
+        else if (st === 'O') offCount++;
+      });
+
+      // Kumpulkan bulan unik dalam rentang periode untuk agregasi potongan & bonus
+      const distinctMonths = new Set<string>();
+      activePeriodDays.forEach((pDay) => {
+        distinctMonths.add(`${pDay.year}-${pDay.month}`);
+      });
+
+      let deductionAmount = 0;
+      let bonusAmount = 0;
+      const deductionReasons: string[] = [];
+
+      distinctMonths.forEach((key) => {
+        const [y, m] = key.split('-').map(Number);
+        const rec = timesheets.find(
+          (ts) => ts.employeeId === emp.id && ts.month === m && ts.year === y
+        );
+        if (rec) {
+          if (rec.deductionAmount) deductionAmount += rec.deductionAmount;
+          if (rec.bonusAmount) bonusAmount += rec.bonusAmount;
+          if (rec.deductionReason) deductionReasons.push(rec.deductionReason);
+        }
+      });
+
+      const grossPay = hadirCount * emp.dailyRate + bonusAmount;
+      const netPay = Math.max(0, grossPay - deductionAmount);
+
+      const representativeRec = timesheets.find(
+        (ts) => ts.employeeId === emp.id && ts.month === reportMonth && ts.year === reportYear
       ) || {
         id: `ts-${emp.id}`,
         employeeId: emp.id,
@@ -102,39 +349,32 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
         month: reportMonth,
         year: reportYear,
         days: {},
-        deductionAmount: 0,
-        deductionReason: '',
-        bonusAmount: 0,
+        deductionAmount,
+        deductionReason: deductionReasons.join('; '),
+        bonusAmount,
         notes: ''
       };
 
-      let hadirCount = 0;
-      let alpaCount = 0;
-      let izinCount = 0;
-      let offCount = 0;
-
-      Object.values(rec.days).forEach((st) => {
-        if (st === 'H') hadirCount++;
-        else if (st === 'A') alpaCount++;
-        else if (st === 'I') izinCount++;
-        else if (st === 'O') offCount++;
-      });
-
-      const grossPay = hadirCount * emp.dailyRate + (rec.bonusAmount || 0);
-      const netPay = Math.max(0, grossPay - (rec.deductionAmount || 0));
-
       return {
         employee: emp,
-        timesheet: rec,
+        timesheet: {
+          ...representativeRec,
+          deductionAmount,
+          deductionReason: deductionReasons.join('; '),
+          bonusAmount
+        },
         hadirCount,
         alpaCount,
         izinCount,
         offCount,
         grossPay,
-        netPay
+        netPay,
+        deductionAmount,
+        deductionReason: deductionReasons.join('; '),
+        bonusAmount
       };
     });
-  }, [filteredEmployees, timesheets, reportMonth, reportYear]);
+  }, [filteredEmployees, timesheets, activePeriodDays, reportMonth, reportYear]);
 
   // Aggregates
   const totalPayroll = useMemo(() => {
@@ -142,7 +382,7 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
   }, [payrollRows]);
 
   const totalDeductions = useMemo(() => {
-    return payrollRows.reduce((acc, row) => acc + (row.timesheet.deductionAmount || 0), 0);
+    return payrollRows.reduce((acc, row) => acc + row.deductionAmount, 0);
   }, [payrollRows]);
 
   const totalHadirDays = useMemo(() => {
@@ -166,7 +406,9 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
       'Potongan (Rp)',
       'Alasan Potongan',
       'Insentif / Lembur (Rp)',
-      'Gaji Bersih / Take Home Pay (Rp)'
+      'Gaji Bersih / Take Home Pay (Rp)',
+      'Periode Cut-Off Timesheet',
+      'Total Hari Aktif Periode'
     ];
 
     const rows: (string | number)[][] = [headers];
@@ -185,14 +427,18 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
         r.alpaCount,
         r.izinCount,
         r.grossPay,
-        r.timesheet.deductionAmount || 0,
-        r.timesheet.deductionReason || '',
-        r.timesheet.bonusAmount || 0,
-        r.netPay
+        r.deductionAmount,
+        r.deductionReason,
+        r.bonusAmount,
+        r.netPay,
+        periodLabel,
+        activePeriodDays.length
       ]);
     });
 
-    const filename = `Rekap_Payroll_Rajawali_${getMonthName(reportMonth)}_${reportYear}.csv`;
+    const filename = isCutoffMode
+      ? `Rekap_Payroll_Cutoff_${pad2(startDay)}${pad2(startMonth)}${startYear}_sd_${pad2(endDay)}${pad2(endMonth)}${endYear}.csv`
+      : `Rekap_Payroll_Rajawali_${getMonthName(reportMonth)}_${reportYear}.csv`;
     downloadCSV(filename, rows);
   };
 
@@ -226,7 +472,14 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
                   timesheets,
                   selectedProjectId: filterProject,
                   month: reportMonth,
-                  year: reportYear
+                  year: reportYear,
+                  customPeriodLabel: `PERIODE: ${periodLabel} (Cut-off Eagle Timesheet)`,
+                  customDays: activePeriodDays.map((p) => ({
+                    day: p.day,
+                    month: p.month,
+                    year: p.year,
+                    label: p.shortLabel
+                  }))
                 });
               }}
               className="flex items-center space-x-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/25 transition cursor-pointer"
@@ -250,17 +503,221 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-3 border-t border-slate-800">
+        {/* Section: Kontrol Periode Buka & Tutup Buku (Tersinkronisasi dengan Eagle Timesheet) */}
+        <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3.5 mt-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                <CalendarRange className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2 flex-wrap">
+                  <span className="text-xs font-bold text-white">
+                    Sinkronisasi Periode Eagle Timesheet
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    {isCutoffMode ? 'Mode Buka-Tutup Buku (Cut-Off)' : 'Mode 1 Bulan Penuh'}
+                  </span>
+                  <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                    {activePeriodDays.length} Hari Kerja Aktif
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Periode hitung presensi dan slip gaji otomatis mengikuti tanggal buka dan tutup buku pada Eagle Timesheet.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 flex-wrap">
+              <button
+                onClick={handleManualSyncFromEagle}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-750 text-amber-300 rounded-lg text-xs font-bold border border-slate-700 transition cursor-pointer shadow-xs"
+                title="Ambil tanggal buka & tutup buku terkini dari Eagle Timesheet"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Sinkronkan dari Timesheet</span>
+              </button>
+
+              <button
+                onClick={() => handleUpdateCutoffSettings({ isCutoffMode: !isCutoffMode })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shadow-xs ${
+                  isCutoffMode
+                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                    : 'bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700'
+                }`}
+              >
+                {isCutoffMode ? '✓ Cut-off Buka-Tutup Aktif' : 'Beralih ke Cut-off Buka-Tutup'}
+              </button>
+            </div>
+          </div>
+
+          {/* Selector Tanggal Buka & Tutup Buku */}
+          {isCutoffMode ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 border-t border-slate-800/70">
+              {/* Tanggal Buka Buku */}
+              <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                <div className="flex items-center space-x-2 shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wide">
+                    🟢 Tanggal Buka Buku:
+                  </span>
+                </div>
+                <div className="flex items-center space-x-1.5 text-xs">
+                  <select
+                    value={startDay}
+                    onChange={(e) =>
+                      handleUpdateCutoffSettings({ startDay: Number(e.target.value), isCutoffMode: true })
+                    }
+                    className="bg-slate-950 border border-slate-800 text-white rounded-lg px-2 py-1 text-xs font-bold focus:border-emerald-500 focus:outline-none cursor-pointer"
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <option key={d} value={d}>
+                        {pad2(d)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={startMonth}
+                    onChange={(e) =>
+                      handleUpdateCutoffSettings({ startMonth: Number(e.target.value), isCutoffMode: true })
+                    }
+                    className="bg-slate-950 border border-slate-800 text-white rounded-lg px-2 py-1 text-xs font-bold focus:border-emerald-500 focus:outline-none cursor-pointer"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <option key={m} value={m}>
+                        {getMonthName(m)}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    value={startYear}
+                    onChange={(e) =>
+                      handleUpdateCutoffSettings({ startYear: Number(e.target.value), isCutoffMode: true })
+                    }
+                    className="w-16 bg-slate-950 border border-slate-800 text-white rounded-lg px-2 py-1 text-xs font-bold focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Tanggal Tutup Buku */}
+              <div className="bg-slate-900 border border-rose-500/30 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                <div className="flex items-center space-x-2 shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+                  <span className="text-[11px] font-black text-rose-400 uppercase tracking-wide">
+                    🔴 Tanggal Tutup Buku:
+                  </span>
+                </div>
+                <div className="flex items-center space-x-1.5 text-xs">
+                  <select
+                    value={endDay}
+                    onChange={(e) =>
+                      handleUpdateCutoffSettings({ endDay: Number(e.target.value), isCutoffMode: true })
+                    }
+                    className="bg-slate-950 border border-slate-800 text-white rounded-lg px-2 py-1 text-xs font-bold focus:border-rose-500 focus:outline-none cursor-pointer"
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <option key={d} value={d}>
+                        {pad2(d)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={endMonth}
+                    onChange={(e) =>
+                      handleUpdateCutoffSettings({ endMonth: Number(e.target.value), isCutoffMode: true })
+                    }
+                    className="bg-slate-950 border border-slate-800 text-white rounded-lg px-2 py-1 text-xs font-bold focus:border-rose-500 focus:outline-none cursor-pointer"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <option key={m} value={m}>
+                        {getMonthName(m)}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    value={endYear}
+                    onChange={(e) =>
+                      handleUpdateCutoffSettings({ endYear: Number(e.target.value), isCutoffMode: true })
+                    }
+                    className="w-16 bg-slate-950 border border-slate-800 text-white rounded-lg px-2 py-1 text-xs font-bold focus:border-rose-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-300 font-bold">Pilih Bulan & Tahun Kalender:</span>
+              <div className="flex items-center space-x-2">
+                <select
+                  value={reportMonth}
+                  onChange={(e) =>
+                    handleUpdateCutoffSettings({ calendarMonth: Number(e.target.value), isCutoffMode: false })
+                  }
+                  className="bg-slate-950 border border-slate-800 text-white rounded-lg px-2.5 py-1 text-xs font-bold focus:border-amber-500 focus:outline-none cursor-pointer"
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <option key={m} value={m}>
+                      {getMonthName(m)}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  value={reportYear}
+                  onChange={(e) =>
+                    handleUpdateCutoffSettings({ calendarYear: Number(e.target.value), isCutoffMode: false })
+                  }
+                  className="w-20 bg-slate-950 border border-slate-800 text-white rounded-lg px-2.5 py-1 text-xs font-bold focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Presets Cepat Periode */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] text-slate-400 font-semibold mr-1">Preset Cepat:</span>
+              <button
+                onClick={applyPreset21to20}
+                className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg font-bold text-[11px] transition cursor-pointer"
+              >
+                ⚡ Cut-Off 21 - 20 (21-08-2026 s/d 20-09-2026)
+              </button>
+              <button
+                onClick={applyPreset26to25}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 rounded-lg font-semibold text-[11px] transition cursor-pointer"
+              >
+                ⚡ Cut-Off 26 - 25 (26-07-2026 s/d 25-08-2026)
+              </button>
+              <button
+                onClick={applyPresetFullMonth}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 rounded-lg font-semibold text-[11px] transition cursor-pointer"
+              >
+                📅 1 Bulan Penuh (1 - 31)
+              </button>
+            </div>
+
+            <div className="text-[11px] text-slate-400">
+              Periode Aktif:{' '}
+              <strong className="text-amber-400 font-mono font-bold">{periodLabel}</strong> (
+              {activePeriodDays.length} Hari Kerja)
+            </div>
+          </div>
+        </div>
+
+        {/* Filters Search & Project */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-slate-800">
           <div className="bg-slate-950 border border-slate-800 rounded-xl p-2 flex items-center space-x-2">
             <Search className="w-4 h-4 text-slate-400 shrink-0" />
             <input
               id="payroll-search-input"
               type="text"
-              placeholder="Cari nama karyawan..."
+              placeholder="Cari nama karyawan / NIK / posisi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none w-full"
+              className="bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none w-full font-medium"
             />
           </div>
 
@@ -270,7 +727,7 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
               id="payroll-project-filter"
               value={filterProject}
               onChange={(e) => setFilterProject(e.target.value)}
-              className="bg-transparent text-xs text-slate-200 focus:outline-none w-full cursor-pointer"
+              className="bg-transparent text-xs text-slate-200 focus:outline-none w-full cursor-pointer font-medium"
             >
               <option value="ALL">Semua Lokasi Proyek</option>
               {projects.map((p) => (
@@ -279,14 +736,6 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
                 </option>
               ))}
             </select>
-          </div>
-
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-2 flex items-center space-x-2">
-            <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-            <span className="text-xs text-slate-400">Periode:</span>
-            <span className="text-xs font-bold text-amber-400">
-              {getMonthName(reportMonth)} {reportYear}
-            </span>
           </div>
         </div>
       </div>
@@ -404,7 +853,19 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
                                 timesheet: row.timesheet,
                                 project: empProj,
                                 month: reportMonth,
-                                year: reportYear
+                                year: reportYear,
+                                customPeriodLabel: `PERIODE: ${periodLabel}`,
+                                customStats: {
+                                  hadir: row.hadirCount,
+                                  alpa: row.alpaCount,
+                                  izin: row.izinCount,
+                                  off: row.offCount,
+                                  deductionAmount: row.deductionAmount,
+                                  deductionReason: row.deductionReason,
+                                  bonusAmount: row.bonusAmount,
+                                  grossPay: row.grossPay,
+                                  netPay: row.netPay
+                                }
                               });
                             }}
                             className="flex items-center space-x-1 px-2.5 py-1.5 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 font-bold text-[11px] rounded-lg transition-colors border border-emerald-700/50 cursor-pointer"
@@ -473,7 +934,7 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
                             SLIP GAJI RESMI
                           </span>
                           <span className="text-[10px] font-bold text-slate-800 font-mono">
-                            {getMonthName(reportMonth).toUpperCase()} {reportYear}
+                            {periodLabel.toUpperCase()}
                           </span>
                         </div>
                       </div>
@@ -483,6 +944,12 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
 
                 {/* Employee Info Header */}
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 grid grid-cols-2 gap-2 text-xs">
+                  <div className="col-span-2 bg-amber-50/80 p-2 rounded-lg border border-amber-200 flex items-center justify-between text-[11px]">
+                    <span className="text-amber-950 font-bold">Periode Cut-Off (Buka & Tutup Buku):</span>
+                    <span className="font-bold font-mono text-amber-900">
+                      {periodLabel} ({activePeriodDays.length} Hari Kerja)
+                    </span>
+                  </div>
                   <div>
                     <span className="text-slate-500 text-[10px] font-semibold block">Nama Personil:</span>
                     <div className="font-bold text-slate-900 text-sm">{slipEmployee.employee.name}</div>
@@ -633,7 +1100,19 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
                     timesheet: slipEmployee.timesheet,
                     project: empProj,
                     month: reportMonth,
-                    year: reportYear
+                    year: reportYear,
+                    customPeriodLabel: `PERIODE: ${periodLabel}`,
+                    customStats: {
+                      hadir: slipEmployee.hadirCount,
+                      alpa: slipEmployee.alpaCount,
+                      izin: slipEmployee.izinCount,
+                      off: slipEmployee.offCount,
+                      deductionAmount: slipEmployee.deductionAmount,
+                      deductionReason: slipEmployee.deductionReason,
+                      bonusAmount: slipEmployee.bonusAmount,
+                      grossPay: slipEmployee.grossPay,
+                      netPay: slipEmployee.netPay
+                    }
                   });
                 }}
                 className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl shadow-lg shadow-amber-500/20 flex items-center space-x-1.5 cursor-pointer"

@@ -560,13 +560,27 @@ export const generateIndividualPayslipPDF = ({
   timesheet,
   project,
   month,
-  year
+  year,
+  customPeriodLabel,
+  customStats
 }: {
   employee: Employee;
   timesheet: TimesheetMonthRecord;
   project?: Project;
   month: number;
   year: number;
+  customPeriodLabel?: string;
+  customStats?: {
+    hadir: number;
+    alpa: number;
+    izin: number;
+    off?: number;
+    deductionAmount?: number;
+    deductionReason?: string;
+    bonusAmount?: number;
+    grossPay?: number;
+    netPay?: number;
+  };
 }) => {
   const comp = getCompany();
   const doc = new jsPDF({
@@ -579,20 +593,23 @@ export const generateIndividualPayslipPDF = ({
   const pageHeight = doc.internal.pageSize.getHeight(); // 210mm
   const monthName = getMonthName(month);
 
-  let hadir = 0;
-  let alpa = 0;
-  let izin = 0;
-  Object.values(timesheet.days || {}).forEach((st) => {
-    if (st === 'H') hadir++;
-    else if (st === 'A') alpa++;
-    else if (st === 'I') izin++;
-  });
+  let hadir = customStats ? customStats.hadir : 0;
+  let alpa = customStats ? customStats.alpa : 0;
+  let izin = customStats ? customStats.izin : 0;
+  if (!customStats) {
+    Object.values(timesheet.days || {}).forEach((st) => {
+      if (st === 'H') hadir++;
+      else if (st === 'A') alpa++;
+      else if (st === 'I') izin++;
+    });
+  }
 
   const baseEarning = hadir * employee.dailyRate;
-  const bonus = timesheet.bonusAmount || 0;
-  const grossPay = baseEarning + bonus;
-  const deduction = timesheet.deductionAmount || 0;
-  const netPay = Math.max(0, grossPay - deduction);
+  const bonus = customStats?.bonusAmount !== undefined ? customStats.bonusAmount : (timesheet.bonusAmount || 0);
+  const grossPay = customStats?.grossPay !== undefined ? customStats.grossPay : (baseEarning + bonus);
+  const deduction = customStats?.deductionAmount !== undefined ? customStats.deductionAmount : (timesheet.deductionAmount || 0);
+  const deductionReason = customStats?.deductionReason !== undefined ? customStats.deductionReason : (timesheet.deductionReason || '');
+  const netPay = customStats?.netPay !== undefined ? customStats.netPay : Math.max(0, grossPay - deduction);
 
   // Top Header Banner
   doc.setFillColor(15, 39, 68); // Dark Navy
@@ -636,8 +653,8 @@ export const generateIndividualPayslipPDF = ({
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
   doc.text('SLIP GAJI RESMI', pageWidth - 27.5, 10.5, { align: 'center' });
-  doc.setFontSize(6.5);
-  doc.text(`${monthName.toUpperCase()} ${year}`, pageWidth - 27.5, 15, { align: 'center' });
+  doc.setFontSize(customPeriodLabel ? 5.5 : 6.5);
+  doc.text(customPeriodLabel || `${monthName.toUpperCase()} ${year}`, pageWidth - 27.5, 15, { align: 'center' });
 
   // Employee Identity Card Box
   doc.setFillColor(248, 250, 252);
@@ -693,7 +710,7 @@ export const generateIndividualPayslipPDF = ({
       ...(bonus > 0 ? [['Insentif / Tunjangan Tambahan', formatCurrency(bonus)]] : []),
       ['Total Penghasilan Kotor (Gross)', formatCurrency(grossPay)],
       ...(deduction > 0
-        ? [[`Potongan Absensi / Kedisiplinan ${timesheet.deductionReason ? `(${timesheet.deductionReason})` : ''}`, `-${formatCurrency(deduction)}`]]
+        ? [[`Potongan Absensi / Kedisiplinan ${deductionReason ? `(${deductionReason})` : ''}`, `-${formatCurrency(deduction)}`]]
         : [])
     ],
     foot: [['TOTAL GAJI BERSIH (TAKE HOME PAY)', formatCurrency(netPay)]],
