@@ -46,6 +46,7 @@ import {
 import { formatCurrency, formatNumber, formatDateDDMMYYYY } from '../../utils/formatters';
 import { generateMaterialRequestPDF } from '../../utils/pdfExport';
 import { OfficialLetterhead } from '../common/OfficialLetterhead';
+import { ConfirmModal } from '../common/ConfirmModal';
 import { storageService } from '../../services/storageService';
 
 interface MaterialRequestTabProps {
@@ -231,16 +232,21 @@ export const MaterialRequestTab: React.FC<MaterialRequestTabProps> = ({
     showToast(`Barang dari Material Request ${req.requestCode} berhasil dibukukan ke stok fisik lokasi!`);
   };
 
-  // Delete Request (Aktifkan fitur hapus di pengajuan material request)
+  // Delete Request State & Handlers
+  const [deleteRequestTarget, setDeleteRequestTarget] = useState<MaterialRequest | null>(null);
+
   const handleDeleteRequest = (reqId: string) => {
     const target = materialRequests.find((r) => r.id === reqId);
     if (!target) return;
+    setDeleteRequestTarget(target);
+  };
 
-    if (window.confirm(`Apakah Anda yakin ingin menghapus pengajuan Material Request ${target.requestCode} (${target.projectName})?`)) {
-      const updated = materialRequests.filter((r) => r.id !== reqId);
-      onUpdateMaterialRequests(updated);
-      showToast(`Material Request ${target.requestCode} berhasil dihapus.`);
-    }
+  const confirmDeleteRequest = () => {
+    if (!deleteRequestTarget) return;
+    const updated = materialRequests.filter((r) => r.id !== deleteRequestTarget.id);
+    onUpdateMaterialRequests(updated);
+    showToast(`Material Request ${deleteRequestTarget.requestCode} berhasil dihapus.`);
+    setDeleteRequestTarget(null);
   };
 
   return (
@@ -945,6 +951,18 @@ export const MaterialRequestTab: React.FC<MaterialRequestTabProps> = ({
           }}
         />
       )}
+
+      {/* Modal Konfirmasi Hapus Material Request */}
+      <ConfirmModal
+        isOpen={Boolean(deleteRequestTarget)}
+        title="Hapus Material Request"
+        message={`Apakah Anda yakin ingin menghapus pengajuan Material Request ${deleteRequestTarget?.requestCode} (${deleteRequestTarget?.projectName})? Data ini akan dihapus secara permanen.`}
+        confirmText="Ya, Hapus Pengajuan"
+        cancelText="Batal"
+        confirmVariant="danger"
+        onConfirm={confirmDeleteRequest}
+        onCancel={() => setDeleteRequestTarget(null)}
+      />
     </div>
   );
 };

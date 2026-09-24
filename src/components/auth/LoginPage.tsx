@@ -7,9 +7,7 @@ import {
   EyeOff,
   AlertCircle,
   ArrowRight,
-  KeyRound,
-  Building2,
-  Sparkles
+  KeyRound
 } from 'lucide-react';
 import { UserAccount, CompanyProfile } from '../../types';
 
@@ -32,7 +30,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
 
   const compName = companyProfile?.name || 'PT RAJAWALI CYCLE INDONESIA';
-  const brandName = companyProfile?.brandName || 'RAJAWALI CYCLE';
   const tagline = companyProfile?.tagline || 'Integrated Facility Services & Enterprise Management';
 
   const handleLogin = (e: React.FormEvent) => {
@@ -85,39 +82,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
       <div className="w-full max-w-md relative z-10 space-y-6">
         {/* Brand Header */}
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center space-x-3 bg-white border border-slate-200 px-4 py-2 rounded-2xl shadow-sm">
-            {companyProfile?.logoUrl ? (
-              <img
-                src={companyProfile.logoUrl}
-                alt="Logo"
-                className="w-10 h-10 object-contain rounded-xl"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-sm shrink-0">
-                <span className="text-xl font-black text-white">🦅</span>
-              </div>
-            )}
-            <div className="text-left">
-              <div className="flex items-center space-x-2">
-                <span className="text-base sm:text-lg font-black text-slate-900 tracking-tight">{brandName}</span>
-                <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">
-                  ERP Enterprise
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-600 truncate max-w-[200px] font-medium">{compName}</p>
-            </div>
-          </div>
-
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Masuk ke Portal Sistem
-            </h1>
-            <p className="text-xs text-slate-600 mt-1 max-w-sm mx-auto leading-relaxed font-medium">
-              {tagline}
-            </p>
-          </div>
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Masuk ke Portal Sistem
+          </h1>
+          <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed font-medium">
+            {tagline}
+          </p>
         </div>
 
         {/* Form Login Box */}

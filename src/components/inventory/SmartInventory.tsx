@@ -41,6 +41,7 @@ import {
 } from '../../types';
 import { storageService } from '../../services/storageService';
 import { MaterialRequestTab } from './MaterialRequestTab';
+import { ConfirmModal } from '../common/ConfirmModal';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 import { generateInventoryUsagePDF } from '../../utils/pdfExport';
 import {
@@ -153,6 +154,22 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
   const [locationBulkPic, setLocationBulkPic] = useState<string>('Admin Operasional');
   const [locationBulkNotes, setLocationBulkNotes] = useState<string>('Stock Opname Fisik Berkala Lokasi');
   const locationFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Delete & Confirmation Modals State
+  const [deleteStockTarget, setDeleteStockTarget] = useState<{
+    stockId?: string;
+    itemId: string;
+    itemName: string;
+  } | null>(null);
+  const [clearLocationConfirm, setClearLocationConfirm] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === msg ? null : prev));
+    }, 3500);
+  };
 
   // Stock Action Form State
   const [actionForm, setActionForm] = useState<{
@@ -425,29 +442,38 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
       setActiveProjectFilter(resolvedProjectId);
     }
 
-    alert(`Berhasil menyimpan ${savedCount} item ke stok lokasi ${targetProject?.name || ''}!`);
+    showToast(`Berhasil menyimpan ${savedCount} item ke stok lokasi ${targetProject?.name || ''}!`);
     setShowAddLocationStockModal(false);
   };
 
-  const handleDeleteStockItem = (stockId: string, itemName: string) => {
-    if (!window.confirm(`Hapus ${itemName} dari daftar stok lokasi ${activeProjectObj?.name || ''}?`)) {
-      return;
-    }
-    const next = projectStocks.filter((ps) => ps.id !== stockId);
+  const handleDeleteStockItem = (stockId: string | undefined, itemId: string, itemName: string) => {
+    setDeleteStockTarget({ stockId, itemId, itemName });
+  };
+
+  const confirmDeleteStockItem = () => {
+    if (!deleteStockTarget) return;
+    const { stockId, itemId, itemName } = deleteStockTarget;
+
+    const next = projectStocks.filter((ps) => {
+      if (stockId && ps.id === stockId) return false;
+      if (ps.projectId === activeProjectFilter && ps.itemId === itemId) return false;
+      return true;
+    });
+
     onUpdateStocks(next);
+    showToast(`Barang "${itemName}" berhasil dihapus dari daftar stok lokasi ${activeProjectObj?.name || ''}.`);
+    setDeleteStockTarget(null);
   };
 
   const handleClearLocationStock = () => {
-    if (
-      !window.confirm(
-        `Apakah Anda yakin ingin mengosongkan seluruh data stok di lokasi ${activeProjectObj?.name || ''}?`
-      )
-    ) {
-      return;
-    }
+    setClearLocationConfirm(true);
+  };
+
+  const confirmClearLocationStock = () => {
     const next = projectStocks.filter((ps) => ps.projectId !== activeProjectFilter);
     onUpdateStocks(next);
-    alert(`Seluruh data stok di lokasi ${activeProjectObj?.name || ''} telah dikosongkan.`);
+    showToast(`Seluruh data stok di lokasi ${activeProjectObj?.name || ''} telah dikosongkan.`);
+    setClearLocationConfirm(false);
   };
 
   // Helper to get stock for an item in current selected project
@@ -943,6 +969,14 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-4 right-4 z-50 bg-slate-900 text-white border border-amber-500/50 px-4 py-3 rounded-xl shadow-2xl shadow-amber-500/10 flex items-center space-x-3 text-xs animate-in slide-in-from-top duration-200">
+          <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+          <span className="font-semibold text-slate-200">{toastMessage}</span>
+        </div>
+      )}
+
       {/* Header & Site Selector */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -1383,11 +1417,13 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                             {/* Delete From Location */}
                             <button
                               id={`delete-stock-btn-${item.id}`}
-                              onClick={() => handleDeleteStockItem(stockId, item.name)}
-                              title="Hapus barang dari daftar stok lokasi ini"
-                              className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                              type="button"
+                              onClick={() => handleDeleteStockItem(stockId, item.id, item.name)}
+                              title={`Hapus ${item.name} dari daftar stok lokasi ini`}
+                              className="flex items-center space-x-1 px-2.5 py-1.5 bg-rose-500/15 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 hover:border-rose-600 rounded-lg font-bold text-[11px] transition-colors cursor-pointer shadow-sm"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
+                              <span>Hapus</span>
                             </button>
                           </div>
                         </td>
@@ -3063,6 +3099,30 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Konfirmasi Hapus Barang dari Stok Lokasi */}
+      <ConfirmModal
+        isOpen={Boolean(deleteStockTarget)}
+        title="Hapus Barang dari Stok Lokasi"
+        message={`Apakah Anda yakin ingin menghapus "${deleteStockTarget?.itemName}" dari daftar stok lokasi ${activeProjectObj?.name || ''}? Pencatatan stok barang ini di lokasi akan dihapus.`}
+        confirmText="Ya, Hapus Barang"
+        cancelText="Batal"
+        confirmVariant="danger"
+        onConfirm={confirmDeleteStockItem}
+        onCancel={() => setDeleteStockTarget(null)}
+      />
+
+      {/* Modal Konfirmasi Kosongkan Seluruh Stok Lokasi */}
+      <ConfirmModal
+        isOpen={clearLocationConfirm}
+        title="Kosongkan Seluruh Stok Lokasi"
+        message={`Apakah Anda yakin ingin mengosongkan seluruh data stok di lokasi ${activeProjectObj?.name || ''}? Seluruh item stok pada lokasi ini akan dihapus secara permanen.`}
+        confirmText="Ya, Kosongkan Semua"
+        cancelText="Batal"
+        confirmVariant="danger"
+        onConfirm={confirmClearLocationStock}
+        onCancel={() => setClearLocationConfirm(false)}
+      />
     </div>
   );
 };
