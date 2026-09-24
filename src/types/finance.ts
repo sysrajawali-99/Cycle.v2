@@ -511,7 +511,9 @@ export interface InvestmentScheduleRow {
   monthIndex: number; // Bulan ke- 1, 2, ... 12
   monthLabel: string; // e.g. "Bulan ke-1 (Sep 2026)"
   dueDate: string; // YYYY-MM-DD (Tanggal pemberian bagi hasil)
-  profitAmount: number; // Nilai bagi hasil per bulan
+  profitAmount: number; // Nilai bagi hasil utama per bulan
+  secondaryProfitAmount?: number; // Nilai imbal dari bagi hasil per bulan jika split
+  totalProfitCombined?: number; // Total bagi hasil (utama + imbalan)
   principalReturnAmount?: number; // Pengembalian pokok modal jika ada
   totalPayout: number;
   status: ProfitSharingStatus; // "Ditunda" / "DI Realisasikan"
@@ -520,7 +522,12 @@ export interface InvestmentScheduleRow {
   bankAccountNumberSnapshot?: string;
   accountHolderSnapshot?: string;
   bankNameSnapshot?: string;
+  // Snapshot rekening imbal dari bagi hasil (jika split)
+  secondaryBankNameSnapshot?: string;
+  secondaryAccountNumberSnapshot?: string;
+  secondaryAccountHolderSnapshot?: string;
   transferProof?: string;
+  secondaryTransferProof?: string;
   notes?: string;
   updatedBy?: string;
 }
@@ -539,13 +546,28 @@ export interface InvestmentRecord {
   allocation: string; // Alokasi investasi / modal kerja (Site, Mesin, Manpower)
   projectId?: string; // 'ALL' or specific projectId
   projectName?: string;
-  profitSharingPercent: number; // Nilai Bagi Hasil dalam persen % per bulan (e.g. 1.5%)
+  profitSharingPercent: number; // Nilai Bagi Hasil Utama dalam persen % per bulan (e.g. 1.5%)
   profitSharingDay: number; // Tanggal pemberian bagi hasil tiap bulannya (e.g. tanggal 25)
-  monthlyProfitAmount: number; // Nominal bagi hasil per bulan (capitalAmount * profitSharingPercent / 100)
+  monthlyProfitAmount: number; // Nominal bagi hasil utama per bulan (capitalAmount * profitSharingPercent / 100)
   totalProjectedProfit: number; // Total bagi hasil seluruh periode
+
+  // Fitur Split Bagi Hasil: Imbal dari Bagi Hasil
+  hasSplitProfit?: boolean; // Apakah split bagi hasil aktif / dipilih
+  secondaryProfitPercent?: number; // Imbal dari Bagi Hasil (% / Bln)
+  secondaryMonthlyAmount?: number; // Nominal imbal bagi hasil per bulan (Rp)
+  totalMonthlyProfitAmount?: number; // Total bagi hasil bulanan (Utama + Imbalan)
+  secondaryRecipientRole?: string; // Peran penerima imbalan (Agen / Co-Investor / Pengelola)
+
+  // Rekening Penerima Bagi Hasil Utama
   bankName: string;
   bankAccountNumber: string;
   bankAccountHolder: string;
+
+  // Rekening Penerima Imbal Bagi Hasil (Muncul jika split bagi hasil dipilih)
+  secondaryBankName?: string;
+  secondaryBankAccountNumber?: string;
+  secondaryBankAccountHolder?: string;
+
   status: 'ACTIVE' | 'COMPLETED' | 'EXTENDED' | 'TERMINATED';
   schedules: InvestmentScheduleRow[]; // Otomatis terbentuk n baris (misal 12 baris)
   notes?: string;

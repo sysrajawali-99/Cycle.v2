@@ -837,22 +837,22 @@ export const BankStatementUploadModal: React.FC<BankStatementUploadModalProps> =
               </div>
 
               {/* AUTO-MATCH OTOMATIS MASAL BANNER & CONTROLS */}
-              <div className="p-4 bg-gradient-to-r from-emerald-950/60 via-slate-900 to-blue-950/60 rounded-2xl border border-emerald-500/40 shadow-xl space-y-3">
+              <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200 shadow-xs space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center space-x-3">
-                    <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      <Sparkles className="w-5 h-5 animate-pulse text-emerald-400" />
+                    <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200">
+                      <Sparkles className="w-5 h-5 text-emerald-600" />
                     </div>
                     <div>
                       <div className="flex items-center space-x-2">
-                        <h4 className="text-sm font-extrabold text-white">
+                        <h4 className="text-sm font-extrabold text-emerald-950">
                           Auto-Match Otomatis Masal
                         </h4>
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold border border-emerald-500/40">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[10px] font-extrabold border border-emerald-300">
                           {isAutoMatchEnabled ? '⚡ AKTIF' : 'NONAKTIF'}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-300 mt-0.5">
+                      <p className="text-xs text-slate-600 mt-0.5">
                         Pencocokan multi-faktor cerdas (Nominal, Arah DB/CR, Toleransi Tanggal & Kata Kunci Keterangan)
                       </p>
                     </div>
@@ -862,9 +862,9 @@ export const BankStatementUploadModal: React.FC<BankStatementUploadModalProps> =
                     <button
                       type="button"
                       onClick={() => setIsShowingAutoMatchConfig(!isShowingAutoMatchConfig)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all cursor-pointer flex items-center space-x-1.5"
+                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-300 transition-all cursor-pointer flex items-center space-x-1.5 shadow-xs"
                     >
-                      <Filter className="w-3.5 h-3.5 text-blue-400" />
+                      <Filter className="w-3.5 h-3.5 text-blue-600" />
                       <span>{isShowingAutoMatchConfig ? 'Tutup Pengaturan' : 'Pengaturan Match'}</span>
                     </button>
 
@@ -873,8 +873,8 @@ export const BankStatementUploadModal: React.FC<BankStatementUploadModalProps> =
                       onClick={() => setIsAutoMatchEnabled(!isAutoMatchEnabled)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                         isAutoMatchEnabled
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30'
-                          : 'bg-slate-800 text-slate-400 hover:text-white'
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                          : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       {isAutoMatchEnabled ? 'Auto-Match Aktif' : 'Aktifkan'}
@@ -884,32 +884,32 @@ export const BankStatementUploadModal: React.FC<BankStatementUploadModalProps> =
 
                 {/* Auto Match Results Banner */}
                 {isAutoMatchEnabled && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-800">
-                    <div className="flex items-center space-x-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-emerald-200/60">
+                    <div className="flex items-center space-x-2 bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                       <div className="text-xs">
-                        <span className="text-slate-400 block text-[10px]">COCOK OTOMATIS:</span>
-                        <span className="font-bold text-emerald-300 font-mono">
+                        <span className="text-slate-500 block text-[10px] font-bold">COCOK OTOMATIS:</span>
+                        <span className="font-bold text-emerald-700 font-mono">
                           {previewStats.matchedCount} dari {previewStats.totalCount} mutasi ({previewStats.matchPct}%)
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80">
-                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div className="flex items-center space-x-2 bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                       <div className="text-xs">
-                        <span className="text-slate-400 block text-[10px]">BELUM DI BUKU KAS:</span>
-                        <span className="font-bold text-amber-300 font-mono">
+                        <span className="text-slate-500 block text-[10px] font-bold">BELUM DI BUKU KAS:</span>
+                        <span className="font-bold text-amber-700 font-mono">
                           {previewStats.unmatchedCount} mutasi
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80">
-                      <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
+                    <div className="flex items-center space-x-2 bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                      <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
                       <div className="text-xs">
-                        <span className="text-slate-400 block text-[10px]">STATUS INTEGRASI:</span>
-                        <span className="font-bold text-blue-300">
+                        <span className="text-slate-500 block text-[10px] font-bold">STATUS INTEGRASI:</span>
+                        <span className="font-bold text-blue-700">
                           {autoSyncBukuKas ? 'Sinkron 2-Arah Aktif' : 'Hanya Rekening Koran'}
                         </span>
                       </div>
@@ -974,28 +974,28 @@ export const BankStatementUploadModal: React.FC<BankStatementUploadModalProps> =
 
               {/* RECONCILIATION SUMMARY VALIDATION BANNER */}
               {(previewResult.startingBalance !== undefined || previewResult.endingBalance !== undefined) && (
-                <div className="p-3.5 bg-gradient-to-r from-blue-950/40 via-slate-900 to-indigo-950/40 rounded-2xl border border-blue-800/40 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="p-3.5 bg-blue-50/80 rounded-2xl border border-blue-200 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
                   <div className="flex items-center space-x-2">
-                    <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-                      <ShieldCheck className="w-4 h-4" />
+                    <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
                     </div>
                     <div>
-                      <span className="font-bold text-white">Ringkasan Saldo Rekening Koran:</span>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
+                      <span className="font-bold text-slate-900">Ringkasan Saldo Rekening Koran:</span>
+                      <div className="text-[11px] text-slate-600 mt-0.5">
                         {previewResult.periodLabel && <span>Periode: {previewResult.periodLabel} • </span>}
                         {previewResult.startingBalance !== undefined && (
-                          <span>Saldo Awal: <strong className="text-slate-200 font-mono">{financeService.formatRupiah(previewResult.startingBalance)}</strong></span>
+                          <span>Saldo Awal: <strong className="text-slate-900 font-mono">{financeService.formatRupiah(previewResult.startingBalance)}</strong></span>
                         )}
                         {previewResult.endingBalance !== undefined && (
-                          <span> • Saldo Akhir: <strong className="text-emerald-300 font-mono">{financeService.formatRupiah(previewResult.endingBalance)}</strong></span>
+                          <span> • Saldo Akhir: <strong className="text-emerald-800 font-mono font-bold">{financeService.formatRupiah(previewResult.endingBalance)}</strong></span>
                         )}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center space-x-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-900 text-[11px] font-bold flex items-center space-x-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Ekstraksi Lengkap & Akurat</span>
                     </span>
                   </div>

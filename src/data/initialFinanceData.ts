@@ -425,11 +425,18 @@ export function generateInvestmentSchedule(
   profitSharingDay: number,
   bankName: string,
   bankAccountNumber: string,
-  bankAccountHolder: string
+  bankAccountHolder: string,
+  hasSplitProfit: boolean = false,
+  secondaryProfitPercent: number = 0,
+  secondaryBankName: string = '',
+  secondaryBankAccountNumber: string = '',
+  secondaryBankAccountHolder: string = ''
 ): InvestmentScheduleRow[] {
   const schedules: InvestmentScheduleRow[] = [];
   const start = new Date(startDate || '2026-01-01');
-  const monthlyProfit = (capitalAmount * profitSharingPercent) / 100;
+  const primaryProfit = (capitalAmount * (profitSharingPercent || 0)) / 100;
+  const secondaryProfit = hasSplitProfit ? (capitalAmount * (secondaryProfitPercent || 0)) / 100 : 0;
+  const totalCombinedProfit = primaryProfit + secondaryProfit;
 
   for (let i = 1; i <= durationMonths; i++) {
     const dueDateObj = new Date(start.getFullYear(), start.getMonth() + i, profitSharingDay);
@@ -440,21 +447,29 @@ export function generateInvestmentSchedule(
 
     const monthLabel = dueDateObj.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' });
     const isPast = dueDateObj < new Date('2026-08-20');
+    const principalReturn = i === durationMonths ? capitalAmount : 0;
+    const totalPayout = totalCombinedProfit + principalReturn;
 
     schedules.push({
       id: `sch-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`,
       monthIndex: i,
       monthLabel: `Bulan ke-${i} (${monthLabel})`,
       dueDate: dueDateStr,
-      profitAmount: monthlyProfit,
-      principalReturnAmount: i === durationMonths ? capitalAmount : 0,
-      totalPayout: monthlyProfit + (i === durationMonths ? capitalAmount : 0),
+      profitAmount: primaryProfit,
+      secondaryProfitAmount: hasSplitProfit ? secondaryProfit : 0,
+      totalProfitCombined: totalCombinedProfit,
+      principalReturnAmount: principalReturn,
+      totalPayout: totalPayout,
       status: isPast ? ('DI Realisasikan' as ProfitSharingStatus) : ('Ditunda' as ProfitSharingStatus),
       realizationDate: isPast ? dueDateStr : undefined,
       bankNameSnapshot: bankName,
       bankAccountNumberSnapshot: bankAccountNumber,
       accountHolderSnapshot: bankAccountHolder,
+      secondaryBankNameSnapshot: hasSplitProfit ? secondaryBankName : undefined,
+      secondaryAccountNumberSnapshot: hasSplitProfit ? secondaryBankAccountNumber : undefined,
+      secondaryAccountHolderSnapshot: hasSplitProfit ? secondaryBankAccountHolder : undefined,
       transferProof: isPast ? `TRF-BGI-M${i}-${yyyy}${mm}` : undefined,
+      secondaryTransferProof: isPast && hasSplitProfit ? `TRF-IMB-M${i}-${yyyy}${mm}` : undefined,
       notes: isPast ? `Bagi hasil bulan ke-${i} telah direalisasikan` : `Menunggu jatuh tempo tanggal ${profitSharingDay}`
     });
   }

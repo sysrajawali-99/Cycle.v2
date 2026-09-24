@@ -780,20 +780,20 @@ export const FinanceStatements: React.FC<FinanceStatementsProps> = ({
             </div>
 
             {/* Net Profit Final Highlight */}
-            <div className="bg-gradient-to-r from-emerald-950/70 to-slate-950 border border-emerald-500/50 p-5 rounded-2xl flex justify-between items-center text-base font-black text-white shadow-xl">
+            <div className="bg-emerald-50/70 border border-emerald-300 p-5 rounded-2xl flex justify-between items-center text-base font-black text-slate-900 shadow-xs">
               <div>
-                <span className="text-emerald-400 uppercase tracking-wide">
+                <span className="text-emerald-800 uppercase tracking-wide font-black">
                   LABA BERSIH PERIODE BERJALAN (NET PROFIT)
                 </span>
-                <p className="text-xs text-slate-400 font-normal">
+                <p className="text-xs text-slate-600 font-normal">
                   Setelah memperhitungkan seluruh pendapatan, beban langsung, & operasional
                 </p>
               </div>
               <div className="text-right">
-                <span className="text-2xl font-mono text-emerald-400">
+                <span className="text-2xl font-mono font-black text-emerald-700">
                   {financeService.formatRupiah(profitLoss.netProfit)}
                 </span>
-                <div className="text-xs text-emerald-300 font-bold">
+                <div className="text-xs text-emerald-800 font-bold">
                   Net Profit Margin: {(profitLoss.netProfitMargin ?? 0).toFixed(1)}%
                 </div>
               </div>
@@ -1149,17 +1149,17 @@ export const FinanceStatements: React.FC<FinanceStatementsProps> = ({
       {activeTab === 'RATIO' && (
         <div className="space-y-4 animate-in fade-in">
           {/* Health Score Summary Card */}
-          <div className="bg-gradient-to-r from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center space-x-4">
-              <div className="p-4 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                <Award className="w-8 h-8" />
+              <div className="p-4 rounded-2xl bg-amber-100 text-amber-700 border border-amber-200">
+                <Award className="w-8 h-8 text-amber-600" />
               </div>
               <div>
-                <span className="text-xs text-amber-400 font-bold uppercase tracking-wider">
+                <span className="text-xs text-amber-800 font-bold uppercase tracking-wider">
                   Indeks Kesehatan Finansial Perusahaan
                 </span>
-                <h2 className="text-2xl font-black text-white mt-0.5">SANGAT SEHAT & SOLVABEL</h2>
-                <p className="text-xs text-slate-400 mt-1 max-w-xl">
+                <h2 className="text-2xl font-black text-slate-900 mt-0.5">SANGAT SEHAT & SOLVABEL</h2>
+                <p className="text-xs text-slate-600 mt-1 max-w-xl">
                   Berdasarkan kalkulasi likuiditas lancar (Current Ratio {(ratios.currentRatio ?? 0).toFixed(2)}x) dan
                   tingkat profitabilitas (NPM {(ratios.netProfitMargin ?? 0).toFixed(1)}%), arus kas dan permodalan{' '}
                   {companyProfile.name} dalam kondisi prima untuk ekspansi.
@@ -1167,10 +1167,10 @@ export const FinanceStatements: React.FC<FinanceStatementsProps> = ({
               </div>
             </div>
 
-            <div className="text-center md:text-right bg-slate-950/80 p-4 rounded-2xl border border-slate-800 min-w-[160px]">
-              <span className="text-[10px] text-slate-400 font-semibold uppercase block">Score Rating</span>
-              <div className="text-3xl font-black text-emerald-400 font-mono">92 / 100</div>
-              <span className="text-[10px] text-emerald-300 font-bold">Grade: AAA (Prime)</span>
+            <div className="text-center md:text-right bg-slate-50 p-4 rounded-2xl border border-slate-200 min-w-[160px]">
+              <span className="text-[10px] text-slate-500 font-bold uppercase block">Score Rating</span>
+              <div className="text-3xl font-black text-emerald-700 font-mono">92 / 100</div>
+              <span className="text-[10px] text-emerald-800 font-bold">Grade: AAA (Prime)</span>
             </div>
           </div>
 

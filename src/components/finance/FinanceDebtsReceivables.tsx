@@ -1216,17 +1216,17 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
 
       {/* Reminder Notification Banner */}
       {reminders.length > 0 && (
-        <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-rose-950/30 border border-amber-500/30 rounded-xl p-4 shadow-md">
+        <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 shadow-xs">
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center space-x-2">
-              <span className="p-1 rounded-lg bg-amber-500/20 text-amber-400">
-                <AlertCircle className="w-4 h-4" />
+              <span className="p-1.5 rounded-lg bg-amber-500/20 text-amber-700">
+                <AlertCircle className="w-4 h-4 text-amber-600" />
               </span>
-              <h3 className="text-xs sm:text-sm font-bold text-amber-300">
+              <h3 className="text-xs sm:text-sm font-black text-amber-950">
                 Notifikasi Pengingat Jatuh Tempo ({reminders.length} Transaksi Perlu Perhatian)
               </h3>
             </div>
-            <span className="text-[11px] text-slate-400">Prioritas Harian</span>
+            <span className="text-[11px] text-amber-800 font-semibold">Prioritas Harian</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 mt-2">
@@ -1235,26 +1235,26 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
                 key={idx}
                 className={`p-2.5 rounded-lg border text-xs flex items-center justify-between ${
                   rem.isOverdue
-                    ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
-                    : 'bg-slate-800/60 border-slate-700/60 text-slate-200'
+                    ? 'bg-rose-50 border-rose-300 text-rose-950'
+                    : 'bg-white border-slate-200 text-slate-900'
                 }`}
               >
                 <div className="min-w-0 pr-2">
                   <div className="flex items-center space-x-1.5">
                     <span
-                      className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
-                        rem.type === 'DEBT' ? 'bg-rose-500/20 text-rose-300' : 'bg-cyan-500/20 text-cyan-300'
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                        rem.type === 'DEBT' ? 'bg-rose-100 text-rose-800 border border-rose-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
                       }`}
                     >
                       {rem.type === 'DEBT' ? 'HUTANG' : 'PIUTANG'}
                     </span>
-                    <span className="font-semibold truncate">{rem.targetName}</span>
+                    <span className="font-bold truncate text-slate-900">{rem.targetName}</span>
                   </div>
-                  <p className="text-[11px] text-slate-400 truncate mt-0.5">{rem.title}</p>
+                  <p className="text-[11px] text-slate-500 truncate mt-0.5">{rem.title}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="font-bold">{formatCurrency(rem.amount)}</div>
-                  <div className={`text-[10px] font-semibold ${rem.isOverdue ? 'text-rose-400' : 'text-amber-400'}`}>
+                  <div className="font-black text-slate-900">{formatCurrency(rem.amount)}</div>
+                  <div className={`text-[10px] font-bold ${rem.isOverdue ? 'text-rose-700' : 'text-amber-800'}`}>
                     {rem.isOverdue ? `Telat ${Math.abs(rem.daysRemaining)} hari` : `H-${rem.daysRemaining} hari`}
                   </div>
                 </div>
@@ -1370,25 +1370,25 @@ export const FinanceDebtsReceivables: React.FC<FinanceDebtsReceivablesProps> = (
 
       {/* SINKRONISASI BAGI HASIL INVESTOR BANNER */}
       {activeTab === 'DEBTS' && investorDebts.length > 0 && (
-        <div className="bg-gradient-to-r from-purple-950/40 via-slate-900 to-slate-900 border border-purple-500/30 rounded-xl p-3.5 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+        <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-3.5 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center space-x-2.5">
-            <span className="p-2 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
-              <Briefcase className="w-4 h-4 text-purple-400" />
+            <span className="p-2 rounded-lg bg-purple-100 text-purple-700 border border-purple-200 shrink-0">
+              <Briefcase className="w-4 h-4 text-purple-600" />
             </span>
             <div>
-              <div className="font-bold text-white flex items-center gap-1.5">
+              <div className="font-bold text-slate-900 flex items-center gap-1.5">
                 <span>Sinkronisasi Otomatis Bagi Hasil Mitra Investor</span>
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
                   REALTIME
                 </span>
               </div>
-              <div className="text-slate-300 text-[11px] mt-0.5">
-                Terhubung langsung dengan {investments.length} mitra investor. Sebanyak <strong>{investorDebts.length} jadwal bagi hasil bulanan</strong> otomatis tercatat sebagai kewajiban hutang dengan sisa <strong>{formatCurrency(stats.investorDebtRemaining)}</strong>.
+              <div className="text-slate-600 text-[11px] mt-0.5">
+                Terhubung langsung dengan {investments.length} mitra investor. Sebanyak <strong>{investorDebts.length} jadwal bagi hasil bulanan</strong> otomatis tercatat sebagai kewajiban hutang dengan sisa <strong className="text-purple-900">{formatCurrency(stats.investorDebtRemaining)}</strong>.
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-900 border border-purple-300">
               {investorDebts.filter((d) => d.status !== 'PAID').length} Jadwal Tertunda
             </span>
           </div>

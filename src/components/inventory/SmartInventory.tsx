@@ -1438,7 +1438,7 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
               <button
                 id="download-inventory-recap-pdf-btn"
                 onClick={handleDownloadUsagePDF}
-                className="flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-600/30 border border-emerald-400/30 transition-all cursor-pointer shrink-0"
+                className="flex items-center space-x-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer shrink-0"
               >
                 <Download className="w-4 h-4" />
                 <span>Download PDF Rekap (A4)</span>
@@ -2603,32 +2603,32 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
             {/* Modal Body */}
             <div className="p-5 overflow-y-auto space-y-4 text-xs">
               {/* Step 1: Download Official 6-Column Template Banner */}
-              <div className="bg-gradient-to-r from-amber-950/30 to-slate-950 border border-amber-500/30 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
                 <div className="space-y-1">
-                  <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs">
-                    <Sparkles className="w-4 h-4" />
+                  <div className="flex items-center space-x-2 text-amber-950 font-bold text-xs">
+                    <Sparkles className="w-4 h-4 text-amber-600" />
                     <span>Format Template Resmi Stok Lokasi (6 Kolom Terpisah)</span>
                   </div>
-                  <p className="text-slate-300 text-[11px] leading-relaxed">
+                  <p className="text-slate-700 text-[11px] leading-relaxed">
                     Template Excel (.xlsx) dibuat dengan <b>masing-masing kolom terpisah</b> (bukan 1 kolom dipisah koma):
                   </p>
                   <div className="flex flex-wrap gap-1.5 pt-1">
-                    <span className="bg-slate-900 text-slate-300 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-mono">
+                    <span className="bg-white text-slate-700 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-mono shadow-xs">
                       Kolom A: Kode Barang
                     </span>
-                    <span className="bg-slate-900 text-slate-300 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-mono">
+                    <span className="bg-white text-slate-700 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-mono shadow-xs">
                       Kolom B: Nama Barang
                     </span>
-                    <span className="bg-slate-900 text-slate-300 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-mono">
+                    <span className="bg-white text-slate-700 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-mono shadow-xs">
                       Kolom C: Kategori
                     </span>
-                    <span className="bg-slate-900 text-slate-300 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-mono">
+                    <span className="bg-white text-slate-700 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-mono shadow-xs">
                       Kolom D: Satuan
                     </span>
-                    <span className="bg-slate-900 text-slate-300 border border-slate-800 px-2 py-0.5 rounded text-[10px] font-mono">
+                    <span className="bg-white text-slate-700 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-mono shadow-xs">
                       Kolom E: Min. Stok
                     </span>
-                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded text-[10px] font-mono font-bold">
+                    <span className="bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded text-[10px] font-mono font-bold">
                       Kolom F: Sisa Stok Saat Ini
                     </span>
                   </div>

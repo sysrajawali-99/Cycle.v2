@@ -621,46 +621,46 @@ export const FinanceOutflowForecast: React.FC<FinanceOutflowForecastProps> = ({
 
       {/* Cash Buffer & Liquidity Health Banner */}
       <div
-        className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+        className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs ${
           liquidityStatus.isSafe
-            ? 'bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border-emerald-500/30'
-            : 'bg-gradient-to-r from-rose-950/50 via-slate-900 to-slate-900 border-rose-500/40'
+            ? 'bg-emerald-50/70 border-emerald-200'
+            : 'bg-rose-50/70 border-rose-200'
         }`}
       >
         <div className="flex items-center space-x-3">
           <div
             className={`p-2.5 rounded-xl ${
-              liquidityStatus.isSafe ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+              liquidityStatus.isSafe ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
             }`}
           >
             {liquidityStatus.isSafe ? <CheckCircle2 className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h3 className="font-bold text-sm text-white">
+              <h3 className="font-bold text-sm text-slate-900">
                 Analisa Likuiditas Kas & Runway: {liquidityStatus.isSafe ? 'SURPLUS / AMAN' : 'DEFISIT / PERLU PERHATIAN'}
               </h3>
               <span
-                className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
                   liquidityStatus.isSafe
-                    ? 'bg-emerald-500/20 text-emerald-300'
-                    : 'bg-rose-500/20 text-rose-300'
+                    ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                    : 'bg-rose-100 text-rose-900 border border-rose-300'
                 }`}
               >
                 Coverage: {liquidityStatus.coverageRatio.toFixed(1)}%
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Posisi Kas & Bank saat ini sebesar <strong className="text-white">{formatCurrency(currentCashAndBank)}</strong> vs total rencana pengeluaran <strong className="text-white">{formatCurrency(grandTotalForecast)}</strong>.
+            <p className="text-xs text-slate-600 mt-0.5">
+              Posisi Kas & Bank saat ini sebesar <strong className="text-slate-900">{formatCurrency(currentCashAndBank)}</strong> vs total rencana pengeluaran <strong className="text-slate-900">{formatCurrency(grandTotalForecast)}</strong>.
             </p>
           </div>
         </div>
 
         <div className="text-left md:text-right">
-          <div className="text-[11px] text-slate-400">Net Surplus / (Kekurangan Dana):</div>
+          <div className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Net Surplus / (Kekurangan Dana):</div>
           <div
             className={`text-lg sm:text-xl font-black ${
-              liquidityStatus.isSafe ? 'text-emerald-400' : 'text-rose-400'
+              liquidityStatus.isSafe ? 'text-emerald-700' : 'text-rose-700'
             }`}
           >
             {liquidityStatus.surplusDeficit >= 0 ? '+' : ''}

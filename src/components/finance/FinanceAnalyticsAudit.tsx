@@ -346,21 +346,21 @@ export const FinanceAnalyticsAudit: React.FC<FinanceAnalyticsAuditProps> = ({
       {activeTab === 'AUDIT' && (
         <div className="space-y-4 animate-in fade-in">
           {/* AI Compliance & Security Banner */}
-          <div className="bg-gradient-to-r from-purple-950/40 via-slate-900 to-indigo-950/40 border border-purple-900/40 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-lg">
+          <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
             <div className="flex items-start space-x-3">
-              <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0 mt-0.5">
-                <Shield className="w-5 h-5" />
+              <div className="p-2 rounded-xl bg-purple-100 text-purple-700 border border-purple-200 shrink-0 mt-0.5">
+                <Shield className="w-5 h-5 text-purple-600" />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center space-x-2">
-                  <h3 className="text-xs font-bold text-white">
+                  <h3 className="text-xs sm:text-sm font-black text-purple-950">
                     Audit Kepatuhan & Integritas Data Anti-Fraud
                   </h3>
-                  <span className="text-[10px] bg-purple-500/20 text-purple-300 font-bold px-2 py-0.2 rounded border border-purple-500/30">
+                  <span className="text-[10px] bg-purple-100 text-purple-900 font-black px-2 py-0.5 rounded border border-purple-300">
                     Sistem PIN Aktif
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
+                <p className="text-[11px] text-slate-600 leading-relaxed">
                   Semua aktivitas penghapusan transaksi dan COA wajib melalui verifikasi PIN Otorisasi 6 digit.
                   Tercatat <strong>{deleteLogs.length} aktivitas penghapusan</strong> dalam database jejak audit.
                 </p>
@@ -369,7 +369,7 @@ export const FinanceAnalyticsAudit: React.FC<FinanceAnalyticsAuditProps> = ({
 
             <button
               onClick={() => openAIModalWithTab('INSIGHTS')}
-              className="px-3.5 py-2 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shrink-0 cursor-pointer self-end md:self-center"
+              className="px-3.5 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shrink-0 cursor-pointer self-end md:self-center shadow-xs"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
               <span>Analisa Anomali AI</span>
@@ -498,17 +498,17 @@ export const FinanceAnalyticsAudit: React.FC<FinanceAnalyticsAuditProps> = ({
       {activeTab === 'ANALYTICS' && (
         <div className="space-y-4 animate-in fade-in">
           {/* AI Cost Center Advisory Card */}
-          <div className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-indigo-950/40 border border-blue-900/40 rounded-2xl p-4.5 shadow-lg space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+          <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-4.5 shadow-xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-200 pb-3">
               <div className="flex items-center space-x-2.5">
-                <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                  <Sparkles className="w-5 h-5 animate-pulse" />
+                <div className="p-2 rounded-xl bg-blue-100 text-blue-700 border border-blue-200">
+                  <Sparkles className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                  <h3 className="text-sm font-bold text-blue-950 flex items-center space-x-2">
                     <span>Saran Ahli Keuangan AI: Efisiensi & Kontrol Beban Proyek</span>
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-600">
                     Deteksi anomali pemakaian bahan chemical, lembur tenaga alih daya, dan overhead kantor
                   </p>
                 </div>
@@ -516,7 +516,7 @@ export const FinanceAnalyticsAudit: React.FC<FinanceAnalyticsAuditProps> = ({
 
               <button
                 onClick={() => openAIModalWithTab('COST_ANALYSIS')}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-lg shadow-blue-900/30 cursor-pointer self-end sm:self-center"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-xs cursor-pointer self-end sm:self-center"
               >
                 <span>Buka Detail Analisa AI</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -524,28 +524,28 @@ export const FinanceAnalyticsAudit: React.FC<FinanceAnalyticsAuditProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-xs">
-              <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
-                <span className="text-[11px] text-slate-400 block font-semibold">Beban Terbesar</span>
-                <div className="font-bold text-white">
+              <div className="bg-white p-3 rounded-xl border border-blue-200/80 space-y-1 shadow-xs">
+                <span className="text-[11px] text-slate-500 block font-bold">Beban Terbesar</span>
+                <div className="font-bold text-slate-900">
                   {expenseCategories[0]?.name || 'Gaji & Upah Tenaga Kebersihan'}
                 </div>
-                <span className="text-[10px] text-amber-400">
+                <span className="text-[10px] text-amber-700 font-bold">
                   {expenseCategories[0] ? financeService.formatRupiah(expenseCategories[0].amount) : 'Rp 0'}
                 </span>
               </div>
 
-              <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
-                <span className="text-[11px] text-slate-400 block font-semibold">Fokus Penghematan AI</span>
-                <div className="font-bold text-emerald-400">Sentralisasi Chemical & Takaran</div>
-                <span className="text-[10px] text-slate-400">Potensi efisiensi 5-8% dari total beban</span>
+              <div className="bg-white p-3 rounded-xl border border-blue-200/80 space-y-1 shadow-xs">
+                <span className="text-[11px] text-slate-500 block font-bold">Fokus Penghematan AI</span>
+                <div className="font-bold text-emerald-700">Sentralisasi Chemical & Takaran</div>
+                <span className="text-[10px] text-slate-500">Potensi efisiensi 5-8% dari total beban</span>
               </div>
 
-              <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1">
-                <span className="text-[11px] text-slate-400 block font-semibold">Rasio Beban Operasional</span>
-                <div className="font-bold text-cyan-400">
+              <div className="bg-white p-3 rounded-xl border border-blue-200/80 space-y-1 shadow-xs">
+                <span className="text-[11px] text-slate-500 block font-bold">Rasio Beban Operasional</span>
+                <div className="font-bold text-blue-700">
                   {totalIncome > 0 ? ((totalExpense / totalIncome) * 100).toFixed(1) : 0}% dari Omset
                 </div>
-                <span className="text-[10px] text-emerald-400">Dalam batas sehat SAK (&lt; 85%)</span>
+                <span className="text-[10px] text-emerald-700 font-semibold">Dalam batas sehat SAK (&lt; 85%)</span>
               </div>
             </div>
           </div>
@@ -652,21 +652,21 @@ export const FinanceAnalyticsAudit: React.FC<FinanceAnalyticsAuditProps> = ({
       {activeTab === 'CLOSING' && (
         <div className="space-y-4 animate-in fade-in">
           {/* AI Pre-Closing Readiness Alert Card */}
-          <div className="bg-gradient-to-r from-emerald-950/40 via-slate-900 to-teal-950/40 border border-emerald-900/40 rounded-2xl p-4.5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center space-x-3">
-              <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
-                <Sparkles className="w-6 h-6 animate-pulse" />
+              <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200 shrink-0">
+                <Sparkles className="w-6 h-6 text-emerald-600" />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center space-x-2">
-                  <h3 className="text-sm font-bold text-white">
+                  <h3 className="text-sm font-bold text-emerald-950">
                     Audit Kesiapan Tutup Buku (AI Pre-Closing Audit)
                   </h3>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.2 rounded border border-emerald-500/30">
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-300">
                     {trialBalanceSummary.isBalanced ? 'Neraca Saldo Balanced' : 'Perlu Penyesuaian'}
                   </span>
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
+                <p className="text-xs text-slate-700 leading-relaxed">
                   Pemeriksaan otomatis kesesuaian saldo debit/kredit, rekonsiliasi mutasi bank, dan alokasi laba ditahan (Retained Earnings).
                 </p>
               </div>
@@ -674,7 +674,7 @@ export const FinanceAnalyticsAudit: React.FC<FinanceAnalyticsAuditProps> = ({
 
             <button
               onClick={() => openAIModalWithTab('CLOSING_AUDIT')}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-lg shadow-emerald-900/30 cursor-pointer self-end sm:self-center shrink-0"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-xs cursor-pointer self-end sm:self-center shrink-0"
             >
               <span>Lihat Checklist Akuntan AI</span>
               <ChevronRight className="w-3.5 h-3.5" />
