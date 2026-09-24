@@ -364,30 +364,70 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               </div>
 
               {currentUser?.isLocationLocked ? (
-                <div className="flex items-center space-x-2 bg-emerald-50 border border-emerald-300 rounded-xl px-3 py-2 text-xs text-emerald-900">
+                <div className="flex items-center space-x-2 bg-emerald-50 border border-emerald-300 rounded-xl px-3 py-2 text-xs text-emerald-900 overflow-hidden">
                   <Lock className="w-4 h-4 text-emerald-700 shrink-0" />
-                  <span className="font-bold truncate text-emerald-900">
+                  <span className="font-bold truncate text-emerald-900 flex-1 min-w-0">
                     {currentProject ? currentProject.name : 'Lokasi Terkunci'}
                   </span>
                 </div>
               ) : (
-                <div className="flex items-center space-x-2 bg-white border border-slate-300 rounded-xl px-2.5 py-1.5">
-                  <Building2 className="w-4 h-4 text-amber-700 shrink-0" />
-                  <select
-                    id="mobile-sheet-project-select"
-                    value={selectedProjectId}
-                    onChange={(e) => onSelectProject?.(e.target.value)}
-                    className="bg-transparent text-xs text-slate-900 w-full focus:outline-none cursor-pointer py-1 font-semibold"
-                  >
-                    <option value="ALL" className="bg-white text-slate-900">
-                      🌐 Semua Lokasi Proyek (HQ All Sites)
-                    </option>
-                    {(projects || []).map((proj) => (
-                      <option key={proj.id} value={proj.id} className="bg-white text-slate-900">
-                        📍 {proj.name} ({proj.code})
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2 bg-white border border-slate-300 rounded-xl px-3 py-2 shadow-2xs overflow-hidden">
+                    <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span className="font-bold text-xs text-slate-900 truncate flex-1 min-w-0 leading-tight">
+                      {selectedProjectId === 'ALL'
+                        ? '🌐 Semua Lokasi Proyek (HQ All Sites)'
+                        : `📍 ${currentProject ? currentProject.name : 'Pilih Lokasi'}`}
+                    </span>
+                    {currentProject?.code && (
+                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200 shrink-0">
+                        {currentProject.code}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Horizontal touchable project selector chips */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 pt-0.5 scrollbar-thin">
+                    <button
+                      type="button"
+                      onClick={() => onSelectProject?.('ALL')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 border ${
+                        selectedProjectId === 'ALL'
+                          ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      🌐 Semua Lokasi
+                    </button>
+                    {(projects || []).map((proj) => {
+                      const isSelected = selectedProjectId === proj.id;
+                      return (
+                        <button
+                          key={proj.id}
+                          type="button"
+                          onClick={() => onSelectProject?.(proj.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 border flex items-center space-x-1.5 ${
+                            isSelected
+                              ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-xs'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className="truncate max-w-[160px]">📍 {proj.name}</span>
+                          {proj.code && (
+                            <span
+                              className={`text-[9px] font-mono px-1 py-0.2 rounded font-bold ${
+                                isSelected
+                                  ? 'bg-amber-600 text-white'
+                                  : 'bg-slate-100 text-slate-600 border border-slate-200'
+                              }`}
+                            >
+                              {proj.code}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>

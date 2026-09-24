@@ -6,7 +6,9 @@ import {
   X, 
   LogOut, 
   Lock, 
-  Trash2
+  Trash2,
+  ChevronDown,
+  Check
 } from 'lucide-react';
 import { Project, UserAccount, AppView, CompanyProfile } from '../../types';
 import { storageService } from '../../services/storageService';
@@ -39,6 +41,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectView
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(() => storageService.getCompanyProfile());
 
   useEffect(() => {
@@ -88,7 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center space-x-1 sm:space-x-2">
-                  <span className="text-xs sm:text-base md:text-lg font-extrabold tracking-tight text-slate-900 group-hover:text-amber-600 transition-colors leading-tight break-words line-clamp-2 sm:line-clamp-none sm:whitespace-nowrap">
+                  <span className="text-xs sm:text-base md:text-lg font-extrabold tracking-tight text-slate-900 group-hover:text-amber-600 transition-colors leading-tight truncate">
                     {companyProfile.brandName || companyProfile.name || 'RAJAWALI CYCLE'}
                   </span>
                   <span className="bg-amber-100 text-amber-800 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-amber-300 hidden sm:inline-block shrink-0">
@@ -108,37 +111,150 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isLocationLocked ? (
               // LOCKED SITE VIEW (For Admin Lokasi 1 / 2)
               <div
-                className="flex items-center space-x-1 bg-emerald-50 border border-emerald-300 px-2 sm:px-3 py-1.5 rounded-xl text-xs max-w-[115px] sm:max-w-[210px] md:max-w-none text-emerald-900 shrink min-w-0"
+                className="flex items-center space-x-1 sm:space-x-1.5 bg-emerald-50 border border-emerald-300 px-2 sm:px-3 py-1.5 rounded-xl text-xs max-w-[115px] xs:max-w-[155px] sm:max-w-[240px] md:max-w-none text-emerald-900 shrink min-w-0 overflow-hidden"
                 title={`Akses lokasi Anda terkunci pada ${currentProject?.name || 'Site Ini'}`}
               >
                 <Lock className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                <span className="font-semibold text-slate-900 truncate text-xs">
+                <span className="font-bold text-slate-900 truncate text-[11px] sm:text-xs flex-1 min-w-0">
                   {currentProject ? currentProject.name : 'Lokasi Terkunci'}
                 </span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded border border-emerald-300 hidden sm:inline-block font-bold">
+                <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded border border-emerald-300 hidden sm:inline-block font-bold shrink-0">
                   Terkunci
                 </span>
               </div>
             ) : (
-              // UNLOCKED SITE SELECTOR (For Super Admin & General Admin)
-              <div className="flex items-center space-x-1 sm:space-x-1.5 bg-slate-50 border border-slate-300 px-1.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm max-w-[105px] xs:max-w-[130px] sm:max-w-[210px] md:max-w-none shrink min-w-0">
-                <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 shrink-0" />
-                <select
-                  id="navbar-site-selector"
-                  value={selectedProjectId}
-                  onChange={(e) => onSelectProject?.(e.target.value)}
-                  className="bg-transparent text-slate-900 font-semibold focus:outline-none cursor-pointer text-xs sm:text-sm truncate w-full min-w-0"
-                  title="Pilih Lokasi Gedung (Semua Lokasi / Spesifik)"
+              // UNLOCKED SITE SELECTOR (Custom Responsive Trigger + Modal / Dropdown)
+              <div className="relative shrink min-w-0">
+                <button
+                  type="button"
+                  id="navbar-site-selector-btn"
+                  onClick={() => setIsLocationMenuOpen(!isLocationMenuOpen)}
+                  className="flex items-center space-x-1 sm:space-x-1.5 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 border border-slate-300 hover:border-slate-400 px-2 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm max-w-[115px] xs:max-w-[160px] sm:max-w-[230px] md:max-w-[300px] shrink min-w-0 transition-colors shadow-2xs group cursor-pointer overflow-hidden"
+                  title="Pilih Lokasi Gedung / Proyek"
                 >
-                  <option value="ALL" className="bg-white text-slate-900">
-                    🌐 Semua Lokasi
-                  </option>
-                  {projects.map((proj) => (
-                    <option key={proj.id} value={proj.id} className="bg-white text-slate-900">
-                      📍 {proj.name} ({proj.code})
-                    </option>
-                  ))}
-                </select>
+                  <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 shrink-0" />
+                  <span className="font-bold text-slate-800 truncate text-[11px] sm:text-xs flex-1 min-w-0 text-left leading-tight">
+                    {selectedProjectId === 'ALL'
+                      ? 'Semua Lokasi'
+                      : (currentProject?.name || 'Pilih Lokasi')}
+                  </span>
+                  <ChevronDown
+                    className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
+                      isLocationMenuOpen ? 'rotate-180 text-amber-600' : 'group-hover:text-slate-600'
+                    }`}
+                  />
+                </button>
+
+                {/* Location Selection Dropdown (Desktop) / Bottom Sheet (Mobile) */}
+                {isLocationMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs sm:bg-transparent"
+                      onClick={() => setIsLocationMenuOpen(false)}
+                    />
+                    <div className="fixed sm:absolute bottom-0 sm:bottom-auto sm:top-full left-0 sm:left-auto sm:right-0 w-full sm:w-80 max-h-[85vh] sm:max-h-[480px] bg-white sm:rounded-2xl rounded-t-3xl shadow-2xl border border-slate-200 z-50 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 sm:slide-in-from-top-2 duration-200 text-slate-900">
+                      {/* Sheet/Modal Header */}
+                      <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600">
+                            <Building2 className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                              Pilih Lokasi Gedung
+                            </h4>
+                            <p className="text-[10px] text-slate-500 font-medium">
+                              Filter modul & rekapitulasi data area
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsLocationMenuOpen(false)}
+                          className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 flex items-center justify-center cursor-pointer transition-colors"
+                          title="Tutup"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Options List */}
+                      <div className="overflow-y-auto p-2 sm:p-2.5 space-y-1 divide-y divide-slate-100/60 max-h-[60vh] sm:max-h-[360px]">
+                        {/* Option: Semua Lokasi */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSelectProject?.('ALL');
+                            setIsLocationMenuOpen(false);
+                          }}
+                          className={`w-full text-left p-2.5 rounded-xl flex items-center justify-between transition-all cursor-pointer ${
+                            selectedProjectId === 'ALL'
+                              ? 'bg-amber-50 text-amber-950 border border-amber-300 font-bold shadow-xs'
+                              : 'hover:bg-slate-50 text-slate-700 font-medium'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2.5 min-w-0 flex-1 pr-2">
+                            <span className="text-base shrink-0">🌐</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-bold truncate">Semua Lokasi Proyek</div>
+                              <div className="text-[10px] text-slate-500">Konsolidasi seluruh site & HQ</div>
+                            </div>
+                          </div>
+                          {selectedProjectId === 'ALL' && (
+                            <div className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-xs">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                          )}
+                        </button>
+
+                        {/* List of individual projects */}
+                        {projects.map((proj) => {
+                          const isSelected = selectedProjectId === proj.id;
+                          return (
+                            <button
+                              key={proj.id}
+                              type="button"
+                              onClick={() => {
+                                onSelectProject?.(proj.id);
+                                setIsLocationMenuOpen(false);
+                              }}
+                              className={`w-full text-left p-2.5 rounded-xl flex items-center justify-between transition-all cursor-pointer pt-2 ${
+                                isSelected
+                                  ? 'bg-amber-50 text-amber-950 border border-amber-300 font-bold shadow-xs'
+                                  : 'hover:bg-slate-50 text-slate-700 font-medium'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-2.5 min-w-0 flex-1 pr-2">
+                                <span className="text-base shrink-0">📍</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center space-x-1.5 flex-wrap">
+                                    <span className="text-xs font-bold truncate text-slate-900">
+                                      {proj.name}
+                                    </span>
+                                    {proj.code && (
+                                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded border border-slate-200 shrink-0">
+                                        {proj.code}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 truncate mt-0.5">
+                                    {proj.type ? `${proj.type} • ` : ''}
+                                    {proj.address || 'Alamat proyek'}
+                                  </div>
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <div className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-xs">
+                                  <Check className="w-3 h-3 stroke-[3]" />
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
