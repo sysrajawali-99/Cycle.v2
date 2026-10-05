@@ -255,6 +255,21 @@ export async function initVpsDatabase(): Promise<VpsDbStatus> {
         );
       `);
 
+      // Create state history table for version tracking (max 10 versions per key)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS rajawali_state_history (
+          id SERIAL PRIMARY KEY,
+          key VARCHAR(255) NOT NULL,
+          data JSONB NOT NULL,
+          saved_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          user_id VARCHAR(64)
+        );
+      `);
+
+      await client.query(`
+        ALTER TABLE rajawali_app_state ALTER COLUMN key TYPE VARCHAR(255);
+      `);
+
       dbEngine = 'postgresql';
       lastError = undefined;
       lastSyncTimestamp = new Date().toISOString();
@@ -305,66 +320,234 @@ export function getVpsDbStatus(): VpsDbStatus {
 }
 
 /**
- * Save single state entry (upsert)
+ * Merge two arrays of objects by their `id` property.
+ * Rules:
+ * - Newer updatedAt wins.
+ * - Records existing only on server are preserved.
+ * - Records without updatedAt: incoming wins.
+ * - Records with deletedAt are preserved (soft deleted, never permanently erased).
+ */
+export function mergeIdArrays(serverArray: any[], incomingArray: any[]): any[] {
+  const map = new Map<string, any>();
+
+  // 1. Put existing server items into map
+  if (Array.isArray(serverArray)) {
+    for (const item of serverArray) {
+      if (item && item.id !== undefined && item.id !== null) {
+        map.set(String(item.id), item);
+      }
+    }
+  }
+
+  // 2. Merge incoming items
+  if (Array.isArray(incomingArray)) {
+    for (const incoming of incomingArray) {
+      if (!incoming || incoming.id === undefined || incoming.id === null) continue;
+      const id = String(incoming.id);
+      const existing = map.get(id);
+
+      if (!existing) {
+        map.set(id, incoming);
+      } else {
+        const existingUpdated = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+        const incomingUpdated = incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0;
+
+        if (!incoming.updatedAt) {
+          map.set(id, incoming);
+        } else if (incomingUpdated >= existingUpdated) {
+          map.set(id, incoming);
+        } else {
+          map.set(id, existing);
+        }
+      }
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+/**
+ * Save single state entry with transaction, row-locking (FOR UPDATE), history tracking,
+ * and conflict-free merge.
  */
 export async function saveVpsState(
   key: string,
   data: any,
   meta?: { userId?: string; userName?: string }
-): Promise<boolean> {
+): Promise<any> {
   lastSyncTimestamp = new Date().toISOString();
 
-  // 1. Always update local store immediately for instant response
-  const store = readLocalStore();
-  store[key] = data;
-  writeLocalStore(store);
+  const serialized = typeof data === 'string' ? data : JSON.stringify(data);
+  const ukuran = Buffer.byteLength(serialized, 'utf8');
+  const user = meta?.userName || meta?.userId || 'system';
+  console.log(`[SYNC] key=${key}, ukuran=${ukuran} byte, user=${user}`);
 
-  // 2. If connected to PostgreSQL directly
-  if (dbEngine === 'postgresql' && pgPool) {
+  // 1. If connected to PostgreSQL directly
+  if (dbEngine === 'postgresql') {
+    if (!pgPool) {
+      throw new Error('[VPS] PostgreSQL pool tidak terhubung.');
+    }
+    const client = await pgPool.connect();
     try {
-      await pgPool.query(
+      await client.query('BEGIN');
+
+      // Row-level lock via SELECT ... FOR UPDATE
+      const res = await client.query(
+        'SELECT data FROM rajawali_app_state WHERE key = $1 FOR UPDATE',
+        [key]
+      );
+      const oldData = res.rows.length > 0 ? res.rows[0].data : null;
+
+      // Guard: Tolak jika kiriman array kosong sedangkan data di server tidak kosong
+      if (Array.isArray(data) && data.length === 0 && Array.isArray(oldData) && oldData.length > 0) {
+        console.warn(
+          `[GUARD] Ditolak: Kiriman array kosong untuk key=${key} sedangkan server memiliki ${oldData.length} record.`
+        );
+        await client.query('ROLLBACK');
+        throw new Error(
+          `[GUARD] Kiriman ditolak karena array kosong berpotensi menimpa data server (${oldData.length} data tersimpan).`
+        );
+      }
+
+      // Merge data
+      let finalData = data;
+      if (Array.isArray(oldData) && Array.isArray(data)) {
+        finalData = mergeIdArrays(oldData, data);
+      } else if (
+        oldData &&
+        typeof oldData === 'object' &&
+        !Array.isArray(oldData) &&
+        data &&
+        typeof data === 'object' &&
+        !Array.isArray(data)
+      ) {
+        finalData = { ...oldData, ...data };
+      }
+
+      // Simpan riwayat perubahan ke rajawali_state_history sebelum ditimpa
+      if (oldData !== null && oldData !== undefined) {
+        await client.query(
+          `INSERT INTO rajawali_state_history (key, data, user_id) VALUES ($1, $2, $3)`,
+          [key, JSON.stringify(oldData), meta?.userId || 'system']
+        );
+
+        // Pertahankan maksimal 10 versi terakhir per key
+        await client.query(
+          `DELETE FROM rajawali_state_history
+           WHERE key = $1 AND id NOT IN (
+             SELECT id FROM rajawali_state_history WHERE key = $1 ORDER BY id DESC LIMIT 10
+           )`,
+          [key]
+        );
+      }
+
+      // Upsert data hasil gabungan
+      const serializedFinal = JSON.stringify(finalData);
+      await client.query(
         `
         INSERT INTO rajawali_app_state (key, data, updated_at)
         VALUES ($1, $2, CURRENT_TIMESTAMP)
         ON CONFLICT (key)
         DO UPDATE SET data = $2, updated_at = CURRENT_TIMESTAMP
         `,
-        [key, JSON.stringify(data)]
+        [key, serializedFinal]
       );
 
       if (meta?.userId || meta?.userName) {
-        pgPool
-          .query(
-            `INSERT INTO rajawali_sync_logs (action_key, user_id, user_name) VALUES ($1, $2, $3)`,
-            [key, meta.userId || 'system', meta.userName || 'Anonymous']
-          )
-          .catch(() => {});
+        await client.query(
+          `INSERT INTO rajawali_sync_logs (action_key, user_id, user_name) VALUES ($1, $2, $3)`,
+          [key, meta.userId || 'system', meta.userName || 'Anonymous']
+        );
       }
-      return true;
+
+      await client.query('COMMIT');
+      return finalData;
     } catch (err: any) {
-      console.warn(`[VPS] PostgreSQL save error for key ${key}:`, err?.message || err);
-      return false;
+      await client.query('ROLLBACK').catch(() => {});
+      console.error(`[VPS] PostgreSQL save error for key ${key}:`, err?.message || err);
+      throw err;
+    } finally {
+      client.release();
     }
   }
 
-  // 3. If connected to Remote VPS via HTTP API
+  // 2. If connected to Remote VPS via HTTP API
   if (dbEngine === 'remote_vps' && remoteVpsUrl) {
+    const store = readLocalStore();
+    const oldData = store[key];
+
+    // Guard: Tolak jika kiriman array kosong sedangkan data di server tidak kosong
+    if (Array.isArray(data) && data.length === 0 && Array.isArray(oldData) && oldData.length > 0) {
+      console.warn(
+        `[GUARD] Ditolak (remote_vps): Kiriman array kosong untuk key=${key} sedangkan server memiliki ${oldData.length} record.`
+      );
+      throw new Error(
+        `[GUARD] Kiriman ditolak karena array kosong berpotensi menimpa data server (${oldData.length} data tersimpan).`
+      );
+    }
+
+    let finalData = data;
+    if (Array.isArray(oldData) && Array.isArray(data)) {
+      finalData = mergeIdArrays(oldData, data);
+    } else if (
+      oldData &&
+      typeof oldData === 'object' &&
+      !Array.isArray(oldData) &&
+      data &&
+      typeof data === 'object' &&
+      !Array.isArray(data)
+    ) {
+      finalData = { ...oldData, ...data };
+    }
+
+    // Update local store with merged data
+    store[key] = finalData;
+    writeLocalStore(store);
+
     try {
       fetch(`${remoteVpsUrl}/api/vps/state/${encodeURIComponent(key)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data, meta }),
+        body: JSON.stringify({ data: finalData, meta }),
         signal: AbortSignal.timeout(12000)
       }).catch((err) => {
         console.warn(`[VPS] Remote VPS sync failed for key ${key}:`, err?.message || err);
       });
-      return true;
+      return finalData;
     } catch {
-      return true;
+      return finalData;
     }
   }
 
-  return true;
+  // 3. Fallback: Only used if engine = local_file
+  const store = readLocalStore();
+  const oldData = store[key];
+
+  if (Array.isArray(data) && data.length === 0 && Array.isArray(oldData) && oldData.length > 0) {
+    console.warn(
+      `[GUARD] Ditolak (local): Kiriman array kosong untuk key=${key} sedangkan server memiliki ${oldData.length} record.`
+    );
+    throw new Error(`[GUARD] Kiriman ditolak karena array kosong menimpa data server.`);
+  }
+
+  let finalData = data;
+  if (Array.isArray(oldData) && Array.isArray(data)) {
+    finalData = mergeIdArrays(oldData, data);
+  } else if (
+    oldData &&
+    typeof oldData === 'object' &&
+    !Array.isArray(oldData) &&
+    data &&
+    typeof data === 'object' &&
+    !Array.isArray(data)
+  ) {
+    finalData = { ...oldData, ...data };
+  }
+
+  store[key] = finalData;
+  writeLocalStore(store);
+
+  return finalData;
 }
 
 /**

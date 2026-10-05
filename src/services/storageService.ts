@@ -196,6 +196,166 @@ export function registerDataChangeListener(listener: (key: string, data: any) =>
   });
 }
 
+// =============================================================================
+// PERSISTENT OUTBOX (Tracks unconfirmed local user changes)
+// =============================================================================
+export interface OutboxEntry {
+  key: StorageActionType;
+  data: any;
+  timestamp: string;
+  userId?: string;
+  userName?: string;
+}
+
+const OUTBOX_STORAGE_KEY = 'rajawali_sync_outbox';
+
+export const outboxService = {
+  getEntries(): Record<string, OutboxEntry> {
+    try {
+      const raw = localStorage.getItem(OUTBOX_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  },
+
+  addEntry(key: StorageActionType, data: any, user?: { id?: string; name?: string } | null) {
+    try {
+      const outbox = this.getEntries();
+      outbox[key] = {
+        key,
+        data,
+        timestamp: new Date().toISOString(),
+        userId: user?.id,
+        userName: user?.name
+      };
+      localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(outbox));
+    } catch (err) {
+      console.warn('[Outbox] Failed to add entry:', err);
+    }
+  },
+
+  removeEntry(key: string, timestamp?: string) {
+    try {
+      const outbox = this.getEntries();
+      if (outbox[key]) {
+        if (!timestamp || new Date(outbox[key].timestamp).getTime() <= new Date(timestamp).getTime()) {
+          delete outbox[key];
+          localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(outbox));
+        }
+      }
+    } catch (err) {
+      console.warn('[Outbox] Failed to remove entry:', err);
+    }
+  },
+
+  hasPending(key: string): boolean {
+    const outbox = this.getEntries();
+    return Boolean(outbox[key]);
+  },
+
+  getPending(key: string): OutboxEntry | undefined {
+    const outbox = this.getEntries();
+    return outbox[key];
+  }
+};
+
+// =============================================================================
+// RECORD METADATA & SOFT DELETE HELPERS
+// =============================================================================
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'id-' + Math.random().toString(36).substring(2, 10) + '-' + Date.now();
+}
+
+export function ensureRecordMetadata<T extends Record<string, any>>(item: T, forceUpdate = false): T {
+  if (!item || typeof item !== 'object') return item;
+  const now = new Date().toISOString();
+  const id =
+    item.id !== undefined && item.id !== null && String(item.id).trim().length > 0
+      ? String(item.id)
+      : generateUUID();
+  const updatedAt = forceUpdate ? now : item.updatedAt || item.createdAt || now;
+  return {
+    ...item,
+    id,
+    updatedAt
+  };
+}
+
+function readProcessedRecords<T extends Record<string, any>>(rawArray: any[]): T[] {
+  if (!Array.isArray(rawArray)) return [];
+  return rawArray
+    .filter((r) => r && typeof r === 'object' && !r.deletedAt)
+    .map((r) => ensureRecordMetadata(r, false) as T);
+}
+
+function writeProcessedRecords<T extends Record<string, any>>(
+  storageKey: string,
+  incomingRecords: T[]
+): any[] {
+  if (!Array.isArray(incomingRecords)) return [];
+  const now = new Date().toISOString();
+
+  let existingRaw: any[] = [];
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) existingRaw = parsed;
+    }
+  } catch {}
+
+  const incomingProcessed = incomingRecords.map((item) => ensureRecordMetadata(item, true));
+  const incomingIds = new Set(incomingProcessed.map((item) => String(item.id)));
+
+  // Soft Delete: Any records present in existing raw storage that are missing in incoming are marked with deletedAt
+  const preservedDeleted: any[] = [];
+  for (const old of existingRaw) {
+    if (old && old.id !== undefined && old.id !== null) {
+      const idStr = String(old.id);
+      if (!incomingIds.has(idStr)) {
+        preservedDeleted.push({
+          ...old,
+          deletedAt: old.deletedAt || now,
+          updatedAt: now
+        });
+      }
+    }
+  }
+
+  return [...incomingProcessed, ...preservedDeleted];
+}
+
+function readStorageRecords<T extends Record<string, any>>(storageKey: string, defaultData: T[] = []): T[] {
+  const raw = localStorage.getItem(storageKey);
+  if (raw === null) {
+    if (defaultData && defaultData.length > 0) {
+      initStorageQuietly(storageKey, defaultData);
+    }
+    return readProcessedRecords<T>(defaultData);
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return readProcessedRecords<T>(parsed);
+  } catch {
+    return [];
+  }
+}
+
+function writeStorageRecords<T extends Record<string, any>>(
+  actionKey: StorageActionType,
+  storageKey: string,
+  incomingData: T[],
+  customEvent?: string
+): void {
+  const fullData = writeProcessedRecords<T>(storageKey, incomingData);
+  applyStorageUpdate(actionKey, storageKey, fullData, customEvent, 'user_action');
+}
+
 /**
  * Core update wrapper: Persists to local storage instantly with zero latency,
  * dispatches optional DOM events, and runs all registered storage middlewares
@@ -208,6 +368,12 @@ function applyStorageUpdate<T>(
   customEventName?: string,
   source: 'user_action' | 'system_sync' | 'remote_sync' | 'reset' = 'user_action'
 ): void {
+  // Track in persistent outbox if this change was triggered by local user action
+  if (source === 'user_action') {
+    const activeUser = storageService.getActiveUser();
+    outboxService.addEntry(actionKey, data, activeUser);
+  }
+
   // 1. Instant local persistence
   try {
     localStorage.setItem(storageKey, JSON.stringify(data));
@@ -288,39 +454,19 @@ export const storageService = {
   },
 
   getProjects(): Project[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.PROJECTS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.PROJECTS, INITIAL_PROJECTS);
-      return INITIAL_PROJECTS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<Project>(STORAGE_KEYS.PROJECTS, INITIAL_PROJECTS);
   },
 
   saveProjects(data: Project[]) {
-    applyStorageUpdate('projects', STORAGE_KEYS.PROJECTS, data);
+    writeStorageRecords('projects', STORAGE_KEYS.PROJECTS, data);
   },
 
   getEmployees(): Employee[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.EMPLOYEES, INITIAL_EMPLOYEES);
-      return INITIAL_EMPLOYEES;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<Employee>(STORAGE_KEYS.EMPLOYEES, INITIAL_EMPLOYEES);
   },
 
   saveEmployees(data: Employee[]) {
-    applyStorageUpdate('employees', STORAGE_KEYS.EMPLOYEES, data);
+    writeStorageRecords('employees', STORAGE_KEYS.EMPLOYEES, data);
   },
 
   getTimesheets(): TimesheetMonthRecord[] {
@@ -329,18 +475,13 @@ export const storageService = {
       const emps = this.getEmployees();
       const initialTS = generateSeedTimesheets(emps);
       initStorageQuietly(STORAGE_KEYS.TIMESHEETS, initialTS);
-      return initialTS;
+      return readProcessedRecords<TimesheetMonthRecord>(initialTS);
     }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<TimesheetMonthRecord>(STORAGE_KEYS.TIMESHEETS, []);
   },
 
   saveTimesheets(data: TimesheetMonthRecord[]) {
-    applyStorageUpdate('timesheets', STORAGE_KEYS.TIMESHEETS, data);
+    writeStorageRecords('timesheets', STORAGE_KEYS.TIMESHEETS, data);
   },
 
   getTimesheetCutoffSettings(): TimesheetCutoffSettings {
@@ -374,172 +515,75 @@ export const storageService = {
   },
 
   getMutations(): MutationHistory[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.MUTATIONS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.MUTATIONS, INITIAL_MUTATIONS);
-      return INITIAL_MUTATIONS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<MutationHistory>(STORAGE_KEYS.MUTATIONS, INITIAL_MUTATIONS);
   },
 
   saveMutations(data: MutationHistory[]) {
-    applyStorageUpdate('mutations', STORAGE_KEYS.MUTATIONS, data);
+    writeStorageRecords('mutations', STORAGE_KEYS.MUTATIONS, data);
   },
 
   getInventoryItems(): InventoryItem[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.INVENTORY_ITEMS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.INVENTORY_ITEMS, INITIAL_INVENTORY_ITEMS);
-      return INITIAL_INVENTORY_ITEMS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<InventoryItem>(STORAGE_KEYS.INVENTORY_ITEMS, INITIAL_INVENTORY_ITEMS);
   },
 
   saveInventoryItems(data: InventoryItem[]) {
-    applyStorageUpdate('inventory_items', STORAGE_KEYS.INVENTORY_ITEMS, data);
+    writeStorageRecords('inventory_items', STORAGE_KEYS.INVENTORY_ITEMS, data);
   },
 
   getProjectStocks(): ProjectStock[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.PROJECT_STOCKS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.PROJECT_STOCKS, INITIAL_PROJECT_STOCKS);
-      return INITIAL_PROJECT_STOCKS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-      initStorageQuietly(STORAGE_KEYS.PROJECT_STOCKS, INITIAL_PROJECT_STOCKS);
-      return INITIAL_PROJECT_STOCKS;
-    } catch {
-      return INITIAL_PROJECT_STOCKS;
-    }
+    return readStorageRecords<ProjectStock>(STORAGE_KEYS.PROJECT_STOCKS, INITIAL_PROJECT_STOCKS);
   },
 
   saveProjectStocks(data: ProjectStock[]) {
-    applyStorageUpdate('project_stocks', STORAGE_KEYS.PROJECT_STOCKS, data);
+    writeStorageRecords('project_stocks', STORAGE_KEYS.PROJECT_STOCKS, data);
   },
 
   getInventoryLogs(): InventoryLog[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.INVENTORY_LOGS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.INVENTORY_LOGS, INITIAL_INVENTORY_LOGS);
-      return INITIAL_INVENTORY_LOGS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<InventoryLog>(STORAGE_KEYS.INVENTORY_LOGS, INITIAL_INVENTORY_LOGS);
   },
 
   saveInventoryLogs(data: InventoryLog[]) {
-    applyStorageUpdate('inventory_logs', STORAGE_KEYS.INVENTORY_LOGS, data);
+    writeStorageRecords('inventory_logs', STORAGE_KEYS.INVENTORY_LOGS, data);
   },
 
   getMaterialRequests(): MaterialRequest[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.MATERIAL_REQUESTS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.MATERIAL_REQUESTS, INITIAL_MATERIAL_REQUESTS);
-      return INITIAL_MATERIAL_REQUESTS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<MaterialRequest>(STORAGE_KEYS.MATERIAL_REQUESTS, INITIAL_MATERIAL_REQUESTS);
   },
 
   saveMaterialRequests(data: MaterialRequest[]) {
-    applyStorageUpdate('material_requests', STORAGE_KEYS.MATERIAL_REQUESTS, data);
+    writeStorageRecords('material_requests', STORAGE_KEYS.MATERIAL_REQUESTS, data);
   },
 
   getTasks(): CleaningTask[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.TASKS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.TASKS, INITIAL_TASKS);
-      return INITIAL_TASKS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<CleaningTask>(STORAGE_KEYS.TASKS, INITIAL_TASKS);
   },
 
   saveTasks(data: CleaningTask[]) {
-    applyStorageUpdate('tasks', STORAGE_KEYS.TASKS, data);
+    writeStorageRecords('tasks', STORAGE_KEYS.TASKS, data);
   },
 
   getBlasts(): BlastAnnouncement[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.BLASTS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.BLASTS, INITIAL_BLASTS);
-      return INITIAL_BLASTS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<BlastAnnouncement>(STORAGE_KEYS.BLASTS, INITIAL_BLASTS);
   },
 
   saveBlasts(data: BlastAnnouncement[]) {
-    applyStorageUpdate('blasts', STORAGE_KEYS.BLASTS, data);
+    writeStorageRecords('blasts', STORAGE_KEYS.BLASTS, data);
   },
 
   getSops(): SopDocument[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.SOPS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.SOPS, INITIAL_SOPS);
-      return INITIAL_SOPS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<SopDocument>(STORAGE_KEYS.SOPS, INITIAL_SOPS);
   },
 
   saveSops(data: SopDocument[]) {
-    applyStorageUpdate('sops', STORAGE_KEYS.SOPS, data);
+    writeStorageRecords('sops', STORAGE_KEYS.SOPS, data);
   },
 
   getUsers(): UserAccount[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.USERS);
-    if (!raw) {
-      initStorageQuietly(STORAGE_KEYS.USERS, INITIAL_USERS);
-      return INITIAL_USERS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-      return INITIAL_USERS;
-    } catch {
-      return INITIAL_USERS;
-    }
+    return readStorageRecords<UserAccount>(STORAGE_KEYS.USERS, INITIAL_USERS);
   },
 
   saveUsers(data: UserAccount[]) {
-    applyStorageUpdate('users', STORAGE_KEYS.USERS, data);
+    writeStorageRecords('users', STORAGE_KEYS.USERS, data);
   },
 
   getActiveUser(): UserAccount | null {
@@ -570,21 +614,11 @@ export const storageService = {
 
   // Finance Storage Handlers
   getChartOfAccounts(): ChartOfAccount[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.CHART_OF_ACCOUNTS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.CHART_OF_ACCOUNTS, INITIAL_CHART_OF_ACCOUNTS);
-      return INITIAL_CHART_OF_ACCOUNTS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : INITIAL_CHART_OF_ACCOUNTS;
-    } catch {
-      return INITIAL_CHART_OF_ACCOUNTS;
-    }
+    return readStorageRecords<ChartOfAccount>(STORAGE_KEYS.CHART_OF_ACCOUNTS, INITIAL_CHART_OF_ACCOUNTS);
   },
 
   saveChartOfAccounts(data: ChartOfAccount[]) {
-    applyStorageUpdate('chart_of_accounts', STORAGE_KEYS.CHART_OF_ACCOUNTS, data);
+    writeStorageRecords('chart_of_accounts', STORAGE_KEYS.CHART_OF_ACCOUNTS, data);
   },
 
   resetCoaBalancesToZero(): ChartOfAccount[] {
@@ -615,75 +649,35 @@ export const storageService = {
   },
 
   getFinanceTransactions(): FinanceTransaction[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.FINANCE_TRANSACTIONS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.FINANCE_TRANSACTIONS, INITIAL_FINANCE_TRANSACTIONS);
-      return INITIAL_FINANCE_TRANSACTIONS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<FinanceTransaction>(STORAGE_KEYS.FINANCE_TRANSACTIONS, INITIAL_FINANCE_TRANSACTIONS);
   },
 
   saveFinanceTransactions(data: FinanceTransaction[]) {
-    applyStorageUpdate('finance_transactions', STORAGE_KEYS.FINANCE_TRANSACTIONS, data);
+    writeStorageRecords('finance_transactions', STORAGE_KEYS.FINANCE_TRANSACTIONS, data);
   },
 
   getBankStatements(): BankStatementImport[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.BANK_STATEMENTS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.BANK_STATEMENTS, INITIAL_BANK_STATEMENTS);
-      return INITIAL_BANK_STATEMENTS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<BankStatementImport>(STORAGE_KEYS.BANK_STATEMENTS, INITIAL_BANK_STATEMENTS);
   },
 
   saveBankStatements(data: BankStatementImport[]) {
-    applyStorageUpdate('bank_statements', STORAGE_KEYS.BANK_STATEMENTS, data);
+    writeStorageRecords('bank_statements', STORAGE_KEYS.BANK_STATEMENTS, data);
   },
 
   getPeriodClosings(): PeriodClosing[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.PERIOD_CLOSINGS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.PERIOD_CLOSINGS, INITIAL_PERIOD_CLOSINGS);
-      return INITIAL_PERIOD_CLOSINGS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<PeriodClosing>(STORAGE_KEYS.PERIOD_CLOSINGS, INITIAL_PERIOD_CLOSINGS);
   },
 
   savePeriodClosings(data: PeriodClosing[]) {
-    applyStorageUpdate('period_closings', STORAGE_KEYS.PERIOD_CLOSINGS, data);
+    writeStorageRecords('period_closings', STORAGE_KEYS.PERIOD_CLOSINGS, data);
   },
 
   getAuditTrails(): AuditTrailItem[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.AUDIT_TRAILS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.AUDIT_TRAILS, INITIAL_AUDIT_TRAILS);
-      return INITIAL_AUDIT_TRAILS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<AuditTrailItem>(STORAGE_KEYS.AUDIT_TRAILS, INITIAL_AUDIT_TRAILS);
   },
 
   saveAuditTrails(data: AuditTrailItem[]) {
-    applyStorageUpdate('audit_trails', STORAGE_KEYS.AUDIT_TRAILS, data);
+    writeStorageRecords('audit_trails', STORAGE_KEYS.AUDIT_TRAILS, data);
   },
 
   addAuditTrail(item: AuditTrailItem) {
@@ -692,160 +686,66 @@ export const storageService = {
   },
 
   getCurrencyRates(): CurrencyRate[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.CURRENCY_RATES);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.CURRENCY_RATES, INITIAL_CURRENCY_RATES);
-      return INITIAL_CURRENCY_RATES;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : INITIAL_CURRENCY_RATES;
-    } catch {
-      return INITIAL_CURRENCY_RATES;
-    }
+    return readStorageRecords<CurrencyRate>(STORAGE_KEYS.CURRENCY_RATES, INITIAL_CURRENCY_RATES);
   },
 
   saveCurrencyRates(data: CurrencyRate[]) {
-    applyStorageUpdate('currency_rates', STORAGE_KEYS.CURRENCY_RATES, data);
+    writeStorageRecords('currency_rates', STORAGE_KEYS.CURRENCY_RATES, data);
   },
 
   // -------------------------------------------------------------------------
   // DEBTS (HUTANG USAHA & OPERASIONAL)
   // -------------------------------------------------------------------------
   getDebts(): DebtRecord[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.DEBTS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.DEBTS, []);
-      return [];
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      // Bersihkan data dummy/demo awal agar data mencerminkan data aktual 0 bila belum ada input hutang riil
-      const cleaned = parsed.filter((d: any) => {
-        if (!d || !d.id) return false;
-        const id = String(d.id || '');
-        const code = String(d.code || '');
-        if (/^debt-00[0-9]$/.test(id) || id.startsWith('HUT-INV-') || /^HUT-2026-08-00[0-9]$/.test(id) || /^HUT-2026-08-00[0-9]$/.test(code)) {
-          return false;
-        }
-        if (typeof d.creditorName === 'string' && (d.creditorName.includes('Diversey') || d.creditorName.includes('Karcher') || d.creditorName.includes('Mitra Seragam') || d.creditorName.includes('KMK'))) {
-          return false;
-        }
-        return true;
-      });
-      if (cleaned.length !== parsed.length) {
-        this.saveDebts(cleaned);
-      }
-      return cleaned;
-    } catch {
-      return [];
-    }
+    return readStorageRecords<DebtRecord>(STORAGE_KEYS.DEBTS, []);
   },
 
   saveDebts(data: DebtRecord[]) {
-    applyStorageUpdate('debts', STORAGE_KEYS.DEBTS, data);
+    writeStorageRecords('debts', STORAGE_KEYS.DEBTS, data);
   },
 
   // -------------------------------------------------------------------------
   // RECEIVABLES (PIUTANG USAHA & KONTRAK KLIEN)
   // -------------------------------------------------------------------------
   getReceivables(): ReceivableRecord[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.RECEIVABLES);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.RECEIVABLES, []);
-      return [];
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      // Bersihkan data dummy/demo awal agar data mencerminkan data aktual 0 bila belum ada piutang tertagih
-      const cleaned = parsed.filter((r: any) => {
-        if (!r || !r.id) return false;
-        const id = String(r.id || '');
-        const code = String(r.code || '');
-        if (/^rec-00[0-9]$/.test(id) || /^PIU-2026-08-00[0-9]$/.test(id) || /^PIU-2026-08-00[0-9]$/.test(code)) {
-          return false;
-        }
-        if (typeof r.customerName === 'string' && (r.customerName.includes('Pakuwon') || r.customerName.includes('Medika') || r.customerName.includes('Menara Bintang') || r.customerName.includes('Senopati'))) {
-          return false;
-        }
-        return true;
-      });
-      if (cleaned.length !== parsed.length) {
-        this.saveReceivables(cleaned);
-      }
-      return cleaned;
-    } catch {
-      return [];
-    }
+    return readStorageRecords<ReceivableRecord>(STORAGE_KEYS.RECEIVABLES, []);
   },
 
   saveReceivables(data: ReceivableRecord[]) {
-    applyStorageUpdate('receivables', STORAGE_KEYS.RECEIVABLES, data);
+    writeStorageRecords('receivables', STORAGE_KEYS.RECEIVABLES, data);
   },
 
   // -------------------------------------------------------------------------
   // INVESTMENTS (INVESTASI & BAGI HASIL INVESTOR)
   // -------------------------------------------------------------------------
   getInvestments(): InvestmentRecord[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.INVESTMENTS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.INVESTMENTS, INITIAL_INVESTMENTS);
-      return INITIAL_INVESTMENTS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+    return readStorageRecords<InvestmentRecord>(STORAGE_KEYS.INVESTMENTS, INITIAL_INVESTMENTS);
   },
 
   saveInvestments(data: InvestmentRecord[]) {
-    applyStorageUpdate('investments', STORAGE_KEYS.INVESTMENTS, data);
+    writeStorageRecords('investments', STORAGE_KEYS.INVESTMENTS, data);
   },
 
   // -------------------------------------------------------------------------
   // CLIENT CONTRACTS (KONTRAK KERJASAMA KLIEN)
   // -------------------------------------------------------------------------
   getClientContracts(): ClientContract[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.CLIENT_CONTRACTS);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.CLIENT_CONTRACTS, INITIAL_CLIENT_CONTRACTS);
-      return INITIAL_CLIENT_CONTRACTS;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : INITIAL_CLIENT_CONTRACTS;
-    } catch {
-      return INITIAL_CLIENT_CONTRACTS;
-    }
+    return readStorageRecords<ClientContract>(STORAGE_KEYS.CLIENT_CONTRACTS, INITIAL_CLIENT_CONTRACTS);
   },
 
   saveClientContracts(data: ClientContract[]) {
-    applyStorageUpdate('client_contracts', STORAGE_KEYS.CLIENT_CONTRACTS, data);
+    writeStorageRecords('client_contracts', STORAGE_KEYS.CLIENT_CONTRACTS, data);
   },
 
   // -------------------------------------------------------------------------
   // CLIENT INVOICES (INVOICE BULANAN & PEKERJAAN EKSTRA)
   // -------------------------------------------------------------------------
   getClientInvoices(): ClientInvoice[] {
-    const raw = localStorage.getItem(STORAGE_KEYS.CLIENT_INVOICES);
-    if (raw === null) {
-      initStorageQuietly(STORAGE_KEYS.CLIENT_INVOICES, INITIAL_CLIENT_INVOICES);
-      return INITIAL_CLIENT_INVOICES;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : INITIAL_CLIENT_INVOICES;
-    } catch {
-      return INITIAL_CLIENT_INVOICES;
-    }
+    return readStorageRecords<ClientInvoice>(STORAGE_KEYS.CLIENT_INVOICES, INITIAL_CLIENT_INVOICES);
   },
 
   saveClientInvoices(data: ClientInvoice[]) {
-    applyStorageUpdate('client_invoices', STORAGE_KEYS.CLIENT_INVOICES, data);
+    writeStorageRecords('client_invoices', STORAGE_KEYS.CLIENT_INVOICES, data);
   },
 
   // -------------------------------------------------------------------------
@@ -1040,7 +940,7 @@ export const storageService = {
     return this.saveDashboardWidgets(defaults);
   },
 
-  saveRemoteState(key: StorageActionType, data: any) {
+  saveRemoteState(key: StorageActionType, remoteData: any) {
     const keyMap: Record<StorageActionType, string> = {
       company_profile: STORAGE_KEYS.COMPANY_PROFILE,
       projects: STORAGE_KEYS.PROJECTS,
@@ -1069,10 +969,70 @@ export const storageService = {
     };
     const storageKey = keyMap[key];
     if (storageKey) {
+      let localRaw: any = null;
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) localRaw = JSON.parse(raw);
+      } catch {}
+
+      let mergedData = remoteData;
+
+      if (Array.isArray(remoteData)) {
+        const localArray: any[] = Array.isArray(localRaw) ? localRaw : [];
+        const pendingEntry = outboxService.getPending(key);
+        const pendingIds = new Set<string>();
+        if (pendingEntry && Array.isArray(pendingEntry.data)) {
+          for (const item of pendingEntry.data) {
+            if (item && item.id !== undefined && item.id !== null) {
+              pendingIds.add(String(item.id));
+            }
+          }
+        }
+
+        const map = new Map<string, any>();
+
+        // 1. Put local items
+        for (const item of localArray) {
+          if (item && item.id !== undefined && item.id !== null) {
+            map.set(String(item.id), item);
+          }
+        }
+
+        // 2. Merge remote items
+        for (const remoteItem of remoteData) {
+          if (!remoteItem || remoteItem.id === undefined || remoteItem.id === null) continue;
+          const id = String(remoteItem.id);
+          const localItem = map.get(id);
+
+          if (!localItem) {
+            map.set(id, remoteItem);
+          } else {
+            // If local item is in outbox (pending unsent change by user), preserve local item
+            if (pendingIds.has(id)) {
+              map.set(id, localItem);
+            } else {
+              const localUpdated = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
+              const remoteUpdated = remoteItem.updatedAt ? new Date(remoteItem.updatedAt).getTime() : 0;
+
+              if (!remoteItem.updatedAt || remoteUpdated >= localUpdated) {
+                map.set(id, remoteItem);
+              } else {
+                map.set(id, localItem);
+              }
+            }
+          }
+        }
+
+        mergedData = Array.from(map.values());
+      } else if (remoteData && typeof remoteData === 'object' && !Array.isArray(remoteData)) {
+        const localObj = localRaw && typeof localRaw === 'object' && !Array.isArray(localRaw) ? localRaw : {};
+        mergedData = { ...localObj, ...remoteData };
+      }
+
       applyStorageUpdate(
         key,
         storageKey,
-        data,
+        mergedData,
         key === 'company_profile' ? 'company_profile_updated' : undefined,
         'remote_sync'
       );

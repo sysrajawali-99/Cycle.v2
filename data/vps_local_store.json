@@ -68511,16 +68511,5 @@
   "client_invoices": [],
   "ping_test": {
     "timestamp": "2026-10-05T06:19:00Z"
-  },
-  "test_guard": [
-    {
-      "id": "rec-1",
-      "name": "Existing"
-    },
-    {
-      "id": "rec-2",
-      "name": "New Record"
-    }
-  ],
-  "test_multi_user": []
+  }
 }

@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { storageService, StorageActionType } from './storageService';
+import { storageService, StorageActionType, outboxService } from './storageService';
 import { UserAccount } from '../types';
 
 export interface VpsConnectionStatus {
@@ -68,9 +68,14 @@ class VpsSyncService {
         (payload: { key: StorageActionType; data: any; senderId?: string; timestamp?: string }) => {
           if (!payload?.key) return;
 
+          // Clear confirmed item from outbox
+          outboxService.removeEntry(payload.key, payload.timestamp);
+
           const currentUser = storageService.getActiveUser();
-          // If this update was originated from this user's current session, skip to avoid loops
+          // If this update was originated from this user's current session and there's no newer data, skip re-applying
           if (payload.senderId && currentUser?.id && payload.senderId === currentUser.id) {
+            this.currentStatus.lastSync = payload.timestamp || new Date().toISOString();
+            this.notifyStatusListeners();
             return;
           }
 
@@ -79,6 +84,10 @@ class VpsSyncService {
           this.notifyStatusListeners();
         }
       );
+
+      this.socket.on('sync_error', (payload: { key?: string; error?: string }) => {
+        console.warn(`[VPS Sync] Server sync_error for key ${payload?.key}:`, payload?.error);
+      });
 
       this.socket.on('bulk_synced', () => {
         this.checkStatus();
@@ -89,8 +98,9 @@ class VpsSyncService {
 
     // 3. Register storage middleware to automatically broadcast and sync local changes to VPS
     storageService.registerStorageMiddleware((ctx) => {
-      // Do not re-sync if the change arrived from remote
-      if (ctx.source === 'remote_sync') return;
+      // CRITICAL: Only send to server if changed directly by USER ACTION!
+      // Never send on remote_sync, system_sync, or reset!
+      if (ctx.source !== 'user_action') return;
 
       const activeUser = storageService.getActiveUser();
       this.queueStateSync(ctx.key, ctx.data, activeUser);
@@ -167,6 +177,8 @@ class VpsSyncService {
           lastSync: json.lastSync || new Date().toISOString(),
           error: json.error
         };
+        // Pull latest updates with safe merge and flush outbox
+        this.autoSyncOnStartup();
       }
     } catch (err: any) {
       this.currentStatus.error = err?.message || 'Gagal menyambung kembali ke VPS';
@@ -223,12 +235,18 @@ class VpsSyncService {
 
       // HTTP fallback with keepalive for guaranteed persistence across page reload / navigation
       try {
-        await fetch(`/api/vps/state/${encodeURIComponent(key)}`, {
+        const res = await fetch(`/api/vps/state/${encodeURIComponent(key)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data, meta }),
           keepalive: true
         });
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.success) {
+            outboxService.removeEntry(key);
+          }
+        }
         this.currentStatus.lastSync = new Date().toISOString();
         this.notifyStatusListeners();
       } catch (err) {
@@ -352,7 +370,7 @@ class VpsSyncService {
       const keys = states && typeof states === 'object' ? Object.keys(states) : [];
 
       if (keys.length > 0) {
-        // VPS already has records: hydrate local storage immediately
+        // VPS has records: hydrate local storage with conflict-free merge
         for (const [key, data] of Object.entries(states)) {
           if (data !== undefined && data !== null) {
             this.applyRemoteUpdate(key as StorageActionType, data);
@@ -367,16 +385,19 @@ class VpsSyncService {
             new CustomEvent('rajawali_startup_sync_completed', { detail: { count: keys.length } })
           );
         } catch {}
-
-        return true;
-      } else {
-        // Only seed if local storage has actual data
-        const localEmps = storageService.getEmployees();
-        if (localEmps && localEmps.length > 0) {
-          await this.pushAllDataToVps();
-        }
-        return false;
       }
+
+      // Check and flush any pending unconfirmed changes from outbox
+      const pendingOutbox = outboxService.getEntries();
+      for (const [outboxKey, entry] of Object.entries(pendingOutbox)) {
+        this.queueStateSync(
+          outboxKey as StorageActionType,
+          entry.data,
+          { id: entry.userId, name: entry.userName } as any
+        );
+      }
+
+      return keys.length > 0;
     } catch (err) {
       console.warn('[VPS Auto-Sync] Background startup sync:', err);
       return false;

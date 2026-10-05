@@ -1,7 +1,6 @@
 import express from 'express';
 import http from 'http';
 import path from 'path';
-import { execSync } from 'child_process';
 import { createServer as createViteServer } from 'vite';
 import { Server as SocketIOServer } from 'socket.io';
 import { GoogleGenAI } from '@google/genai';
@@ -11,8 +10,7 @@ import {
   getVpsDbStatus,
   saveVpsState,
   getVpsState,
-  getAllVpsStates,
-  bulkSaveVpsStates
+  getAllVpsStates
 } from './server/vpsDatabase.ts';
 
 dotenv.config();
@@ -23,7 +21,10 @@ const io = new SocketIOServer(server, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
-  }
+  },
+  maxHttpBufferSize: 50 * 1024 * 1024,
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 const PORT = 3000;
 
@@ -41,30 +42,10 @@ function getGeminiClient(): GoogleGenAI | null {
 }
 
 // -------------------------------------------------------------
-// Health Check & Project Archive Download
+// Health Check
 // -------------------------------------------------------------
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-app.get('/api/export-zip', (_req, res) => {
-  try {
-    const zipPath = path.join('/tmp', 'rajawali-cycle.zip');
-    execSync(`python3 -c "
-import os, zipfile
-zip_path = '${zipPath}'
-with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-    for root, dirs, files in os.walk('.'):
-        dirs[:] = [d for d in dirs if d not in ('node_modules', '.git', 'dist', '.cache', '.vercel')]
-        for file in files:
-            file_path = os.path.join(root, file)
-            arcname = os.path.relpath(file_path, '.')
-            zf.write(file_path, arcname)
-"`);
-    res.download(zipPath, 'rajawali-cycle.zip');
-  } catch (err: any) {
-    res.status(500).json({ error: err?.message || 'Failed to generate zip' });
-  }
 });
 
 // -------------------------------------------------------------
@@ -110,36 +91,24 @@ app.post('/api/vps/state/:key', async (req, res) => {
   try {
     const { key } = req.params;
     const { data, meta } = req.body;
-    await saveVpsState(key, data, meta);
+    const mergedData = await saveVpsState(key, data, meta);
     io.emit('state_updated', {
       key,
-      data,
+      data: mergedData,
       senderId: meta?.userId || 'server',
       timestamp: new Date().toISOString()
     });
-    res.json({ success: true, key, updated: true });
+    res.json({ success: true, key, data: mergedData, updated: true });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Gagal menyimpan state' });
   }
 });
 
-app.post('/api/vps/bulk-sync', async (req, res) => {
-  try {
-    const { states, meta } = req.body;
-    if (states && typeof states === 'object') {
-      const count = await bulkSaveVpsStates(states);
-      io.emit('bulk_synced', {
-        keys: Object.keys(states),
-        senderId: meta?.userId || 'server',
-        timestamp: new Date().toISOString()
-      });
-      res.json({ success: true, count });
-    } else {
-      res.status(400).json({ success: false, error: 'Data states tidak valid' });
-    }
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Gagal sinkronisasi bulk' });
-  }
+app.all('/api/vps/bulk-sync', (_req, res) => {
+  res.status(410).json({
+    success: false,
+    error: 'Endpoint /api/vps/bulk-sync telah dinonaktifkan (410 Gone).'
+  });
 });
 
 // Socket.io real-time broadcast and synchronization
@@ -147,16 +116,21 @@ io.on('connection', (socket) => {
   socket.on('sync_state', async (payload: { key: string; data: any; meta?: any }) => {
     try {
       if (payload?.key) {
-        await saveVpsState(payload.key, payload.data, payload.meta);
-        socket.broadcast.emit('state_updated', {
+        const mergedData = await saveVpsState(payload.key, payload.data, payload.meta);
+        io.emit('state_updated', {
           key: payload.key,
-          data: payload.data,
+          data: mergedData,
           senderId: payload.meta?.userId || socket.id,
           timestamp: new Date().toISOString()
         });
       }
-    } catch (err) {
-      console.error('Socket sync_state error:', err);
+    } catch (err: any) {
+      console.error('Socket sync_state error:', err?.message || err);
+      socket.emit('sync_error', {
+        key: payload?.key,
+        error: err?.message || 'Gagal menyimpan state ke database',
+        timestamp: new Date().toISOString()
+      });
     }
   });
 
