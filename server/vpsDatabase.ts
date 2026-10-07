@@ -383,12 +383,10 @@ export async function saveVpsState(
   console.log(`[SYNC] key=${key}, ukuran=${ukuran} byte, user=${user}`);
 
   // 1. If connected to PostgreSQL directly
-  if (dbEngine === 'postgresql') {
-    if (!pgPool) {
-      throw new Error('[VPS] PostgreSQL pool tidak terhubung.');
-    }
-    const client = await pgPool.connect();
+  if (dbEngine === 'postgresql' && pgPool) {
+    let client;
     try {
+      client = await pgPool.connect();
       await client.query('BEGIN');
 
       // Row-level lock via SELECT ... FOR UPDATE
@@ -463,11 +461,15 @@ export async function saveVpsState(
       await client.query('COMMIT');
       return finalData;
     } catch (err: any) {
-      await client.query('ROLLBACK').catch(() => {});
-      console.error(`[VPS] PostgreSQL save error for key ${key}:`, err?.message || err);
-      throw err;
+      if (client) {
+        await client.query('ROLLBACK').catch(() => {});
+      }
+      console.warn(`[VPS] PostgreSQL save error for key ${key}, falling back to local file store:`, err?.message || err);
+      // Fallback to local store so data is not lost
     } finally {
-      client.release();
+      if (client) {
+        client.release();
+      }
     }
   }
 
