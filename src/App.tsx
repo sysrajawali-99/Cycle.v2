@@ -427,20 +427,22 @@ export default function App() {
   };
 
   const handleUpdateAccount = (account: ChartOfAccount) => {
-    const updated = accounts.map((a) => (a.code === account.code ? account : a));
+    const updated = accounts.map((a) =>
+      (account.id && a.id === account.id) || a.code === account.code ? account : a
+    );
     setAccounts(updated);
     storageService.saveChartOfAccounts(updated);
   };
 
   const handleDeleteAccount = (accountCode: string) => {
-    const updated = accounts.filter((a) => a.code !== accountCode);
+    const updated = accounts.filter((a) => a.code !== accountCode && a.id !== accountCode);
     setAccounts(updated);
     storageService.saveChartOfAccounts(updated);
   };
 
   const handleBatchDeleteAccounts = (accountCodes: string[]) => {
     const codeSet = new Set(accountCodes);
-    const updated = accounts.filter((a) => !codeSet.has(a.code));
+    const updated = accounts.filter((a) => !codeSet.has(a.code) && (!a.id || !codeSet.has(a.id)));
     setAccounts(updated);
     storageService.saveChartOfAccounts(updated);
   };

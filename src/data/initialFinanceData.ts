@@ -384,6 +384,7 @@ export const INITIAL_AUDIT_TRAILS: AuditTrailItem[] = [];
 
 export const INITIAL_CURRENCY_RATES: CurrencyRate[] = [
   {
+    id: 'IDR',
     code: 'IDR',
     name: 'Indonesian Rupiah',
     symbol: 'Rp',
@@ -391,6 +392,7 @@ export const INITIAL_CURRENCY_RATES: CurrencyRate[] = [
     lastUpdated: '2026-08-29 08:00'
   },
   {
+    id: 'USD',
     code: 'USD',
     name: 'United States Dollar',
     symbol: '$',
@@ -398,6 +400,7 @@ export const INITIAL_CURRENCY_RATES: CurrencyRate[] = [
     lastUpdated: '2026-08-29 08:00'
   },
   {
+    id: 'SGD',
     code: 'SGD',
     name: 'Singapore Dollar',
     symbol: 'S$',

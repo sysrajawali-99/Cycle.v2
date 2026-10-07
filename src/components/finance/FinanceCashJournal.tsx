@@ -1237,7 +1237,14 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
         ? accounts.find((a) => a.code === coaFormData.parentCode)
         : undefined;
 
+    const existingAcc = accounts.find((a) => a.code === coaFormData.editingOriginalCode);
+    const existingId = existingAcc?.id || cleanCode;
+
     const accountPayload: ChartOfAccount = {
+      id:
+        coaModalMode === 'create'
+          ? (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `coa-${Date.now()}`)
+          : existingId,
       code: cleanCode,
       name: cleanName,
       type: coaFormData.type,
@@ -1247,7 +1254,7 @@ export const FinanceCashJournal: React.FC<FinanceCashJournalProps> = ({
       currentBalance:
         coaModalMode === 'create'
           ? initBalNum
-          : (accounts.find((a) => a.code === coaFormData.editingOriginalCode)?.currentBalance ?? initBalNum),
+          : (existingAcc?.currentBalance ?? initBalNum),
       description: coaFormData.description.trim(),
       isActive: coaFormData.isActive,
       isSystem: false,

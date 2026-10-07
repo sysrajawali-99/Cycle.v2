@@ -29,6 +29,7 @@ export type AccountCategory =
   | 'Beban Pajak & Bunga Bank';
 
 export interface ChartOfAccount {
+  id?: string;
   code: string;
   name: string;
   type: AccountType;
@@ -43,6 +44,8 @@ export interface ChartOfAccount {
   parentCode?: string;
   parentName?: string;
   level?: number; // 1 = Akun Induk / Header, 2 = Akun Standar / Sub-Akun Level 1, 3 = Sub-Akun Level 2
+  updatedAt?: string;
+  deletedAt?: string;
 }
 
 export type TransactionType = 'IN' | 'OUT' | 'JOURNAL' | 'ADJUSTMENT';
@@ -334,11 +337,14 @@ export interface TrialBalanceSummary {
 }
 
 export interface CurrencyRate {
+  id?: string;
   code: 'IDR' | 'USD' | 'SGD';
   name: string;
   symbol: string;
   rateToIdr: number;
   lastUpdated: string;
+  updatedAt?: string;
+  deletedAt?: string;
 }
 
 export interface AICostCenterAnomaly {

@@ -319,51 +319,109 @@ export function getVpsDbStatus(): VpsDbStatus {
   };
 }
 
+function getServerDeterministicId(item: any, fallbackIndex?: number): string {
+  if (!item || typeof item !== 'object') return `unknown-${fallbackIndex ?? 0}`;
+  if (item.id !== undefined && item.id !== null && String(item.id).trim().length > 0) {
+    return String(item.id).trim();
+  }
+  // Aturan 5:
+  // - chart_of_accounts: id = nilai field "code" (contoh: id "1110")
+  // - currency_rates: id = nilai field "code" (contoh: id "USD")
+  if (item.code !== undefined && item.code !== null && String(item.code).trim().length > 0) {
+    return String(item.code).trim();
+  }
+  if (item.key !== undefined && item.key !== null && String(item.key).trim().length > 0) {
+    return String(item.key).trim();
+  }
+  return `item-${fallbackIndex ?? 0}`;
+}
+
 /**
  * Merge two arrays of objects by their `id` property.
  * Rules:
+ * - Deterministic ID used for collections like chart_of_accounts (id = code) and currency_rates (id = code).
+ * - Records without id are NEVER discarded.
  * - Newer updatedAt wins.
  * - Records existing only on server are preserved.
  * - Records without updatedAt: incoming wins.
  * - Records with deletedAt are preserved (soft deleted, never permanently erased).
+ * - Server result length never drops below old server records count.
  */
 export function mergeIdArrays(serverArray: any[], incomingArray: any[]): any[] {
+  if (!Array.isArray(serverArray) && !Array.isArray(incomingArray)) return [];
+  if (!Array.isArray(serverArray)) serverArray = [];
+  if (!Array.isArray(incomingArray)) incomingArray = [];
+
+  // Guard: if incoming is empty but server has data, NEVER discard server data
+  if (incomingArray.length === 0 && serverArray.length > 0) {
+    console.warn(`[VPS Merge Guard] Incoming array is empty while server has ${serverArray.length} records. Preserving server data.`);
+    return serverArray;
+  }
+
   const map = new Map<string, any>();
 
-  // 1. Put existing server items into map
-  if (Array.isArray(serverArray)) {
-    for (const item of serverArray) {
-      if (item && item.id !== undefined && item.id !== null) {
-        map.set(String(item.id), item);
-      }
-    }
+  // 1. Put existing server items into map (attaching deterministic id if missing)
+  for (let i = 0; i < serverArray.length; i++) {
+    const raw = serverArray[i];
+    if (!raw || typeof raw !== 'object') continue;
+    const id = getServerDeterministicId(raw, i);
+    const item =
+      raw.id !== undefined && raw.id !== null && String(raw.id).trim().length > 0
+        ? raw
+        : { ...raw, id };
+    map.set(id, item);
   }
 
-  // 2. Merge incoming items
-  if (Array.isArray(incomingArray)) {
-    for (const incoming of incomingArray) {
-      if (!incoming || incoming.id === undefined || incoming.id === null) continue;
-      const id = String(incoming.id);
-      const existing = map.get(id);
+  // 2. Merge incoming items (attaching deterministic id if missing)
+  for (let j = 0; j < incomingArray.length; j++) {
+    const rawIncoming = incomingArray[j];
+    if (!rawIncoming || typeof rawIncoming !== 'object') continue;
+    const id = getServerDeterministicId(rawIncoming, j);
+    const incoming =
+      rawIncoming.id !== undefined && rawIncoming.id !== null && String(rawIncoming.id).trim().length > 0
+        ? rawIncoming
+        : { ...rawIncoming, id };
+    const existing = map.get(id);
 
-      if (!existing) {
+    if (!existing) {
+      map.set(id, incoming);
+    } else {
+      const existingUpdated = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+      const incomingUpdated = incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0;
+
+      if (!incoming.updatedAt) {
+        map.set(id, incoming);
+      } else if (incomingUpdated >= existingUpdated) {
         map.set(id, incoming);
       } else {
-        const existingUpdated = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
-        const incomingUpdated = incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0;
-
-        if (!incoming.updatedAt) {
-          map.set(id, incoming);
-        } else if (incomingUpdated >= existingUpdated) {
-          map.set(id, incoming);
-        } else {
-          map.set(id, existing);
-        }
+        map.set(id, existing);
       }
     }
   }
 
-  return Array.from(map.values());
+  const result = Array.from(map.values());
+
+  // Rule 4: Hasil merge di server tidak boleh memuat lebih sedikit record daripada data lama;
+  // record yang dihapus tetap ada di array dengan deletedAt.
+  if (result.length < serverArray.length) {
+    console.warn(
+      `[VPS Merge Guard] Result count (${result.length}) is less than serverArray count (${serverArray.length}). Preserving all existing server records.`
+    );
+    for (let k = 0; k < serverArray.length; k++) {
+      const rawOld = serverArray[k];
+      const id = getServerDeterministicId(rawOld, k);
+      if (!map.has(id)) {
+        const item =
+          rawOld.id !== undefined && rawOld.id !== null
+            ? rawOld
+            : { ...rawOld, id };
+        map.set(id, item);
+      }
+    }
+    return Array.from(map.values());
+  }
+
+  return result;
 }
 
 /**

@@ -270,13 +270,49 @@ function generateUUID(): string {
   return 'id-' + Math.random().toString(36).substring(2, 10) + '-' + Date.now();
 }
 
-export function ensureRecordMetadata<T extends Record<string, any>>(item: T, forceUpdate = false): T {
+/**
+ * Deterministically derives or preserves a record's unique identity.
+ * Rule:
+ * - If item already has a valid id, it is NEVER changed (set once, immutable).
+ * - For chart_of_accounts (11 records) and currency_rates (3 records): id = value of field "code" (e.g. id "1110", id "USD").
+ * - Other collections keep their existing id.
+ * - Truly new records created by user can use UUID.
+ */
+export function getDeterministicRecordId<T extends Record<string, any>>(item: T, collectionKey?: string): string {
+  if (item && item.id !== undefined && item.id !== null && String(item.id).trim().length > 0) {
+    return String(item.id).trim();
+  }
+
+  // Specifically for chart_of_accounts or currency_rates when id is missing
+  if (
+    collectionKey === 'chart_of_accounts' ||
+    collectionKey === 'rajawali_finance_coa' ||
+    collectionKey === 'currency_rates' ||
+    collectionKey === 'rajawali_finance_currency_rates' ||
+    (item && (item.category === 'Kas & Bank' || item.type === 'Asset' || item.type === 'Liability' || item.type === 'Equity' || item.type === 'Revenue' || item.type === 'Expense')) ||
+    (item && (item.code === 'IDR' || item.code === 'USD' || item.code === 'SGD'))
+  ) {
+    if (item && item.code !== undefined && item.code !== null && String(item.code).trim().length > 0) {
+      return String(item.code).trim();
+    }
+  }
+
+  // Fallback if item has a natural code field
+  if (item && item.code !== undefined && item.code !== null && String(item.code).trim().length > 0) {
+    return String(item.code).trim();
+  }
+
+  return generateUUID();
+}
+
+export function ensureRecordMetadata<T extends Record<string, any>>(
+  item: T,
+  forceUpdate = false,
+  collectionKey?: string
+): T {
   if (!item || typeof item !== 'object') return item;
   const now = new Date().toISOString();
-  const id =
-    item.id !== undefined && item.id !== null && String(item.id).trim().length > 0
-      ? String(item.id)
-      : generateUUID();
+  const id = getDeterministicRecordId(item, collectionKey);
   const updatedAt = forceUpdate ? now : item.updatedAt || item.createdAt || now;
   return {
     ...item,
@@ -285,16 +321,17 @@ export function ensureRecordMetadata<T extends Record<string, any>>(item: T, for
   };
 }
 
-function readProcessedRecords<T extends Record<string, any>>(rawArray: any[]): T[] {
+function readProcessedRecords<T extends Record<string, any>>(rawArray: any[], collectionKey?: string): T[] {
   if (!Array.isArray(rawArray)) return [];
   return rawArray
     .filter((r) => r && typeof r === 'object' && !r.deletedAt)
-    .map((r) => ensureRecordMetadata(r, false) as T);
+    .map((r) => ensureRecordMetadata(r, false, collectionKey) as T);
 }
 
 function writeProcessedRecords<T extends Record<string, any>>(
   storageKey: string,
-  incomingRecords: T[]
+  incomingRecords: T[],
+  collectionKey?: string
 ): any[] {
   if (!Array.isArray(incomingRecords)) return [];
   const now = new Date().toISOString();
@@ -308,20 +345,35 @@ function writeProcessedRecords<T extends Record<string, any>>(
     }
   } catch {}
 
-  const incomingProcessed = incomingRecords.map((item) => ensureRecordMetadata(item, true));
+  const incomingProcessed = incomingRecords.map((item) =>
+    ensureRecordMetadata(item, true, collectionKey)
+  );
   const incomingIds = new Set(incomingProcessed.map((item) => String(item.id)));
 
-  // Soft Delete: Any records present in existing raw storage that are missing in incoming are marked with deletedAt
+  // Soft Delete: Any records present in existing raw storage that are missing in incoming are preserved with deletedAt.
+  // Rule 3: Soft delete (deletedAt) hanya diberikan saat user benar-benar menghapus record.
+  // Jangan pernah menandai record dengan deletedAt karena id tidak cocok atau tidak ditemukan saat merge.
   const preservedDeleted: any[] = [];
   for (const old of existingRaw) {
-    if (old && old.id !== undefined && old.id !== null) {
-      const idStr = String(old.id);
-      if (!incomingIds.has(idStr)) {
-        preservedDeleted.push({
-          ...old,
-          deletedAt: old.deletedAt || now,
-          updatedAt: now
-        });
+    if (old && typeof old === 'object') {
+      const oldId = getDeterministicRecordId(old, collectionKey);
+      if (!incomingIds.has(oldId)) {
+        if (old.deletedAt) {
+          preservedDeleted.push({
+            ...old,
+            id: oldId,
+            deletedAt: old.deletedAt,
+            updatedAt: old.updatedAt || now
+          });
+        } else if (incomingRecords.length > 0) {
+          // Explicit user deletion: incoming list is non-empty and missing this item
+          preservedDeleted.push({
+            ...old,
+            id: oldId,
+            deletedAt: now,
+            updatedAt: now
+          });
+        }
       }
     }
   }
@@ -329,18 +381,35 @@ function writeProcessedRecords<T extends Record<string, any>>(
   return [...incomingProcessed, ...preservedDeleted];
 }
 
-function readStorageRecords<T extends Record<string, any>>(storageKey: string, defaultData: T[] = []): T[] {
+function readStorageRecords<T extends Record<string, any>>(
+  storageKey: string,
+  defaultData: T[] = [],
+  collectionKey?: string
+): T[] {
   const raw = localStorage.getItem(storageKey);
   if (raw === null) {
     if (defaultData && defaultData.length > 0) {
-      initStorageQuietly(storageKey, defaultData);
+      const seeded = defaultData.map((d) => ensureRecordMetadata(d, false, collectionKey));
+      initStorageQuietly(storageKey, seeded);
+      return readProcessedRecords<T>(seeded, collectionKey);
     }
-    return readProcessedRecords<T>(defaultData);
+    return [];
   }
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return readProcessedRecords<T>(parsed);
+    // Auto-recovery for chart_of_accounts or currency_rates if stored as "[]" from earlier merge bug
+    if (
+      parsed.length === 0 &&
+      defaultData.length > 0 &&
+      (storageKey === STORAGE_KEYS.CHART_OF_ACCOUNTS || storageKey === STORAGE_KEYS.CURRENCY_RATES)
+    ) {
+      console.warn(`[Storage] Auto-recovering empty collection for ${storageKey} from default data.`);
+      const seeded = defaultData.map((d) => ensureRecordMetadata(d, false, collectionKey));
+      initStorageQuietly(storageKey, seeded);
+      return readProcessedRecords<T>(seeded, collectionKey);
+    }
+    return readProcessedRecords<T>(parsed, collectionKey);
   } catch {
     return [];
   }
@@ -352,7 +421,27 @@ function writeStorageRecords<T extends Record<string, any>>(
   incomingData: T[],
   customEvent?: string
 ): void {
-  const fullData = writeProcessedRecords<T>(storageKey, incomingData);
+  // Guard Rule 2b: JANGAN PERNAH menulis array kosong ke localStorage bila salah satu sisi tidak kosong
+  let existingCount = 0;
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) existingCount = parsed.length;
+    }
+  } catch {}
+
+  if (
+    Array.isArray(incomingData) &&
+    incomingData.length === 0 &&
+    existingCount > 0 &&
+    (actionKey === 'chart_of_accounts' || actionKey === 'currency_rates')
+  ) {
+    console.warn(`[Storage Guard] Attempted to write empty array to ${storageKey} while ${existingCount} items exist. Aborted.`);
+    return;
+  }
+
+  const fullData = writeProcessedRecords<T>(storageKey, incomingData, actionKey);
   applyStorageUpdate(actionKey, storageKey, fullData, customEvent, 'user_action');
 }
 
@@ -614,7 +703,11 @@ export const storageService = {
 
   // Finance Storage Handlers
   getChartOfAccounts(): ChartOfAccount[] {
-    return readStorageRecords<ChartOfAccount>(STORAGE_KEYS.CHART_OF_ACCOUNTS, INITIAL_CHART_OF_ACCOUNTS);
+    return readStorageRecords<ChartOfAccount>(
+      STORAGE_KEYS.CHART_OF_ACCOUNTS,
+      INITIAL_CHART_OF_ACCOUNTS,
+      'chart_of_accounts'
+    );
   },
 
   saveChartOfAccounts(data: ChartOfAccount[]) {
@@ -686,7 +779,11 @@ export const storageService = {
   },
 
   getCurrencyRates(): CurrencyRate[] {
-    return readStorageRecords<CurrencyRate>(STORAGE_KEYS.CURRENCY_RATES, INITIAL_CURRENCY_RATES);
+    return readStorageRecords<CurrencyRate>(
+      STORAGE_KEYS.CURRENCY_RATES,
+      INITIAL_CURRENCY_RATES,
+      'currency_rates'
+    );
   },
 
   saveCurrencyRates(data: CurrencyRate[]) {
@@ -979,51 +1076,74 @@ export const storageService = {
 
       if (Array.isArray(remoteData)) {
         const localArray: any[] = Array.isArray(localRaw) ? localRaw : [];
-        const pendingEntry = outboxService.getPending(key);
-        const pendingIds = new Set<string>();
-        if (pendingEntry && Array.isArray(pendingEntry.data)) {
-          for (const item of pendingEntry.data) {
-            if (item && item.id !== undefined && item.id !== null) {
-              pendingIds.add(String(item.id));
-            }
-          }
-        }
 
-        const map = new Map<string, any>();
-
-        // 1. Put local items
-        for (const item of localArray) {
-          if (item && item.id !== undefined && item.id !== null) {
-            map.set(String(item.id), item);
-          }
-        }
-
-        // 2. Merge remote items
-        for (const remoteItem of remoteData) {
-          if (!remoteItem || remoteItem.id === undefined || remoteItem.id === null) continue;
-          const id = String(remoteItem.id);
-          const localItem = map.get(id);
-
-          if (!localItem) {
-            map.set(id, remoteItem);
-          } else {
-            // If local item is in outbox (pending unsent change by user), preserve local item
-            if (pendingIds.has(id)) {
-              map.set(id, localItem);
-            } else {
-              const localUpdated = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
-              const remoteUpdated = remoteItem.updatedAt ? new Date(remoteItem.updatedAt).getTime() : 0;
-
-              if (!remoteItem.updatedAt || remoteUpdated >= localUpdated) {
-                map.set(id, remoteItem);
-              } else {
-                map.set(id, localItem);
+        // Rule 2c: Jika lokal berisi "[]" atau kosong sedangkan remote berisi data, pakai data remote (pulihkan otomatis)
+        if (localArray.length === 0 && remoteData.length > 0) {
+          mergedData = remoteData.map((item) => ensureRecordMetadata(item, false, key));
+        } else if (remoteData.length === 0 && localArray.length > 0) {
+          console.warn(`[Sync Guard] Remote state for ${key} is empty while local has ${localArray.length} records. Preserving local data.`);
+          mergedData = localArray.map((item) => ensureRecordMetadata(item, false, key));
+        } else {
+          const pendingEntry = outboxService.getPending(key);
+          const pendingIds = new Set<string>();
+          if (pendingEntry && Array.isArray(pendingEntry.data)) {
+            for (const item of pendingEntry.data) {
+              if (item) {
+                const id = getDeterministicRecordId(item, key);
+                if (id) pendingIds.add(id);
               }
             }
           }
+
+          const map = new Map<string, any>();
+
+          // 1. Put local items (using deterministic id so records without id are NEVER skipped)
+          for (let i = 0; i < localArray.length; i++) {
+            const rawItem = localArray[i];
+            if (!rawItem || typeof rawItem !== 'object') continue;
+            const item = ensureRecordMetadata(rawItem, false, key);
+            const id = String(item.id);
+            map.set(id, item);
+          }
+
+          // 2. Merge remote items (using deterministic id so records without id are NEVER skipped)
+          for (let j = 0; j < remoteData.length; j++) {
+            const rawRemote = remoteData[j];
+            if (!rawRemote || typeof rawRemote !== 'object') continue;
+            const remoteItem = ensureRecordMetadata(rawRemote, false, key);
+            const id = String(remoteItem.id);
+            const localItem = map.get(id);
+
+            if (!localItem) {
+              map.set(id, remoteItem);
+            } else {
+              // If local item is in outbox (pending unsent change by user), preserve local item
+              if (pendingIds.has(id)) {
+                map.set(id, localItem);
+              } else {
+                const localUpdated = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
+                const remoteUpdated = remoteItem.updatedAt ? new Date(remoteItem.updatedAt).getTime() : 0;
+
+                if (!remoteItem.updatedAt || remoteUpdated >= localUpdated) {
+                  map.set(id, remoteItem);
+                } else {
+                  map.set(id, localItem);
+                }
+              }
+            }
+          }
+
+          mergedData = Array.from(map.values());
         }
 
-        mergedData = Array.from(map.values());
+        // Rule 2b: JANGAN PERNAH menulis array kosong ke localStorage bila salah satu sisi (lokal atau remote) tidak kosong.
+        // Jika hasil merge kosong padahal ada input tidak kosong: batalkan, pertahankan data yang ada, dan tulis log peringatan.
+        if (mergedData.length === 0 && (localArray.length > 0 || remoteData.length > 0)) {
+          console.warn(
+            `[Sync Guard] ABORT: Merge result for ${key} produced 0 records while local (${localArray.length}) or remote (${remoteData.length}) is not empty. Aborting merge and keeping existing data.`
+          );
+          return;
+        }
       } else if (remoteData && typeof remoteData === 'object' && !Array.isArray(remoteData)) {
         const localObj = localRaw && typeof localRaw === 'object' && !Array.isArray(localRaw) ? localRaw : {};
         mergedData = { ...localObj, ...remoteData };
