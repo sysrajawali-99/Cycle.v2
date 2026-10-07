@@ -253,6 +253,7 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
       'Total Hadir',
       'Total Alpa',
       'Total Izin',
+      'Total Sakit',
       'Gaji Kotor (Rp)',
       'Potongan (Rp)',
       'Alasan Potongan',
@@ -277,6 +278,7 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
         r.hadirCount,
         r.alpaCount,
         r.izinCount,
+        r.sakitCount,
         r.grossPay,
         r.deductionAmount,
         r.deductionReason,
@@ -641,6 +643,8 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
                 <th className="p-3.5 text-right">Rate / Hari</th>
                 <th className="p-3.5 text-center">Hadir</th>
                 <th className="p-3.5 text-center">Alpa</th>
+                <th className="p-3.5 text-center">Izin</th>
+                <th className="p-3.5 text-center">Sakit</th>
                 <th className="p-3.5 text-right">Gaji Kotor</th>
                 <th className="p-3.5 text-right">Potongan</th>
                 <th className="p-3.5 text-right">Gaji Bersih</th>
@@ -650,7 +654,7 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
             <tbody className="divide-y divide-slate-800/70 text-xs">
               {payrollRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-12 text-center text-slate-500">
+                  <td colSpan={11} className="p-12 text-center text-slate-500">
                     Tidak ada data payroll yang sesuai.
                   </td>
                 </tr>
@@ -679,6 +683,14 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
 
                       <td className="p-3.5 text-center font-bold text-rose-400">
                         {row.alpaCount}
+                      </td>
+
+                      <td className="p-3.5 text-center font-bold text-amber-400">
+                        {row.izinCount}
+                      </td>
+
+                      <td className="p-3.5 text-center font-bold text-purple-400">
+                        {row.sakitCount}
                       </td>
 
                       <td className="p-3.5 text-right font-medium text-slate-300">
@@ -722,6 +734,7 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
                                   hadir: row.hadirCount,
                                   alpa: row.alpaCount,
                                   izin: row.izinCount,
+                                  sakit: row.sakitCount,
                                   off: row.offCount,
                                   deductionAmount: row.deductionAmount,
                                   deductionReason: row.deductionReason,
@@ -844,7 +857,7 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
                 </div>
 
                 {/* Presensi Summary Badges */}
-                <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
+                <div className="grid grid-cols-5 gap-2 text-center text-[10px]">
                   <div className="bg-emerald-50 border border-emerald-200 p-1.5 rounded-lg">
                     <span className="text-emerald-700 font-bold block">HADIR</span>
                     <span className="text-xs font-black text-emerald-900">{slipEmployee.hadirCount} Hari</span>
@@ -856,6 +869,10 @@ export const ReportingCenter: React.FC<ReportingCenterProps> = ({
                   <div className="bg-amber-50 border border-amber-200 p-1.5 rounded-lg">
                     <span className="text-amber-700 font-bold block">IZIN</span>
                     <span className="text-xs font-black text-amber-900">{slipEmployee.izinCount} Hari</span>
+                  </div>
+                  <div className="bg-purple-50 border border-purple-200 p-1.5 rounded-lg">
+                    <span className="text-purple-700 font-bold block">SAKIT</span>
+                    <span className="text-xs font-black text-purple-900">{slipEmployee.sakitCount} Hari</span>
                   </div>
                   <div className="bg-slate-100 border border-slate-200 p-1.5 rounded-lg">
                     <span className="text-slate-600 font-bold block">RATE / HARI</span>

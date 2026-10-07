@@ -1010,12 +1010,13 @@ export const googleDriveService = {
       const projects = storageService.getProjects();
       const projMap = new Map(projects.map((p) => [p.id, p.name]));
 
-      const headers = ['ID', 'Nama Karyawan', 'Lokasi Proyek', 'Bulan', 'Tahun', 'Total Hadir (H)', 'Absen (A)', 'Izin (I)', 'Off (O)', 'Potongan', 'Bonus Lembur', 'Catatan'];
+      const headers = ['ID', 'Nama Karyawan', 'Lokasi Proyek', 'Bulan', 'Tahun', 'Total Hadir (H)', 'Absen (A)', 'Izin (I)', 'Sakit (S)', 'Off (O)', 'Potongan', 'Bonus Lembur', 'Catatan'];
       const rows = timesheets.map((ts) => {
         const dayValues = Object.values(ts.days || {});
         const totalHadir = dayValues.filter((v) => v === 'H').length;
         const totalAbsen = dayValues.filter((v) => v === 'A').length;
         const totalIzin = dayValues.filter((v) => v === 'I').length;
+        const totalSakit = dayValues.filter((v) => v === 'S').length;
         const totalOff = dayValues.filter((v) => v === 'O').length;
         return [
           `"${ts.id}"`,
@@ -1026,6 +1027,7 @@ export const googleDriveService = {
           totalHadir,
           totalAbsen,
           totalIzin,
+          totalSakit,
           totalOff,
           ts.deductionAmount || 0,
           ts.bonusAmount || 0,

@@ -25,6 +25,7 @@ export interface PayrollRowItem {
   hadirCount: number;
   alpaCount: number;
   izinCount: number;
+  sakitCount: number;
   offCount: number;
   grossPay: number;
   netPay: number;
@@ -41,6 +42,7 @@ export interface PayrollSummaryResult {
   totalHadirDays: number;
   totalAlpaDays: number;
   totalIzinDays: number;
+  totalSakitDays: number;
   totalOffDays: number;
   personnelCount: number;
   periodLabel: string;
@@ -170,6 +172,7 @@ export function calculatePayrollSummary(
     let hadirCount = 0;
     let alpaCount = 0;
     let izinCount = 0;
+    let sakitCount = 0;
     let offCount = 0;
 
     // Kehadiran in active period
@@ -178,6 +181,7 @@ export function calculatePayrollSummary(
       if (st === 'H') hadirCount++;
       else if (st === 'A') alpaCount++;
       else if (st === 'I') izinCount++;
+      else if (st === 'S') sakitCount++;
       else if (st === 'O') offCount++;
     });
 
@@ -232,6 +236,7 @@ export function calculatePayrollSummary(
       hadirCount,
       alpaCount,
       izinCount,
+      sakitCount,
       offCount,
       grossPay,
       netPay,
@@ -248,6 +253,7 @@ export function calculatePayrollSummary(
   const totalHadirDays = payrollRows.reduce((acc, row) => acc + row.hadirCount, 0);
   const totalAlpaDays = payrollRows.reduce((acc, row) => acc + row.alpaCount, 0);
   const totalIzinDays = payrollRows.reduce((acc, row) => acc + row.izinCount, 0);
+  const totalSakitDays = payrollRows.reduce((acc, row) => acc + row.sakitCount, 0);
   const totalOffDays = payrollRows.reduce((acc, row) => acc + row.offCount, 0);
 
   return {
@@ -258,6 +264,7 @@ export function calculatePayrollSummary(
     totalHadirDays,
     totalAlpaDays,
     totalIzinDays,
+    totalSakitDays,
     totalOffDays,
     personnelCount: filteredEmployees.length,
     periodLabel,

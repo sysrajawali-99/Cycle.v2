@@ -334,7 +334,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     onUpdateTimesheets(nextTimesheets);
   };
 
-  // Siklus status presensi saat klik sel: '' -> 'H' -> 'A' -> 'I' -> 'O' -> ''
+  // Siklus status presensi saat klik sel: '' -> 'H' -> 'A' -> 'I' -> 'S' -> 'O' -> ''
   const handleCellClick = (employeeId: string, day: number, month: number, year: number) => {
     const currentRecord = getRecordForEmployeeMonth(employeeId, month, year);
     const currentStatus = currentRecord.days[day] || '';
@@ -343,7 +343,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     if (currentStatus === '') nextStatus = 'H';
     else if (currentStatus === 'H') nextStatus = 'A';
     else if (currentStatus === 'A') nextStatus = 'I';
-    else if (currentStatus === 'I') nextStatus = 'O';
+    else if (currentStatus === 'I') nextStatus = 'S';
+    else if (currentStatus === 'S') nextStatus = 'O';
     else if (currentStatus === 'O') nextStatus = '';
 
     const newDays = { ...currentRecord.days };
@@ -428,11 +429,12 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     onUpdateTimesheets(nextTimesheets);
   };
 
-  // Perhitungan statistik baris (Hadir, Alpha, Izin, Potongan, Gaji Bersih) mengikuti tanggal yang dipilih
+  // Perhitungan statistik baris (Hadir, Alpha, Izin, Sakit, Potongan, Gaji Bersih) mengikuti tanggal yang dipilih
   const calculateRowStats = (employee: Employee) => {
     let hadir = 0;
     let alpa = 0;
     let izin = 0;
+    let sakit = 0;
     let off = 0;
 
     // Hitung presensi tepat di dalam rentang tanggal aktif
@@ -441,6 +443,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       if (st === 'H') hadir++;
       else if (st === 'A') alpa++;
       else if (st === 'I') izin++;
+      else if (st === 'S') sakit++;
       else if (st === 'O') off++;
     });
 
@@ -473,6 +476,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       hadir,
       alpa,
       izin,
+      sakit,
       off,
       grossPay,
       deduction,
@@ -487,6 +491,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     let hadir = 0;
     let alpa = 0;
     let izin = 0;
+    let sakit = 0;
     let off = 0;
     let unrecorded = 0;
 
@@ -495,11 +500,12 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       if (st === 'H') hadir++;
       else if (st === 'A') alpa++;
       else if (st === 'I') izin++;
+      else if (st === 'S') sakit++;
       else if (st === 'O') off++;
       else unrecorded++;
     });
 
-    return { hadir, alpa, izin, off, unrecorded, total: filteredEmployees.length };
+    return { hadir, alpa, izin, sakit, off, unrecorded, total: filteredEmployees.length };
   }, [filteredEmployees, timesheets, activeDayObj]);
 
   // Ringkasan konsolidasi KPI finansial & kehadiran untuk seluruh karyawan dalam periode terpilih
@@ -510,6 +516,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     let totalHadirAll = 0;
     let totalAlpaAll = 0;
     let totalIzinAll = 0;
+    let totalSakitAll = 0;
 
     filteredEmployees.forEach((emp) => {
       const stats = calculateRowStats(emp);
@@ -519,6 +526,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       totalHadirAll += stats.hadir;
       totalAlpaAll += stats.alpa;
       totalIzinAll += stats.izin;
+      totalSakitAll += stats.sakit;
     });
 
     return {
@@ -528,7 +536,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       totalBonusAll,
       totalHadirAll,
       totalAlpaAll,
-      totalIzinAll
+      totalIzinAll,
+      totalSakitAll
     };
   }, [filteredEmployees, timesheets, activePeriodDays]);
 
@@ -671,6 +680,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       'Total Hadir',
       'Total Alpa',
       'Total Izin',
+      'Total Sakit',
       'Potongan (Rp)',
       'Alasan Potongan',
       'Insentif / Lembur (Rp)',
@@ -699,6 +709,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
         stats.hadir,
         stats.alpa,
         stats.izin,
+        stats.sakit,
         stats.deduction,
         stats.deductionReason || '',
         stats.bonus,
@@ -1096,11 +1107,12 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
 
         {/* Legend Drawer Trigger */}
         <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[11px] text-slate-400">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-wrap">
             <span className="font-semibold text-slate-300">Status Presensi:</span>
-            <span className="text-emerald-400 font-bold">H: Hadir</span> • 
-            <span className="text-rose-400 font-bold">A: Alpa</span> • 
-            <span className="text-amber-400 font-bold">I: Izin</span> • 
+            <span className="text-emerald-400 font-bold">H: Hadir</span>,{' '}
+            <span className="text-rose-400 font-bold">A: Alpa</span>,{' '}
+            <span className="text-amber-400 font-bold">I: Izin</span>,{' '}
+            <span className="text-purple-400 font-bold">S: Sakit</span>,{' '}
             <span className="text-slate-400 font-bold">OFF: Libur</span>
           </div>
           <button
@@ -1133,7 +1145,13 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                 <span className="w-6 h-6 rounded bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-sm">
                   !
                 </span>
-                <span className="text-slate-300"><b>Izin (I)</b>: Sakit / Izin Dinas</span>
+                <span className="text-slate-300"><b>Izin (I)</b>: Izin / Cuti Dinas / Keperluan Pribadi</span>
+              </div>
+              <div className="flex items-center space-x-1.5">
+                <span className="w-6 h-6 rounded bg-purple-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                  S
+                </span>
+                <span className="text-slate-300"><b>Sakit (S)</b>: Surat Dokter / Keterangan Sakit</span>
               </div>
               <div className="flex items-center space-x-1.5">
                 <span className="w-6 h-6 rounded bg-slate-700 text-slate-300 flex items-center justify-center font-bold text-xs shadow-sm">
@@ -1296,6 +1314,9 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                 <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold px-2.5 py-1 rounded-lg">
                   ! {dailyStats.izin} Izin
                 </span>
+                <span className="bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold px-2.5 py-1 rounded-lg">
+                  S {dailyStats.sakit} Sakit
+                </span>
                 <span className="bg-slate-800 text-slate-300 font-semibold px-2.5 py-1 rounded-lg">
                   OFF {dailyStats.off}
                 </span>
@@ -1381,8 +1402,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       </div>
                     </div>
 
-                    {/* Touch Attendance Action Buttons (H, A, I, O) */}
-                    <div className="grid grid-cols-4 gap-1.5 pt-1">
+                    {/* Touch Attendance Action Buttons (H, A, I, S, O) */}
+                    <div className="grid grid-cols-5 gap-1.5 pt-1">
                       {/* Hadir Button */}
                       <button
                         id={`btn-hadir-${emp.id}-${activeDayObj.dateKey}`}
@@ -1429,6 +1450,22 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       >
                         <span className="text-sm">!</span>
                         <span className="text-[10px] mt-0.5">Izin</span>
+                      </button>
+
+                      {/* Sakit Button */}
+                      <button
+                        id={`btn-sakit-${emp.id}-${activeDayObj.dateKey}`}
+                        onClick={() =>
+                          handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, 'S')
+                        }
+                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
+                          currentStatus === 'S'
+                            ? 'bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-500/30 font-black'
+                            : 'bg-slate-950/80 text-purple-400/80 border-purple-500/30 hover:bg-purple-950/40'
+                        }`}
+                      >
+                        <span className="text-sm font-black">S</span>
+                        <span className="text-[10px] mt-0.5">Sakit</span>
                       </button>
 
                       {/* Off Button */}
@@ -1588,6 +1625,9 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   <th className="p-3 text-center min-w-[50px] bg-slate-950 border-r border-slate-800 text-amber-400">
                     Izin
                   </th>
+                  <th className="p-3 text-center min-w-[50px] bg-slate-950 border-r border-slate-800 text-purple-400">
+                    Sakit
+                  </th>
                   <th className="p-3 min-w-[130px] bg-slate-950 border-r border-slate-800 text-right text-rose-300 hidden sm:table-cell">
                     Potongan (Rp)
                   </th>
@@ -1601,7 +1641,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
               <tbody className="divide-y divide-slate-800/60 text-xs">
                 {filteredEmployees.length === 0 ? (
                   <tr>
-                    <td colSpan={activePeriodDays.length + 9} className="p-12 text-center text-slate-500">
+                    <td colSpan={activePeriodDays.length + 10} className="p-12 text-center text-slate-500">
                       <p className="text-base font-semibold text-slate-400">Tidak ada data karyawan yang cocok.</p>
                     </td>
                   </tr>
@@ -1664,6 +1704,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                     ? 'bg-rose-500 text-white font-extrabold shadow-rose-500/30'
                                     : status === 'I'
                                     ? 'bg-amber-500 text-slate-950 font-extrabold shadow-amber-500/30'
+                                    : status === 'S'
+                                    ? 'bg-purple-600 text-white font-extrabold shadow-purple-500/30'
                                     : status === 'O'
                                     ? 'bg-slate-800 text-slate-400 font-mono text-[10px]'
                                     : 'text-slate-700 hover:text-slate-400'
@@ -1672,6 +1714,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                 {status === 'H' && '✓'}
                                 {status === 'A' && '✗'}
                                 {status === 'I' && '!'}
+                                {status === 'S' && 'S'}
                                 {status === 'O' && 'OFF'}
                                 {status === '' && '·'}
                               </div>
@@ -1692,6 +1735,11 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         {/* Kolom Izin */}
                         <td className="p-3 text-center font-bold text-amber-400 bg-slate-950/40 border-r border-slate-800">
                           {stats.izin}
+                        </td>
+
+                        {/* Kolom Sakit */}
+                        <td className="p-3 text-center font-bold text-purple-400 bg-slate-950/40 border-r border-slate-800">
+                          {stats.sakit}
                         </td>
 
                         {/* Kolom Potongan & Tombol Edit */}
@@ -1757,6 +1805,9 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   </td>
                   <td className="p-3 text-center font-black text-amber-400 bg-amber-950/40 border-r border-slate-800">
                     {summary.totalIzinAll}
+                  </td>
+                  <td className="p-3 text-center font-black text-purple-400 bg-purple-950/40 border-r border-slate-800">
+                    {summary.totalSakitAll}
                   </td>
                   <td className="p-3 text-right font-black text-rose-300 bg-slate-950 border-r border-slate-800 hidden sm:table-cell">
                     {formatCurrency(summary.totalDeductionsAll)}
@@ -2000,6 +2051,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                 let totalHadirSum = 0;
                 let totalAlpaSum = 0;
                 let totalIzinSum = 0;
+                let totalSakitSum = 0;
                 let totalDeductionSum = 0;
                 let totalGrossSum = 0;
                 let totalNetSum = 0;
@@ -2010,6 +2062,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   totalHadirSum += stats.hadir;
                   totalAlpaSum += stats.alpa;
                   totalIzinSum += stats.izin;
+                  totalSakitSum += stats.sakit;
                   totalDeductionSum += stats.deduction;
                   totalGrossSum += stats.grossPay;
                   totalNetSum += stats.netPay;
@@ -2099,7 +2152,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       <span>
                         Akumulasi: <strong>{totalHadirSum}</strong> Hadir •{' '}
                         <strong>{totalAlpaSum}</strong> Alpa •{' '}
-                        <strong>{totalIzinSum}</strong> Izin
+                        <strong>{totalIzinSum}</strong> Izin •{' '}
+                        <strong>{totalSakitSum}</strong> Sakit
                       </span>
                       <span>
                         Total Potongan / Denda:{' '}
@@ -2147,6 +2201,9 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                             <th className="py-2 px-1.5 text-center border-r border-slate-700 bg-amber-900 text-amber-100 w-8">
                               I
                             </th>
+                            <th className="py-2 px-1.5 text-center border-r border-slate-700 bg-purple-900 text-purple-100 w-8">
+                              S
+                            </th>
                             <th className="py-2 px-2 text-right border-r border-slate-700 bg-slate-900 text-rose-300 min-w-[75px]">
                               Potongan (Rp)
                             </th>
@@ -2159,7 +2216,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         <tbody className="divide-y divide-slate-200">
                           {rowsData.length === 0 ? (
                             <tr>
-                              <td colSpan={activePeriodDays.length + 9} className="py-8 text-center text-slate-400 font-semibold">
+                              <td colSpan={activePeriodDays.length + 10} className="py-8 text-center text-slate-400 font-semibold">
                                 Tidak ada data personil pada lokasi ini.
                               </td>
                             </tr>
@@ -2205,6 +2262,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                     cellBg = 'bg-rose-100 text-rose-800 font-black';
                                   } else if (status === 'I') {
                                     cellBg = 'bg-amber-100 text-amber-800 font-bold';
+                                  } else if (status === 'S') {
+                                    cellBg = 'bg-purple-100 text-purple-800 font-black';
                                   } else if (status === 'O') {
                                     cellBg = 'bg-slate-100 text-slate-400';
                                     displayTxt = 'OFF';
@@ -2230,6 +2289,9 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                 </td>
                                 <td className="py-1.5 px-1.5 text-center font-bold text-amber-800 bg-amber-50/50 border-r border-slate-200">
                                   {row.stats.izin}
+                                </td>
+                                <td className="py-1.5 px-1.5 text-center font-bold text-purple-800 bg-purple-50/50 border-r border-slate-200">
+                                  {row.stats.sakit}
                                 </td>
                                 <td className="py-1.5 px-2 text-right font-mono text-rose-700 border-r border-slate-200">
                                   {row.stats.deduction > 0 ? formatCurrency(row.stats.deduction) : '-'}
@@ -2262,6 +2324,9 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                             </td>
                             <td className="py-2.5 px-1.5 text-center text-amber-800 bg-amber-100 border-r border-slate-300">
                               {totalIzinSum}
+                            </td>
+                            <td className="py-2.5 px-1.5 text-center text-purple-800 bg-purple-100 border-r border-slate-300">
+                              {totalSakitSum}
                             </td>
                             <td className="py-2.5 px-2 text-right font-mono text-rose-800 bg-rose-50 border-r border-slate-300">
                               {formatCurrency(totalDeductionSum)}

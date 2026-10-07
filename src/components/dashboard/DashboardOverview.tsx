@@ -232,6 +232,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     let present = 0;
     let alpa = 0;
     let izin = 0;
+    let sakit = 0;
     let off = 0;
     let unrecorded = 0;
 
@@ -246,6 +247,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       if (st === 'H') present++;
       else if (st === 'A') alpa++;
       else if (st === 'I') izin++;
+      else if (st === 'S') sakit++;
       else if (st === 'O') off++;
       else unrecorded++;
     });
@@ -253,7 +255,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     const total = filteredEmployees.length || 1;
     const rate = Math.round((present / total) * 100);
 
-    return { present, alpa, izin, off, unrecorded, rate };
+    return { present, alpa, izin, sakit, off, unrecorded, rate };
   }, [filteredEmployees, activeTimesheets]);
 
   // Critical stock items in projectStocks
@@ -608,7 +610,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <div className="flex items-center justify-between text-[11px] text-slate-600 mt-2 pt-2 border-t border-slate-100 font-medium">
                 <span>
                   Alpa: <b className="text-rose-700 font-black">{todayAttendance.alpa}</b> • Izin:{' '}
-                  <b className="text-slate-950 font-black">{todayAttendance.izin}</b>
+                  <b className="text-slate-950 font-black">{todayAttendance.izin}</b> • Sakit:{' '}
+                  <b className="text-purple-700 font-black">{todayAttendance.sakit}</b>
                 </span>
                 <span className="text-emerald-700 font-bold flex items-center space-x-0.5">
                   <span>Ceklis</span>

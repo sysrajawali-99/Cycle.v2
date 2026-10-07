@@ -1,4 +1,4 @@
-export type AttendanceStatus = 'H' | 'A' | 'I' | 'O' | '';
+export type AttendanceStatus = 'H' | 'A' | 'I' | 'S' | 'O' | '';
 
 export type EmployeePosition = 
   | 'Cleaner'

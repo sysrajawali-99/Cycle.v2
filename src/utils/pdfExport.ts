@@ -191,7 +191,7 @@ export const generateTimesheetPDF = ({
   doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
   doc.text(
-    `Laporan resmi akumulasi presensi kerja harian dan perhitungan take home pay personil cleaning service.`,
+    `Laporan resmi akumulasi presensi kerja harian dan perhitungan take home pay personil cleaning service (H: Hadir, A: Alpa, I: Izin, S: Sakit, OFF: Libur).`,
     14,
     33.5
   );
@@ -241,6 +241,7 @@ export const generateTimesheetPDF = ({
   let grandTotalHadir = 0;
   let grandTotalAlpa = 0;
   let grandTotalIzin = 0;
+  let grandTotalSakit = 0;
   let grandTotalDeductions = 0;
 
   const isCustomMode = customDays && customDays.length > 0;
@@ -266,6 +267,7 @@ export const generateTimesheetPDF = ({
       'H',
       'A',
       'I',
+      'S',
       'Potongan (Rp)',
       'Gaji Bersih (THP)'
     ]
@@ -276,6 +278,7 @@ export const generateTimesheetPDF = ({
     let hadir = 0;
     let alpa = 0;
     let izin = 0;
+    let sakit = 0;
     const dayCells: string[] = [];
 
     let deduction = 0;
@@ -298,6 +301,9 @@ export const generateTimesheetPDF = ({
         } else if (st === 'I') {
           izin++;
           dayCells.push('I');
+        } else if (st === 'S') {
+          sakit++;
+          dayCells.push('S');
         } else if (st === 'O') {
           dayCells.push('OFF');
         } else {
@@ -343,6 +349,9 @@ export const generateTimesheetPDF = ({
           } else if (st === 'I') {
             izin++;
             dayCells.push('I');
+          } else if (st === 'S') {
+            sakit++;
+            dayCells.push('S');
           } else if (st === 'O') {
             dayCells.push('OFF');
           } else {
@@ -362,6 +371,7 @@ export const generateTimesheetPDF = ({
     grandTotalHadir += hadir;
     grandTotalAlpa += alpa;
     grandTotalIzin += izin;
+    grandTotalSakit += sakit;
     grandTotalDeductions += deduction;
     grandTotalNet += net;
 
@@ -384,6 +394,7 @@ export const generateTimesheetPDF = ({
       String(hadir),
       String(alpa),
       String(izin),
+      String(sakit),
       deduction > 0 ? formatCurrency(deduction) : '-',
       formatCurrency(net)
     ];
@@ -414,6 +425,7 @@ export const generateTimesheetPDF = ({
         String(grandTotalHadir),
         String(grandTotalAlpa),
         String(grandTotalIzin),
+        String(grandTotalSakit),
         formatCurrency(grandTotalDeductions),
         formatCurrency(grandTotalNet)
       ]
@@ -459,8 +471,9 @@ export const generateTimesheetPDF = ({
       35: { cellWidth: 6, halign: 'center', fontStyle: 'bold', textColor: [5, 150, 105] }, // H
       36: { cellWidth: 6, halign: 'center', fontStyle: 'bold', textColor: [220, 38, 38] }, // A
       37: { cellWidth: 6, halign: 'center', fontStyle: 'bold', textColor: [217, 119, 6] }, // I
-      38: { cellWidth: 16, halign: 'right', textColor: [220, 38, 38] }, // Deduction
-      39: { cellWidth: 20, halign: 'right', fontStyle: 'bold', textColor: [15, 23, 42] } // Net Pay
+      38: { cellWidth: 6, halign: 'center', fontStyle: 'bold', textColor: [126, 34, 206] }, // S
+      39: { cellWidth: 16, halign: 'right', textColor: [220, 38, 38] }, // Deduction
+      40: { cellWidth: 20, halign: 'right', fontStyle: 'bold', textColor: [15, 23, 42] } // Net Pay
     },
     didParseCell: (data) => {
       // Color-code day cells in table body
@@ -477,6 +490,10 @@ export const generateTimesheetPDF = ({
         } else if (val === 'I') {
           data.cell.styles.fillColor = [254, 243, 199]; // Soft Orange
           data.cell.styles.textColor = [146, 64, 14]; // Dark Orange
+          data.cell.styles.fontStyle = 'bold';
+        } else if (val === 'S') {
+          data.cell.styles.fillColor = [243, 232, 255]; // Soft Purple
+          data.cell.styles.textColor = [126, 34, 206]; // Dark Purple
           data.cell.styles.fontStyle = 'bold';
         } else if (val === 'OFF') {
           data.cell.styles.fillColor = [241, 245, 249];
@@ -574,6 +591,7 @@ export const generateIndividualPayslipPDF = ({
     hadir: number;
     alpa: number;
     izin: number;
+    sakit?: number;
     off?: number;
     deductionAmount?: number;
     deductionReason?: string;
@@ -596,11 +614,13 @@ export const generateIndividualPayslipPDF = ({
   let hadir = customStats ? customStats.hadir : 0;
   let alpa = customStats ? customStats.alpa : 0;
   let izin = customStats ? customStats.izin : 0;
+  let sakit = customStats ? (customStats.sakit || 0) : 0;
   if (!customStats) {
     Object.values(timesheet.days || {}).forEach((st) => {
       if (st === 'H') hadir++;
       else if (st === 'A') alpa++;
       else if (st === 'I') izin++;
+      else if (st === 'S') sakit++;
     });
   }
 
@@ -675,12 +695,13 @@ export const generateIndividualPayslipPDF = ({
 
   // Presensi Summary Badges
   const badgeY = 62;
-  const bw = (pageWidth - 20 - 9) / 4;
+  const bw = (pageWidth - 20 - 12) / 5;
 
   const badges = [
     { label: 'HADIR (H)', val: `${hadir} Hari`, color: [5, 150, 105], bg: [220, 252, 231] },
     { label: 'ALPA (A)', val: `${alpa} Hari`, color: [220, 38, 38], bg: [254, 226, 226] },
     { label: 'IZIN (I)', val: `${izin} Hari`, color: [217, 119, 6], bg: [254, 243, 199] },
+    { label: 'SAKIT (S)', val: `${sakit} Hari`, color: [126, 34, 206], bg: [243, 232, 255] },
     { label: 'RATE / HARI', val: formatCurrency(employee.dailyRate), color: [15, 23, 42], bg: [241, 245, 249] }
   ];
 
