@@ -79,37 +79,8 @@ export const DEFAULT_CUTOFF_SETTINGS: TimesheetCutoffSettings = {
   calendarYear: 2026
 };
 
-const STORAGE_KEYS = {
-  COMPANY_PROFILE: 'rajawali_company_profile',
-  PROJECTS: 'rajawali_projects',
-  EMPLOYEES: 'rajawali_employees',
-  TIMESHEETS: 'rajawali_timesheets',
-  MUTATIONS: 'rajawali_mutations',
-  INVENTORY_ITEMS: 'rajawali_inventory_items',
-  PROJECT_STOCKS: 'rajawali_project_stocks',
-  INVENTORY_LOGS: 'rajawali_inventory_logs',
-  MATERIAL_REQUESTS: 'rajawali_material_requests',
-  TASKS: 'rajawali_tasks',
-  BLASTS: 'rajawali_blasts',
-  SOPS: 'rajawali_sops',
-  USERS: 'rajawali_users_accounts',
-  ACTIVE_USER: 'rajawali_active_session_user',
-  SELECTED_PROJECT: 'rajawali_selected_project_id',
-  USER_ROLE: 'rajawali_user_role',
-  CHART_OF_ACCOUNTS: 'rajawali_finance_coa',
-  FINANCE_TRANSACTIONS: 'rajawali_finance_transactions',
-  BANK_STATEMENTS: 'rajawali_finance_bank_statements',
-  PERIOD_CLOSINGS: 'rajawali_finance_period_closings',
-  AUDIT_TRAILS: 'rajawali_finance_audit_trails',
-  CURRENCY_RATES: 'rajawali_finance_currency_rates',
-  DEBTS: 'rajawali_finance_debts',
-  RECEIVABLES: 'rajawali_finance_receivables',
-  INVESTMENTS: 'rajawali_finance_investments',
-  CLIENT_CONTRACTS: 'rajawali_client_contracts',
-  CLIENT_INVOICES: 'rajawali_client_invoices',
-  DASHBOARD_WIDGETS: 'rajawali_dashboard_widgets',
-  TIMESHEET_CUTOFF: 'rajawali_timesheet_cutoff_settings'
-};
+import { STORAGE_KEYS, DATA_KEY_REGISTRY, validateDataRegistry } from './dataRegistry';
+export { STORAGE_KEYS, DATA_KEY_REGISTRY, validateDataRegistry };
 
 // =============================================================================
 // STORAGE MIDDLEWARE & EVENT PIPELINE
@@ -309,8 +280,8 @@ export function ensureRecordMetadata<T extends Record<string, any>>(
   item: T,
   forceUpdate = false,
   collectionKey?: string
-): T {
-  if (!item || typeof item !== 'object') return item;
+): T & { id: string; updatedAt: string } {
+  if (!item || typeof item !== 'object') return item as any;
   const now = new Date().toISOString();
   const id = getDeterministicRecordId(item, collectionKey);
   const updatedAt = forceUpdate ? now : item.updatedAt || item.createdAt || now;

@@ -267,6 +267,10 @@ export async function initVpsDatabase(): Promise<VpsDbStatus> {
       `);
 
       await client.query(`
+        ALTER TABLE rajawali_state_history ADD COLUMN IF NOT EXISTS user_id VARCHAR(64);
+      `);
+
+      await client.query(`
         ALTER TABLE rajawali_app_state ALTER COLUMN key TYPE VARCHAR(255);
       `);
 
@@ -424,6 +428,63 @@ export function mergeIdArrays(serverArray: any[], incomingArray: any[]): any[] {
   return result;
 }
 
+function countActiveRecords(data: any): number {
+  if (!Array.isArray(data)) return 0;
+  return data.filter((item) => item && typeof item === 'object' && !item.deletedAt).length;
+}
+
+function checkServerGuard(key: string, oldData: any, incomingData: any, finalData: any): void {
+  if (Array.isArray(oldData) && oldData.length > 0) {
+    // 1. Guard mengosongkan key yang berisi
+    if (Array.isArray(incomingData) && incomingData.length === 0) {
+      console.warn(
+        `[GUARD] Ditolak: Kiriman array kosong untuk key=${key} sedangkan server memiliki ${oldData.length} record.`
+      );
+      throw new Error(
+        `[GUARD] Kiriman ditolak karena array kosong berpotensi menimpa data server (${oldData.length} data tersimpan).`
+      );
+    }
+
+    // 2. Guard pengurangan record non-deletedAt
+    const oldActiveCount = countActiveRecords(oldData);
+    const finalActiveCount = countActiveRecords(finalData);
+    if (finalActiveCount < oldActiveCount) {
+      console.warn(
+        `[GUARD] Ditolak: Jumlah record non-deletedAt untuk key=${key} berkurang. Sebelum=${oldActiveCount}, Sesudah=${finalActiveCount}.`
+      );
+      throw new Error(
+        `[GUARD] Ditolak: Jumlah record non-deletedAt untuk key=${key} berkurang dari ${oldActiveCount} menjadi ${finalActiveCount}.`
+      );
+    }
+  }
+}
+
+function saveLocalStateHistory(key: string, oldData: any, userId?: string): void {
+  try {
+    const historyFile = path.join(LOCAL_DATA_DIR, 'rajawali_state_history.json');
+    let history: any[] = [];
+    if (fs.existsSync(historyFile)) {
+      try {
+        const raw = fs.readFileSync(historyFile, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) history = parsed;
+      } catch {}
+    }
+    history.push({
+      key,
+      data: oldData,
+      user_id: userId || 'system',
+      timestamp: new Date().toISOString()
+    });
+    if (history.length > 100) {
+      history = history.slice(history.length - 100);
+    }
+    fs.writeFileSync(historyFile, JSON.stringify(history, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[VPS History] Failed to write local history:', err);
+  }
+}
+
 /**
  * Save single state entry with transaction, row-locking (FOR UPDATE), history tracking,
  * and conflict-free merge.
@@ -454,17 +515,6 @@ export async function saveVpsState(
       );
       const oldData = res.rows.length > 0 ? res.rows[0].data : null;
 
-      // Guard: Tolak jika kiriman array kosong sedangkan data di server tidak kosong
-      if (Array.isArray(data) && data.length === 0 && Array.isArray(oldData) && oldData.length > 0) {
-        console.warn(
-          `[GUARD] Ditolak: Kiriman array kosong untuk key=${key} sedangkan server memiliki ${oldData.length} record.`
-        );
-        await client.query('ROLLBACK');
-        throw new Error(
-          `[GUARD] Kiriman ditolak karena array kosong berpotensi menimpa data server (${oldData.length} data tersimpan).`
-        );
-      }
-
       // Merge data
       let finalData = data;
       if (Array.isArray(oldData) && Array.isArray(data)) {
@@ -480,11 +530,14 @@ export async function saveVpsState(
         finalData = { ...oldData, ...data };
       }
 
+      // Guard check: tolak pengurangan record non-deletedAt atau pengosongan data
+      checkServerGuard(key, oldData, data, finalData);
+
       // Simpan riwayat perubahan ke rajawali_state_history sebelum ditimpa
       if (oldData !== null && oldData !== undefined) {
         await client.query(
           `INSERT INTO rajawali_state_history (key, data, user_id) VALUES ($1, $2, $3)`,
-          [key, JSON.stringify(oldData), meta?.userId || 'system']
+          [key, JSON.stringify(oldData), meta?.userId || meta?.userName || 'system']
         );
 
         // Pertahankan maksimal 10 versi terakhir per key
@@ -522,6 +575,9 @@ export async function saveVpsState(
       if (client) {
         await client.query('ROLLBACK').catch(() => {});
       }
+      if (err?.message && typeof err.message === 'string' && err.message.startsWith('[GUARD]')) {
+        throw err;
+      }
       console.warn(`[VPS] PostgreSQL save error for key ${key}, falling back to local file store:`, err?.message || err);
       // Fallback to local store so data is not lost
     } finally {
@@ -535,16 +591,6 @@ export async function saveVpsState(
   if (dbEngine === 'remote_vps' && remoteVpsUrl) {
     const store = readLocalStore();
     const oldData = store[key];
-
-    // Guard: Tolak jika kiriman array kosong sedangkan data di server tidak kosong
-    if (Array.isArray(data) && data.length === 0 && Array.isArray(oldData) && oldData.length > 0) {
-      console.warn(
-        `[GUARD] Ditolak (remote_vps): Kiriman array kosong untuk key=${key} sedangkan server memiliki ${oldData.length} record.`
-      );
-      throw new Error(
-        `[GUARD] Kiriman ditolak karena array kosong berpotensi menimpa data server (${oldData.length} data tersimpan).`
-      );
-    }
 
     let finalData = data;
     if (Array.isArray(oldData) && Array.isArray(data)) {
@@ -560,7 +606,13 @@ export async function saveVpsState(
       finalData = { ...oldData, ...data };
     }
 
+    // Guard check: tolak pengurangan record non-deletedAt atau pengosongan data
+    checkServerGuard(key, oldData, data, finalData);
+
     // Update local store with merged data
+    if (oldData !== null && oldData !== undefined) {
+      saveLocalStateHistory(key, oldData, meta?.userId || meta?.userName);
+    }
     store[key] = finalData;
     writeLocalStore(store);
 
@@ -583,13 +635,6 @@ export async function saveVpsState(
   const store = readLocalStore();
   const oldData = store[key];
 
-  if (Array.isArray(data) && data.length === 0 && Array.isArray(oldData) && oldData.length > 0) {
-    console.warn(
-      `[GUARD] Ditolak (local): Kiriman array kosong untuk key=${key} sedangkan server memiliki ${oldData.length} record.`
-    );
-    throw new Error(`[GUARD] Kiriman ditolak karena array kosong menimpa data server.`);
-  }
-
   let finalData = data;
   if (Array.isArray(oldData) && Array.isArray(data)) {
     finalData = mergeIdArrays(oldData, data);
@@ -602,6 +647,13 @@ export async function saveVpsState(
     !Array.isArray(data)
   ) {
     finalData = { ...oldData, ...data };
+  }
+
+  // Guard check: tolak pengurangan record non-deletedAt atau pengosongan data
+  checkServerGuard(key, oldData, data, finalData);
+
+  if (oldData !== null && oldData !== undefined) {
+    saveLocalStateHistory(key, oldData, meta?.userId || meta?.userName);
   }
 
   store[key] = finalData;
