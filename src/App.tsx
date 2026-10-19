@@ -925,6 +925,7 @@ export default function App() {
                 onAddMasterItem={handleAddMasterItem}
                 onUpdateInventoryItems={handleUpdateInventoryItems}
                 userRole={currentUser.role}
+                onUpdateProjects={handleUpdateProjects}
               />
             )}
 

@@ -271,7 +271,8 @@ export const ProjectLocationSettings: React.FC<ProjectLocationSettingsProps> = (
       washbasinCount: 30,
       toiletPointsPerFloorPW: '2 Pria / 2 Wanita per lantai',
       floorTypes: ['Granit', 'Kramik'],
-      notes: ''
+      notes: '',
+      inventoryBudget: 0
     });
     setIsModalOpen(true);
   };
@@ -308,7 +309,8 @@ export const ProjectLocationSettings: React.FC<ProjectLocationSettingsProps> = (
       washbasinCount: proj.washbasinCount ?? 0,
       toiletPointsPerFloorPW: proj.toiletPointsPerFloorPW || '2 Pria / 2 Wanita per lantai',
       floorTypes: proj.floorTypes || [],
-      notes: proj.notes || ''
+      notes: proj.notes || '',
+      inventoryBudget: proj.inventoryBudget || 0
     });
     setIsModalOpen(true);
   };
@@ -370,6 +372,7 @@ export const ProjectLocationSettings: React.FC<ProjectLocationSettingsProps> = (
       operationalHours: formData.operationalHours.trim(),
       totalAreaM2: Number(formData.totalAreaM2) || 0,
       notes: formData.notes.trim(),
+      inventoryBudget: Number(formData.inventoryBudget) >= 0 ? Number(formData.inventoryBudget) : (editingProject?.inventoryBudget || 0),
       updatedAt: new Date().toISOString().split('T')[0]
     };
 

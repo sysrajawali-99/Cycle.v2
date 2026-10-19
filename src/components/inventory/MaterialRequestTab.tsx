@@ -1028,7 +1028,7 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
         unit: firstItem.unit,
         currentStock: stock ? stock.currentStock : 0,
         requestedQty: 1,
-        unitPrice: firstItem.price || 0,
+        unitPrice: firstItem.unitPrice || 0,
         notes: ''
       }
     ];
@@ -1073,7 +1073,7 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
         unit: unusedItem.unit,
         currentStock: stock ? stock.currentStock : 0,
         requestedQty: 1,
-        unitPrice: unusedItem.price || 0,
+        unitPrice: unusedItem.unitPrice || 0,
         notes: ''
       }
     ]);
@@ -1099,7 +1099,7 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
           category: found.category,
           unit: found.unit,
           currentStock: stock ? stock.currentStock : 0,
-          unitPrice: found.price || 0
+          unitPrice: found.unitPrice || 0
         };
       })
     );
@@ -1129,10 +1129,45 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
     setItems((prev) => prev.filter((it) => it.tempId !== tempId));
   };
 
+  // Selected project & live budget deduction calculation
+  const selectedProj = projects.find((p) => p.id === projectId);
+  const projBudget = selectedProj?.inventoryBudget || 0;
+
   // Calculate totals
   const totalEstimatedCost = useMemo(() => {
     return items.reduce((acc, cur) => acc + (cur.unitPrice || 0) * cur.requestedQty, 0);
   }, [items]);
+
+  const totalQuantity = useMemo(() => {
+    return items.reduce((acc, cur) => acc + (cur.requestedQty || 0), 0);
+  }, [items]);
+
+  const remainingBudget = projBudget - totalEstimatedCost;
+  const isBudgetExceeded = projBudget > 0 && remainingBudget < 0;
+
+  // Percentage & Status Calculations for dynamic visual bar & chart
+  const usagePercentage = useMemo(() => {
+    if (!projBudget || projBudget <= 0) return 0;
+    return Math.round((totalEstimatedCost / projBudget) * 1000) / 10;
+  }, [totalEstimatedCost, projBudget]);
+
+  const remainingPercentage = useMemo(() => {
+    if (!projBudget || projBudget <= 0) return 0;
+    return Math.max(0, Math.round(((projBudget - totalEstimatedCost) / projBudget) * 1000) / 10);
+  }, [totalEstimatedCost, projBudget]);
+
+  const progressFillWidth = useMemo(() => {
+    if (!projBudget || projBudget <= 0) return 0;
+    return Math.min(100, Math.max(0, (totalEstimatedCost / projBudget) * 100));
+  }, [totalEstimatedCost, projBudget]);
+
+  const donutRadius = 26;
+  const donutCircumference = 2 * Math.PI * donutRadius;
+  const donutDashOffset = useMemo(() => {
+    if (!projBudget || projBudget <= 0) return donutCircumference;
+    const fraction = Math.min(1, Math.max(0, (projBudget - totalEstimatedCost) / projBudget));
+    return donutCircumference * (1 - fraction);
+  }, [projBudget, totalEstimatedCost, donutCircumference]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1270,6 +1305,216 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
             </div>
           </div>
 
+          {/* Status Nilai Budget / Saldo Lokasi Proyek */}
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-white block">
+                    Nilai Budget / Saldo Inventaris Lokasi: {selectedProj?.name}
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    Saldo otomatis berkurang secara real-time seiring penambahan barang dan perubahan kuantitas pengajuan.
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                {projBudget === 0 ? (
+                  <span className="text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded font-medium">
+                    Budget belum ditentukan oleh Super Admin
+                  </span>
+                ) : (
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                      isBudgetExceeded
+                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse'
+                        : usagePercentage >= 85
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    }`}
+                  >
+                    {isBudgetExceeded
+                      ? '⚠️ Overbudget'
+                      : usagePercentage >= 85
+                      ? '⚡ Mendekati Limit'
+                      : '✓ Saldo Aman'}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-semibold">1. Plafon Budget / Saldo Lokasi:</span>
+                <span className="text-sm font-black font-mono text-emerald-400">{formatCurrency(projBudget)}</span>
+              </div>
+              <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-semibold">2. Total Estimasi Pengajuan Barang:</span>
+                <span className="text-sm font-black font-mono text-amber-400">{formatCurrency(totalEstimatedCost)}</span>
+              </div>
+              <div className={`p-2.5 rounded-lg border ${isBudgetExceeded ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' : 'bg-slate-900/80 border-slate-800 text-emerald-400'}`}>
+                <span className="text-[10px] text-slate-400 block font-semibold">3. Sisa Saldo Budget Tersedia:</span>
+                <span className="text-sm font-black font-mono">
+                  {formatCurrency(remainingBudget)}
+                </span>
+                {isBudgetExceeded && (
+                  <span className="text-[10px] text-rose-400 font-bold block mt-0.5 animate-pulse">
+                    ⚠️ Melebihi plafon budget lokasi!
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Visual Progress Bar & Donut Mini Chart */}
+            <div className="bg-slate-900/90 rounded-xl p-3.5 border border-slate-800/90 space-y-3">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                {/* Left: Donut Radial Gauge Chart */}
+                <div className="flex items-center space-x-3.5 shrink-0">
+                  <div className="relative w-14 h-14 flex items-center justify-center">
+                    <svg className="w-14 h-14 transform -rotate-90" viewBox="0 0 64 64">
+                      {/* Background track */}
+                      <circle
+                        cx="32"
+                        cy="32"
+                        r={donutRadius}
+                        stroke="#1e293b"
+                        strokeWidth="5.5"
+                        fill="transparent"
+                      />
+                      {/* Active remaining budget arc */}
+                      <circle
+                        cx="32"
+                        cy="32"
+                        r={donutRadius}
+                        stroke={
+                          projBudget <= 0
+                            ? '#475569'
+                            : isBudgetExceeded
+                            ? '#f43f5e'
+                            : usagePercentage >= 85
+                            ? '#f59e0b'
+                            : '#10b981'
+                        }
+                        strokeWidth="5.5"
+                        strokeDasharray={donutCircumference}
+                        strokeDashoffset={donutDashOffset}
+                        strokeLinecap="round"
+                        fill="transparent"
+                        className="transition-all duration-500 ease-out"
+                      />
+                    </svg>
+                    {/* Donut Center Content */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                      <span
+                        className={`text-[11px] font-black font-mono leading-none ${
+                          projBudget <= 0
+                            ? 'text-slate-400'
+                            : isBudgetExceeded
+                            ? 'text-rose-400'
+                            : usagePercentage >= 85
+                            ? 'text-amber-400'
+                            : 'text-emerald-400'
+                        }`}
+                      >
+                        {projBudget > 0 ? `${remainingPercentage}%` : '-'}
+                      </span>
+                      <span className="text-[7.5px] font-semibold text-slate-400 leading-none mt-0.5">
+                        {isBudgetExceeded ? 'Over' : 'Sisa'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-xs font-bold text-white">
+                        Visualisasi Pemakaian & Sisa Saldo
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {projBudget > 0 ? (
+                        <>
+                          <strong className={isBudgetExceeded ? 'text-rose-400 font-mono' : 'text-emerald-400 font-mono'}>
+                            {remainingPercentage}%
+                          </strong>{' '}
+                          saldo tersisa • <span className="text-amber-400 font-mono font-semibold">{usagePercentage}% terpakai</span>
+                        </>
+                      ) : (
+                        'Nilai budget lokasi belum ditentukan oleh Super Admin'
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right: Quick Ratio Pills */}
+                <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto justify-end text-[11px]">
+                  <div className="bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800 flex items-center space-x-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                    <span className="text-slate-400">Pengajuan:</span>
+                    <span className="font-mono font-bold text-amber-400">
+                      {formatCurrency(totalEstimatedCost)} ({usagePercentage}%)
+                    </span>
+                  </div>
+                  <div className="bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800 flex items-center space-x-1.5">
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        isBudgetExceeded ? 'bg-rose-500' : 'bg-emerald-400'
+                      }`}
+                    />
+                    <span className="text-slate-400">Sisa Saldo:</span>
+                    <span
+                      className={`font-mono font-bold ${
+                        isBudgetExceeded ? 'text-rose-400' : 'text-emerald-400'
+                      }`}
+                    >
+                      {formatCurrency(remainingBudget)} ({remainingPercentage}%)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Bar Container */}
+              <div className="space-y-1.5 pt-0.5">
+                <div className="relative h-3.5 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800/90 shadow-inner">
+                  {/* Fill Bar: Total Estimated Cost / Used Budget */}
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ease-out ${
+                      isBudgetExceeded
+                        ? 'bg-gradient-to-r from-rose-600 via-rose-500 to-red-400 shadow-md shadow-rose-500/30'
+                        : usagePercentage >= 85
+                        ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-400 shadow-md shadow-amber-500/20'
+                        : 'bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-400 shadow-md shadow-emerald-500/20'
+                    }`}
+                    style={{ width: `${progressFillWidth}%` }}
+                  />
+                  {/* Overbudget pulse indicator if exceeding 100% */}
+                  {isBudgetExceeded && (
+                    <div className="absolute inset-0 bg-rose-500/30 animate-pulse pointer-events-none" />
+                  )}
+                </div>
+
+                {/* Progress Bar Scale Markers */}
+                <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono px-0.5">
+                  <span>0% (Rp 0)</span>
+                  <span>25%</span>
+                  <span>50%</span>
+                  <span>75%</span>
+                  <span
+                    className={
+                      isBudgetExceeded
+                        ? 'text-rose-400 font-bold'
+                        : 'text-slate-400'
+                    }
+                  >
+                    100% ({formatCurrency(projBudget)})
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Keperluan / Catatan Pengajuan */}
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-1.5">
@@ -1293,7 +1538,7 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
                   Daftar Item Barang yang Diajukan ({items.length} item)
                 </span>
                 <span className="text-[11px] text-slate-400">
-                  Pilih item dari Katalog Master. Sistem otomatis memuat nama barang, satuan, dan sisa stok lokasi.
+                  Pilih item dari Katalog Master. Harga satuan otomatis termuat dan subtotal terhitung otomatis.
                 </span>
               </div>
               <button
@@ -1309,6 +1554,7 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
             {/* Item Rows Container */}
             <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
               {items.map((row, index) => {
+                const rowSubtotal = (row.unitPrice || 0) * (row.requestedQty || 0);
                 return (
                   <div
                     key={row.tempId}
@@ -1320,7 +1566,7 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
                     </div>
 
                     {/* Dropdown Item Selection from Master Catalog */}
-                    <div className="flex-1 min-w-[220px]">
+                    <div className="flex-1 min-w-[200px]">
                       <label className="block text-[10px] font-semibold text-slate-400 mb-1">
                         Pilih Master Item Chemical / Alat / APD
                       </label>
@@ -1331,29 +1577,29 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
                       >
                         {inventoryItems.map((item) => (
                           <option key={item.id} value={item.id}>
-                            [{item.code}] {item.name} ({item.unit}) - {item.category}
+                            [{item.code}] {item.name} ({item.unit}) - {item.category} {item.unitPrice ? `• ${formatCurrency(item.unitPrice)}` : ''}
                           </option>
                         ))}
                       </select>
                       <div className="flex items-center space-x-2 text-[10px] text-slate-400 mt-1">
                         <span>Kategori: <strong className="text-slate-300">{row.category}</strong></span>
                         <span>•</span>
-                        <span>Stok di Proyek Saat Ini: <strong className="text-amber-400">{row.currentStock} {row.unit}</strong></span>
+                        <span>Stok Proyek: <strong className="text-amber-400">{row.currentStock} {row.unit}</strong></span>
                       </div>
                     </div>
 
                     {/* Satuan (Auto Displayed) */}
-                    <div className="w-24 shrink-0">
+                    <div className="w-20 shrink-0">
                       <label className="block text-[10px] font-semibold text-slate-400 mb-1">
                         Satuan
                       </label>
-                      <div className="bg-slate-900/80 border border-slate-800 px-2.5 py-1.5 rounded-lg text-xs font-bold text-amber-300 truncate">
+                      <div className="bg-slate-900/80 border border-slate-800 px-2 py-1.5 rounded-lg text-xs font-bold text-amber-300 truncate text-center">
                         {row.unit}
                       </div>
                     </div>
 
                     {/* Qty Input */}
-                    <div className="w-28 shrink-0">
+                    <div className="w-24 shrink-0">
                       <label className="block text-[10px] font-semibold text-slate-400 mb-1">
                         Qty Barang *
                       </label>
@@ -1367,10 +1613,36 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
                       />
                     </div>
 
-                    {/* Notes per item */}
-                    <div className="flex-1 min-w-[160px]">
+                    {/* Harga Satuan dari Master Catalog */}
+                    <div className="w-32 shrink-0">
                       <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                        Catatan Spesifik (Opsional)
+                        Harga Satuan (Rp)
+                      </label>
+                      <div className="bg-slate-900/80 border border-slate-800 px-2 py-1.5 rounded-lg text-xs font-mono font-bold text-amber-300 truncate text-right">
+                        {formatCurrency(row.unitPrice || 0)}
+                      </div>
+                      <span className="text-[9px] text-slate-500 block text-right mt-0.5">
+                        per {row.unit}
+                      </span>
+                    </div>
+
+                    {/* Subtotal Item */}
+                    <div className="w-32 shrink-0">
+                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                        Subtotal (Rp)
+                      </label>
+                      <div className="bg-slate-900/90 border border-slate-800 px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold text-emerald-400 truncate text-right">
+                        {formatCurrency(rowSubtotal)}
+                      </div>
+                      <span className="text-[9px] text-slate-500 block text-right mt-0.5">
+                        {row.requestedQty} × {formatCurrency(row.unitPrice || 0)}
+                      </span>
+                    </div>
+
+                    {/* Notes per item */}
+                    <div className="flex-1 min-w-[140px]">
+                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                        Catatan (Opsional)
                       </label>
                       <input
                         type="text"
@@ -1397,16 +1669,65 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
               })}
             </div>
 
-            {/* Total Items & Quantity Summary Bar */}
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
-              <div className="text-slate-400">
-                Total Item: <span className="text-white font-bold">{items.length} Macam Barang</span>
+            {/* Total Items, Quantity & Grand Total Price Summary Bar */}
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Total Macam Barang:</span>
+                  <span className="text-sm font-bold text-white">{items.length} Item</span>
+                </div>
+                <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Total Kuantitas:</span>
+                  <span className="text-sm font-bold font-mono text-amber-400">{totalQuantity} Unit/Pcs</span>
+                </div>
+                <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Nilai Budget Lokasi:</span>
+                  <span className="text-sm font-bold font-mono text-emerald-400">{formatCurrency(projBudget)}</span>
+                </div>
+                <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-[10px] text-slate-400 block font-semibold">Sisa Saldo Setelah Pengajuan:</span>
+                    {projBudget > 0 && (
+                      <span className="text-[10px] font-mono text-slate-400 font-bold">{remainingPercentage}%</span>
+                    )}
+                  </div>
+                  <span className={`text-sm font-bold font-mono ${remainingBudget < 0 ? 'text-rose-400 font-black' : 'text-emerald-400'}`}>
+                    {formatCurrency(remainingBudget)}
+                  </span>
+                  {projBudget > 0 && (
+                    <div className="w-full bg-slate-950 h-1.5 rounded-full mt-1.5 overflow-hidden border border-slate-800">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          isBudgetExceeded ? 'bg-rose-500' : usagePercentage >= 85 ? 'bg-amber-400' : 'bg-emerald-400'
+                        }`}
+                        style={{ width: `${Math.max(0, Math.min(100, remainingPercentage))}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-slate-400">Total Kuantitas:</span>
-                <span className="text-sm font-bold font-mono text-amber-400">
-                  {items.reduce((acc, cur) => acc + (cur.requestedQty || 0), 0)} Unit/Pcs
-                </span>
+
+              {/* Highlight Grand Total Harga Barang */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-xl">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 bg-amber-500/20 text-amber-400 rounded-lg">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">
+                      Total Harga Barang yang Diajukan (Estimasi Keseluruhan):
+                    </span>
+                    <span className="text-[11px] text-amber-200/80">
+                      Akumulasi total harga seluruh item barang sesuai data Katalog Master Chemical & Alat
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-amber-300 font-semibold block">Total Estimasi Biaya:</span>
+                  <span className="text-xl font-black font-mono text-amber-400">
+                    {formatCurrency(totalEstimatedCost)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -1990,11 +2311,15 @@ const MaterialRequestDetailSlipModal: React.FC<DetailSlipModalProps> = ({
                   <th className="py-2.5 px-3 text-center">Satuan</th>
                   <th className="py-2.5 px-3 text-center">Qty Diminta</th>
                   <th className="py-2.5 px-3 text-center">Qty Disetujui</th>
+                  <th className="py-2.5 px-3 text-right">Harga Satuan (Rp)</th>
+                  <th className="py-2.5 px-3 text-right">Subtotal (Rp)</th>
                   <th className="py-2.5 px-3">Catatan Khusus</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {request.items.map((item, idx) => {
+                  const itemUnitPrice = item.unitPrice || 0;
+                  const itemSubtotal = itemUnitPrice * (item.requestedQty || 0);
                   return (
                     <tr key={item.id || idx}>
                       <td className="py-2.5 px-3 text-center text-slate-500">{idx + 1}</td>
@@ -2013,6 +2338,12 @@ const MaterialRequestDetailSlipModal: React.FC<DetailSlipModalProps> = ({
                           : request.status === 'APPROVED'
                           ? item.requestedQty
                           : '-'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-700">
+                        {itemUnitPrice > 0 ? formatCurrency(itemUnitPrice) : '-'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-800">
+                        {itemSubtotal > 0 ? formatCurrency(itemSubtotal) : '-'}
                       </td>
                       <td className="py-2.5 px-3 text-slate-600 italic">
                         {item.notes || '-'}
@@ -2039,6 +2370,15 @@ const MaterialRequestDetailSlipModal: React.FC<DetailSlipModalProps> = ({
                           ? i.requestedQty
                           : 0),
                       0
+                    )}
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-slate-600 font-medium text-[11px]">
+                    Total Estimasi:
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono text-emerald-800 text-sm font-black">
+                    {formatCurrency(
+                      request.totalEstimatedCost ||
+                        request.items.reduce((s, i) => s + (i.unitPrice || 0) * (i.requestedQty || 0), 0)
                     )}
                   </td>
                   <td></td>

@@ -54,6 +54,7 @@ export interface Project {
   totalAreaM2?: number;
   notes?: string;
   updatedAt?: string;
+  inventoryBudget?: number; // Nilai Budget / Saldo Inventory untuk lokasi ini (Hanya dapat ditentukan oleh Super Admin)
 }
 
 export interface Employee {

@@ -2125,9 +2125,27 @@ export const generateMaterialRequestPDF = (
       'Satuan',
       'Qty Diminta',
       'Qty Disetujui',
+      'Harga Satuan (Rp)',
+      'Subtotal (Rp)',
       'Catatan'
     ]
   ];
+
+  const totalCost =
+    request.totalEstimatedCost ||
+    request.items.reduce((sum, item) => sum + (item.unitPrice || 0) * (item.requestedQty || 0), 0);
+
+  const totalRequestedQty = request.items.reduce((s, i) => s + (i.requestedQty || 0), 0);
+  const totalApprovedQty = request.items.reduce(
+    (s, i) =>
+      s +
+      (i.approvedQty !== undefined
+        ? i.approvedQty
+        : request.status === 'APPROVED'
+        ? i.requestedQty
+        : 0),
+    0
+  );
 
   const tableBody = request.items.map((item, idx) => [
     idx + 1,
@@ -2137,18 +2155,36 @@ export const generateMaterialRequestPDF = (
     item.unit || '-',
     item.requestedQty,
     item.approvedQty !== undefined ? item.approvedQty : (request.status === 'APPROVED' ? item.requestedQty : '-'),
+    item.unitPrice ? formatCurrency(item.unitPrice) : '-',
+    item.unitPrice ? formatCurrency(item.unitPrice * (item.requestedQty || 0)) : '-',
     item.notes || '-'
   ]);
+
+  const tableFoot = [
+    [
+      'TOTAL',
+      '',
+      `${request.items.length} Macam Barang`,
+      '',
+      '',
+      totalRequestedQty,
+      totalApprovedQty > 0 ? totalApprovedQty : '-',
+      'Total Biaya:',
+      formatCurrency(totalCost),
+      ''
+    ]
+  ];
 
   autoTable(doc, {
     startY: curY,
     margin: { left: margin, right: margin },
     head: tableHead,
     body: tableBody,
+    foot: tableFoot,
     theme: 'grid',
     styles: {
-      fontSize: 8,
-      cellPadding: 2.5,
+      fontSize: 7.5,
+      cellPadding: 2,
       lineColor: [203, 213, 225],
       lineWidth: 0.15,
       textColor: [15, 23, 42]
@@ -2156,19 +2192,28 @@ export const generateMaterialRequestPDF = (
     headStyles: {
       fillColor: [15, 39, 68],
       textColor: [255, 255, 255],
-      fontSize: 8,
+      fontSize: 7.5,
       fontStyle: 'bold',
       halign: 'center'
     },
+    footStyles: {
+      fillColor: [241, 245, 249],
+      textColor: [15, 23, 42],
+      fontSize: 8,
+      fontStyle: 'bold',
+      halign: 'right'
+    },
     columnStyles: {
-      0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 24, halign: 'center', fontStyle: 'bold' },
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
       2: { cellWidth: 'auto', halign: 'left', fontStyle: 'bold' },
-      3: { cellWidth: 26, halign: 'center' },
-      4: { cellWidth: 20, halign: 'center' },
-      5: { cellWidth: 22, halign: 'center', fontStyle: 'bold' },
-      6: { cellWidth: 22, halign: 'center', fontStyle: 'bold', textColor: [16, 185, 129] },
-      7: { cellWidth: 32, halign: 'left' }
+      3: { cellWidth: 20, halign: 'center' },
+      4: { cellWidth: 16, halign: 'center' },
+      5: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
+      6: { cellWidth: 16, halign: 'center', fontStyle: 'bold', textColor: [16, 185, 129] },
+      7: { cellWidth: 24, halign: 'right' },
+      8: { cellWidth: 26, halign: 'right', fontStyle: 'bold', textColor: [15, 39, 68] },
+      9: { cellWidth: 22, halign: 'left' }
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252]

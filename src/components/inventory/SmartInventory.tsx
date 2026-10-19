@@ -73,6 +73,7 @@ interface SmartInventoryProps {
   onAddMasterItem: (item: InventoryItem) => void;
   onUpdateInventoryItems?: (items: InventoryItem[]) => void;
   userRole: UserRole;
+  onUpdateProjects?: (projects: Project[]) => void;
 }
 
 export const SmartInventory: React.FC<SmartInventoryProps> = ({
@@ -91,12 +92,17 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
   onAddLog,
   onAddMasterItem,
   onUpdateInventoryItems,
-  userRole
+  userRole,
+  onUpdateProjects
 }) => {
   const [activeTab, setActiveTab] = useState<'stocks' | 'requests' | 'recap' | 'logs' | 'catalog'>('stocks');
   const [activeProjectFilter, setActiveProjectFilter] = useState<string>(
     selectedProjectId !== 'ALL' ? selectedProjectId : projects[0]?.id || 'proj-1'
   );
+
+  // Super Admin Location Budget Modal State
+  const [showBudgetModal, setShowBudgetModal] = useState<boolean>(false);
+  const [budgetInputValue, setBudgetInputValue] = useState<number>(0);
 
   // Sync active project filter when projects or selected project changes
   useEffect(() => {
@@ -976,6 +982,37 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
   const activeProjectObj = projects.find((p) => p.id === activeProjectFilter);
   const recapProjectObj = projects.find((p) => p.id === recapProjectFilter);
 
+  const isSuperAdmin = currentUser?.role === 'Super Admin (HQ)' || userRole === 'Super Admin (HQ)';
+
+  const handleOpenBudgetModal = () => {
+    setBudgetInputValue(activeProjectObj?.inventoryBudget || 0);
+    setShowBudgetModal(true);
+  };
+
+  const handleSaveBudget = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSuperAdmin) {
+      alert('Hanya Super Admin yang berhak menentukan Nilai Budget / Saldo lokasi.');
+      return;
+    }
+    const val = Math.max(0, Math.round(Number(budgetInputValue) || 0));
+    const updatedProjects = projects.map((p) => {
+      if (p.id !== activeProjectFilter) return p;
+      return {
+        ...p,
+        inventoryBudget: val,
+        updatedAt: new Date().toISOString().split('T')[0]
+      };
+    });
+
+    if (onUpdateProjects) {
+      onUpdateProjects(updatedProjects);
+    }
+    storageService.saveProjects(updatedProjects);
+    showToast(`Nilai Budget / Saldo lokasi ${activeProjectObj?.name || ''} berhasil diperbarui menjadi ${formatCurrency(val)}!`);
+    setShowBudgetModal(false);
+  };
+
   return (
     <div className="space-y-4">
       {/* Header & Site Selector */}
@@ -1003,21 +1040,58 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
             </div>
           </div>
 
-          {/* Project Site Selector for Inventory */}
-          <div className="flex items-center space-x-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
-            <Building2 className="w-4 h-4 text-amber-400 shrink-0 ml-2" />
-            <select
-              id="inventory-project-select"
-              value={activeProjectFilter}
-              onChange={(e) => setActiveProjectFilter(e.target.value)}
-              className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-3"
-            >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id} className="bg-slate-900 text-white">
-                  📍 {p.name} ({p.code})
-                </option>
-              ))}
-            </select>
+          {/* Project Site Selector & Location Budget Display */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Nilai Budget / Saldo Lokasi */}
+            <div className="flex items-center space-x-2.5 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+              <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                <DollarSign className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400 flex items-center space-x-1">
+                  <span>Budget / Saldo Lokasi:</span>
+                  {!isSuperAdmin && (
+                    <span className="text-[9px] bg-slate-800 text-slate-400 px-1 py-0.2 rounded font-mono" title="Hanya dapat ditentukan oleh Super Admin">
+                      Pusat
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs font-black font-mono text-emerald-400">
+                  {formatCurrency(activeProjectObj?.inventoryBudget || 0)}
+                </div>
+              </div>
+
+              {/* Super Admin Action Button */}
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  id="btn-edit-inventory-budget"
+                  onClick={handleOpenBudgetModal}
+                  className="ml-1 px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[10.5px] font-bold flex items-center space-x-1 transition cursor-pointer"
+                  title="Atur / Sesuaikan Nilai Budget / Saldo Lokasi Ini (Khusus Super Admin)"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Atur Budget</span>
+                </button>
+              )}
+            </div>
+
+            {/* Project Site Selector */}
+            <div className="flex items-center space-x-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+              <Building2 className="w-4 h-4 text-amber-400 shrink-0" />
+              <select
+                id="inventory-project-select"
+                value={activeProjectFilter}
+                onChange={(e) => setActiveProjectFilter(e.target.value)}
+                className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-2"
+              >
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                    📍 {p.name} ({p.code})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -1863,7 +1937,7 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
             </div>
           </div>
 
-          {/* Tampilan Baris Katalog Master Barang (Tanpa Nilai Harga) */}
+          {/* Tampilan Baris Katalog Master Barang */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
@@ -1874,6 +1948,7 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                     <th className="p-3.5">Nama Barang Master</th>
                     <th className="p-3.5 w-36">Kategori</th>
                     <th className="p-3.5 text-center w-28">Satuan</th>
+                    <th className="p-3.5 text-right w-36">Harga Satuan (Rp)</th>
                     <th className="p-3.5 text-center w-32">Min. Stok Aman</th>
                     <th className="p-3.5">Deskripsi & Spesifikasi Operasional</th>
                   </tr>
@@ -1890,6 +1965,12 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                         </span>
                       </td>
                       <td className="p-3.5 text-center font-medium text-slate-300">{item.unit}</td>
+                      <td className="p-3.5 text-right font-mono font-bold text-amber-400">
+                        {formatCurrency(item.unitPrice || 0)}
+                        <span className="text-[10px] text-slate-400 font-normal block">
+                          /{item.unit}
+                        </span>
+                      </td>
                       <td className="p-3.5 text-center font-bold text-rose-400">{item.minStock} {item.unit}</td>
                       <td className="p-3.5 text-slate-300 max-w-sm">{item.description || '-'}</td>
                     </tr>
@@ -2078,19 +2159,41 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Batas Min. Stok:</label>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Harga Satuan (Rp) / {masterForm.unit || 'Satuan'}:
+                  </label>
                   <input
-                    id="master-item-minstock"
+                    id="master-item-unitprice"
                     type="number"
-                    min="1"
+                    min="0"
+                    step="500"
                     required
-                    value={masterForm.minStock}
+                    value={masterForm.unitPrice}
                     onChange={(e) =>
-                      setMasterForm({ ...masterForm, minStock: Number(e.target.value) })
+                      setMasterForm({ ...masterForm, unitPrice: Number(e.target.value) })
                     }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                    placeholder="Contoh: 75000"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold text-amber-400 focus:outline-none focus:border-amber-500"
                   />
+                  <span className="text-[10px] text-amber-400/90 font-mono mt-0.5 block">
+                    {formatCurrency(masterForm.unitPrice || 0)} / {masterForm.unit || 'satuan'}
+                  </span>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Batas Min. Stok Aman:</label>
+                <input
+                  id="master-item-minstock"
+                  type="number"
+                  min="1"
+                  required
+                  value={masterForm.minStock}
+                  onChange={(e) =>
+                    setMasterForm({ ...masterForm, minStock: Number(e.target.value) })
+                  }
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                />
               </div>
 
               <div>
@@ -2119,6 +2222,87 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                   className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-amber-500/20"
                 >
                   Simpan Master
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Super Admin Budget / Saldo Management Modal */}
+      {showBudgetModal && isSuperAdmin && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Atur Nilai Budget / Saldo Lokasi</h3>
+                  <p className="text-xs text-amber-400 font-semibold">
+                    {activeProjectObj?.name} ({activeProjectObj?.code})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBudgetModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBudget} className="space-y-4 text-xs">
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-slate-300 space-y-1">
+                <span className="text-[11px] text-slate-400 font-semibold block">
+                  Ketentuan Hak Akses & Plafon:
+                </span>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Nilai Budget / Saldo ini hanya dapat ditentukan dan diubah oleh <strong>Super Admin (HQ)</strong>. Nilai ini menjadi batas pagu belanja pengadaan inventaris chemical & alat untuk lokasi ini dan akan berkurang otomatis saat pengajuan Material Request.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">
+                  Nilai Pagu Budget / Saldo (Rupiah):
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">
+                    Rp
+                  </span>
+                  <input
+                    id="input-project-budget-val"
+                    type="number"
+                    min="0"
+                    step="10000"
+                    required
+                    value={budgetInputValue}
+                    onChange={(e) => setBudgetInputValue(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-sm font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
+                    placeholder="Contoh: 15000000"
+                  />
+                </div>
+                <div className="text-[11px] text-emerald-400 font-mono font-bold mt-1 text-right">
+                  {formatCurrency(budgetInputValue || 0)}
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowBudgetModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl"
+                >
+                  Batal
+                </button>
+                <button
+                  id="submit-save-budget-btn"
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/20"
+                >
+                  Simpan Nilai Budget
                 </button>
               </div>
             </form>
