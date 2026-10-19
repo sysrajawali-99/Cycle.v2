@@ -69,9 +69,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   unreadBlastCount = 0,
   onOpenDriveSync
 }) => {
+  const isSuperAdmin = currentUser?.role === 'Super Admin (HQ)';
+
   // Strict allowed views check: Super Admin gets full access; other users strictly get only selected menus
   const isViewAllowed = (viewId: AppView) => {
-    if (currentUser?.role === 'Super Admin (HQ)') {
+    if (isSuperAdmin) {
       return true;
     }
     const allowed = currentUser?.allowedViews ?? [];
@@ -757,48 +759,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* Footer Info Box */}
-        <div className="p-3 border-t border-slate-200 bg-slate-50 m-2 rounded-xl space-y-2">
-          <div className="flex items-center space-x-2 text-xs text-amber-700 font-semibold">
-            <Sparkles className="w-3.5 h-3.5 shrink-0" />
-            <span>Sistem Terintegrasi Lapangan</span>
-          </div>
-          <p className="text-[11px] text-slate-500 leading-relaxed">
-            Role-Based Access Control aktif. Hak akses dikelola oleh Super Admin HQ.
-          </p>
+        {/* Footer Info Box - Hanya terlihat untuk user Super Admin, tersembunyi untuk seluruh user lainnya */}
+        {isSuperAdmin && (
+          <div className="p-3 border-t border-slate-200 bg-slate-50 m-2 rounded-xl space-y-2">
+            <div className="flex items-center space-x-2 text-xs text-amber-700 font-semibold">
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              <span>Sistem Terintegrasi Lapangan</span>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Role-Based Access Control aktif. Hak akses dikelola oleh Super Admin HQ.
+            </p>
 
-          {onOpenDriveSync && (
-            <button
-              id="sidebar-gdrive-sync-btn"
-              type="button"
-              onClick={() => {
-                onOpenDriveSync();
-                onCloseMobile();
-              }}
-              className="w-full flex items-center justify-center space-x-1.5 py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 cursor-pointer shadow-xs transition-all group"
-            >
-              <Cloud className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform" />
-              <span>Google Drive Cloud Sync</span>
-            </button>
-          )}
-
-          {onResetData && (
-            <button
-              id="sidebar-reset-btn"
-              onClick={() => {
-                if (confirm('Apakah Anda yakin ingin mengosongkan seluruh data operasional sistem (0 Proyek, 0 Karyawan, 0 Stok, 0 Keuangan)?')) {
-                  onResetData();
+            {onOpenDriveSync && (
+              <button
+                id="sidebar-gdrive-sync-btn"
+                type="button"
+                onClick={() => {
+                  onOpenDriveSync();
                   onCloseMobile();
-                }
-              }}
-              className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 text-[11px] rounded-lg border border-slate-200 cursor-pointer"
-              title="Kosongkan seluruh data operasional sistem"
-            >
-              <Trash2 className="w-3 h-3 text-rose-500" />
-              <span>Kosongkan Data Sistem</span>
-            </button>
-          )}
-        </div>
+                }}
+                className="w-full flex items-center justify-center space-x-1.5 py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 cursor-pointer shadow-xs transition-all group"
+              >
+                <Cloud className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform" />
+                <span>Google Drive Cloud Sync</span>
+              </button>
+            )}
+
+            {onResetData && (
+              <button
+                id="sidebar-reset-btn"
+                onClick={() => {
+                  if (confirm('Apakah Anda yakin ingin mengosongkan seluruh data operasional sistem (0 Proyek, 0 Karyawan, 0 Stok, 0 Keuangan)?')) {
+                    onResetData();
+                    onCloseMobile();
+                  }
+                }}
+                className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 text-[11px] rounded-lg border border-slate-200 cursor-pointer"
+                title="Kosongkan seluruh data operasional sistem"
+              >
+                <Trash2 className="w-3 h-3 text-rose-500" />
+                <span>Kosongkan Data Sistem</span>
+              </button>
+            )}
+          </div>
+        )}
       </aside>
     </>
   );
