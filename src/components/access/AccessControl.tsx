@@ -259,6 +259,8 @@ export const AccessControl: React.FC<AccessControlProps> = ({
     role: UserRole;
     password: string;
     securityPin: string;
+    avatar: string;
+    status: 'Aktif' | 'Nonaktif';
     assignedProjectId: string;
     isLocationLocked: boolean;
     allowedViews: AppView[];
@@ -273,6 +275,8 @@ export const AccessControl: React.FC<AccessControlProps> = ({
     role: 'Admin Lokasi 1',
     password: 'password123',
     securityPin: '123456',
+    avatar: '👤',
+    status: 'Aktif',
     assignedProjectId: projects[0]?.id || 'proj-1',
     isLocationLocked: true,
     allowedViews: [
@@ -445,27 +449,44 @@ export const AccessControl: React.FC<AccessControlProps> = ({
     e.preventDefault();
     if (!selectedUserForEdit) return;
 
+    const existingTarget = users.find((u) => u.id === selectedUserForEdit.id);
+    const cleanUsername = selectedUserForEdit.username.trim();
+    const cleanName = selectedUserForEdit.name.trim();
+
+    const sanitizedUser: UserAccount = {
+      ...selectedUserForEdit,
+      name: cleanName,
+      username: cleanUsername,
+      email: selectedUserForEdit.email?.trim() || `${cleanUsername}@rajawali.co.id`,
+      password: selectedUserForEdit.password?.trim() || existingTarget?.password || 'password123',
+      securityPin: selectedUserForEdit.securityPin?.trim() || existingTarget?.securityPin || '123456',
+      status: selectedUserForEdit.status || 'Aktif'
+    };
+
     const updated = users.map((u) => {
-      if (u.id !== selectedUserForEdit.id) return u;
-      return selectedUserForEdit;
+      if (u.id !== sanitizedUser.id) return u;
+      return sanitizedUser;
     });
 
     onUpdateUsers(updated);
     setSelectedUserForEdit(null);
-    showToast(`Data dan konfigurasi akun ${selectedUserForEdit.name} berhasil disimpan.`);
+    showToast(`Data dan konfigurasi akun ${sanitizedUser.name} berhasil disimpan.`);
   };
 
   // Create new user account
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserForm.username.trim() || !newUserForm.name.trim()) {
+    const cleanUsername = newUserForm.username.trim();
+    const cleanName = newUserForm.name.trim();
+
+    if (!cleanUsername || !cleanName) {
       alert('Mohon lengkapi username dan nama pengguna.');
       return;
     }
 
     // check if username already exists
     const exists = users.some(
-      (u) => u.username.toLowerCase() === newUserForm.username.trim().toLowerCase()
+      (u) => Boolean(u.username) && u.username.trim().toLowerCase() === cleanUsername.toLowerCase()
     );
     if (exists) {
       alert('Username sudah digunakan oleh akun lain. Gunakan username unik.');
@@ -474,13 +495,13 @@ export const AccessControl: React.FC<AccessControlProps> = ({
 
     const newUser: UserAccount = {
       id: `user-${Date.now()}`,
-      username: newUserForm.username.trim(),
-      name: newUserForm.name.trim(),
-      email: newUserForm.email.trim() || `${newUserForm.username.trim()}@rajawali.co.id`,
+      username: cleanUsername,
+      name: cleanName,
+      email: newUserForm.email?.trim() || `${cleanUsername}@rajawali.co.id`,
       role: newUserForm.role,
-      password: newUserForm.password || 'password123',
-      securityPin: newUserForm.securityPin || '123456',
-      avatar: newUserForm.role === 'Super Admin (HQ)' ? '👑' : newUserForm.role === 'Admin Operasional' ? '🏢' : '📍',
+      password: newUserForm.password?.trim() || 'password123',
+      securityPin: newUserForm.securityPin?.trim() || '123456',
+      avatar: newUserForm.avatar || (newUserForm.role === 'Super Admin (HQ)' ? '👑' : newUserForm.role === 'Admin Operasional' ? '🏢' : '📍'),
       assignedProjectId: newUserForm.assignedProjectId,
       isLocationLocked: newUserForm.isLocationLocked,
       allowedViews: newUserForm.allowedViews,
@@ -488,7 +509,7 @@ export const AccessControl: React.FC<AccessControlProps> = ({
       canDeleteSops: newUserForm.role === 'Super Admin (HQ)' ? true : newUserForm.canDeleteSops,
       canApproveMaterialRequests: newUserForm.role === 'Super Admin (HQ)' ? true : newUserForm.canApproveMaterialRequests,
       canReviseMaterialRequests: newUserForm.role === 'Super Admin (HQ)' ? true : newUserForm.canReviseMaterialRequests,
-      status: 'Aktif'
+      status: newUserForm.status || 'Aktif'
     };
 
     onUpdateUsers([...users, newUser]);
@@ -500,6 +521,8 @@ export const AccessControl: React.FC<AccessControlProps> = ({
       role: 'Admin Lokasi 1',
       password: 'password123',
       securityPin: '123456',
+      avatar: '👤',
+      status: 'Aktif',
       assignedProjectId: projects[0]?.id || 'proj-1',
       isLocationLocked: true,
       allowedViews: ['dashboard', 'timesheet', 'employees', 'inventory', 'tasks', 'blast', 'sops', 'reports'],

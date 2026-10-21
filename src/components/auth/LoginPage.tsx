@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   Lock,
@@ -10,6 +10,7 @@ import {
   KeyRound
 } from 'lucide-react';
 import { UserAccount, CompanyProfile } from '../../types';
+import { storageService } from '../../services/storageService';
 
 interface LoginPageProps {
   users: UserAccount[];
@@ -31,46 +32,116 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const tagline = companyProfile?.tagline || 'Integrated Facility Services & Enterprise Management';
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Pre-fetch latest users from VPS / server when LoginPage mounts
+  useEffect(() => {
+    fetch('/api/vps/state/users', { signal: AbortSignal.timeout(6000) })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.success && Array.isArray(json?.data) && json.data.length > 0) {
+          storageService.saveRemoteState('users', json.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const checkUserCredentials = (
+    u: UserAccount,
+    cleanUsername: string,
+    rawPassword: string,
+    cleanPassword: string
+  ): boolean => {
+    const usernameMatch = Boolean(u.username) && u.username.trim().toLowerCase() === cleanUsername;
+    const emailMatch = Boolean(u.email) && u.email.trim().toLowerCase() === cleanUsername;
+
+    if (!usernameMatch && !emailMatch) {
+      return false;
+    }
+
+    const storedPass = u.password !== undefined && u.password !== null ? String(u.password) : '';
+    const storedPassClean = storedPass.trim();
+
+    return (
+      storedPass === rawPassword ||
+      storedPassClean === cleanPassword ||
+      cleanPassword === 'password123' ||
+      cleanPassword === 'admin123' ||
+      (!storedPassClean && (cleanPassword === 'password123' || cleanPassword === 'admin123'))
+    );
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setIsLoading(true);
 
-    setTimeout(() => {
-      const cleanUsername = usernameInput.trim().toLowerCase();
-      const user = users.find(
-        (u) =>
-          (u.username.toLowerCase() === cleanUsername || u.email.toLowerCase() === cleanUsername) &&
-          (u.password === passwordInput || passwordInput === 'password123' || passwordInput === 'admin123')
-      );
+    const cleanUsername = usernameInput.trim().toLowerCase();
+    const cleanPassword = passwordInput.trim();
 
-      if (!user) {
+    // 1. First check in current in-memory / local storage users
+    let activeUserList = users;
+    let user = activeUserList.find((u) =>
+      checkUserCredentials(u, cleanUsername, passwordInput, cleanPassword)
+    );
+
+    // 2. If not found in current memory, query live server state (handles newly added users on VPS)
+    if (!user) {
+      try {
+        const res = await fetch('/api/vps/state/users', {
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(6000)
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+            activeUserList = json.data;
+            storageService.saveRemoteState('users', json.data);
+            user = activeUserList.find((u) =>
+              checkUserCredentials(u, cleanUsername, passwordInput, cleanPassword)
+            );
+          }
+        }
+      } catch (err) {
+        console.warn('[LoginPage] Live user check failed, falling back:', err);
+      }
+    }
+
+    if (!user) {
+      // Check if username/email exists at all to provide clear feedback
+      const accountExists = activeUserList.some((u) => {
+        const uName = Boolean(u.username) && u.username.trim().toLowerCase() === cleanUsername;
+        const uMail = Boolean(u.email) && u.email.trim().toLowerCase() === cleanUsername;
+        return uName || uMail;
+      });
+
+      if (accountExists) {
+        setErrorMessage('Kata sandi (password) tidak sesuai. Silakan periksa kembali.');
+      } else {
         setErrorMessage('Username/Email atau Password tidak sesuai. Silakan periksa kembali kredensial Anda.');
-        setIsLoading(false);
-        return;
       }
-
-      if (user.status === 'Nonaktif') {
-        setErrorMessage('Akun Anda sedang dinonaktifkan oleh Super Admin. Silakan hubungi manajemen HQ.');
-        setIsLoading(false);
-        return;
-      }
-
-      // Successful login
-      const updatedUser: UserAccount = {
-        ...user,
-        lastLogin: new Date().toLocaleString('id-ID', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      };
-
       setIsLoading(false);
-      onLoginSuccess(updatedUser);
-    }, 450);
+      return;
+    }
+
+    if (user.status === 'Nonaktif') {
+      setErrorMessage('Akun Anda sedang dinonaktifkan oleh Super Admin. Silakan hubungi manajemen HQ.');
+      setIsLoading(false);
+      return;
+    }
+
+    // Successful login
+    const updatedUser: UserAccount = {
+      ...user,
+      lastLogin: new Date().toLocaleString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    };
+
+    setIsLoading(false);
+    onLoginSuccess(updatedUser);
   };
 
   return (
