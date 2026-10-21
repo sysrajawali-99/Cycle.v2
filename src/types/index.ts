@@ -154,6 +154,7 @@ export interface MaterialRequestItem {
   approvedQty?: number; // Qty yang disetujui / direvisi oleh approver
   unitPrice?: number;
   notes?: string;
+  isManual?: boolean; // Barang diketik manual / di luar Katalog Master
 }
 
 export interface MaterialRequest {
@@ -395,6 +396,7 @@ export interface UserAccount {
   canDeleteSops?: boolean; // Izin Hapus Dokumen SOP di Pusat SOP
   canApproveMaterialRequests?: boolean; // Izin Approval Permintaan Barang (Material Request)
   canReviseMaterialRequests?: boolean; // Izin Revisi Qty Permintaan Barang
+  canManageMasterCatalog?: boolean; // Izin Menambah / Mengelola Item di Katalog Master Chemical, Alat & APD
 }
 
 // =============================================================================

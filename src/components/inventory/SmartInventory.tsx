@@ -26,7 +26,8 @@ import {
   X,
   Info,
   Edit3,
-  Trash2
+  Trash2,
+  Lock
 } from 'lucide-react';
 import {
   Project,
@@ -573,6 +574,10 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
 
   // Execute Bulk Import
   const handleExecuteBulkImport = () => {
+    if (!canManageMaster) {
+      alert('Akses Ditolak: Hanya user yang dipilih oleh Super Admin yang dapat menambahkan isi Katalog Master Chemical, Alat & APD.');
+      return;
+    }
     const validItems = bulkParsedList.filter((item) => item.isValid);
     if (validItems.length === 0) {
       alert('Tidak ada data barang yang valid untuk di-import.');
@@ -899,6 +904,10 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
   // Handle Add Master Catalog Item
   const handleSaveMasterItem = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageMaster) {
+      alert('Akses Ditolak: Hanya user yang dipilih oleh Super Admin yang dapat menambahkan isi Katalog Master Chemical, Alat & APD.');
+      return;
+    }
     if (!masterForm.name.trim()) return;
 
     const newItem: InventoryItem = {
@@ -983,6 +992,7 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
   const recapProjectObj = projects.find((p) => p.id === recapProjectFilter);
 
   const isSuperAdmin = currentUser?.role === 'Super Admin (HQ)' || userRole === 'Super Admin (HQ)';
+  const canManageMaster = isSuperAdmin || Boolean(currentUser?.canManageMasterCatalog);
 
   const handleOpenBudgetModal = () => {
     setBudgetInputValue(activeProjectObj?.inventoryBudget || 0);
@@ -1040,58 +1050,72 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
             </div>
           </div>
 
-          {/* Project Site Selector & Location Budget Display */}
+          {/* Project Site Selector & Location Budget Display (Universal for Catalog) */}
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Nilai Budget / Saldo Lokasi */}
-            <div className="flex items-center space-x-2.5 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
-              <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
-                <DollarSign className="w-4 h-4" />
+            {activeTab === 'catalog' ? (
+              <div className="flex items-center space-x-2.5 bg-slate-950 px-3.5 py-2.5 rounded-xl border border-purple-500/40 text-xs shadow-inner">
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-400 animate-pulse" />
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-semibold">Cakupan Katalog Master:</span>
+                  <span className="font-extrabold text-purple-300">
+                    🌐 Berlaku Universal untuk Seluruh Lokasi / Proyek
+                  </span>
+                </div>
               </div>
-              <div>
-                <div className="text-[10px] text-slate-400 flex items-center space-x-1">
-                  <span>Budget / Saldo Lokasi:</span>
-                  {!isSuperAdmin && (
-                    <span className="text-[9px] bg-slate-800 text-slate-400 px-1 py-0.2 rounded font-mono" title="Hanya dapat ditentukan oleh Super Admin">
-                      Pusat
-                    </span>
+            ) : (
+              <>
+                {/* Nilai Budget / Saldo Lokasi */}
+                <div className="flex items-center space-x-2.5 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+                  <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                    <DollarSign className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 flex items-center space-x-1">
+                      <span>Budget / Saldo Lokasi:</span>
+                      {!isSuperAdmin && (
+                        <span className="text-[9px] bg-slate-800 text-slate-400 px-1 py-0.2 rounded font-mono" title="Hanya dapat ditentukan oleh Super Admin">
+                          Pusat
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs font-black font-mono text-emerald-400">
+                      {formatCurrency(activeProjectObj?.inventoryBudget || 0)}
+                    </div>
+                  </div>
+
+                  {/* Super Admin Action Button */}
+                  {isSuperAdmin && (
+                    <button
+                      type="button"
+                      id="btn-edit-inventory-budget"
+                      onClick={handleOpenBudgetModal}
+                      className="ml-1 px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[10.5px] font-bold flex items-center space-x-1 transition cursor-pointer"
+                      title="Atur / Sesuaikan Nilai Budget / Saldo Lokasi Ini (Khusus Super Admin)"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      <span>Atur Budget</span>
+                    </button>
                   )}
                 </div>
-                <div className="text-xs font-black font-mono text-emerald-400">
-                  {formatCurrency(activeProjectObj?.inventoryBudget || 0)}
+
+                {/* Project Site Selector */}
+                <div className="flex items-center space-x-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+                  <Building2 className="w-4 h-4 text-amber-400 shrink-0" />
+                  <select
+                    id="inventory-project-select"
+                    value={activeProjectFilter}
+                    onChange={(e) => setActiveProjectFilter(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-2"
+                  >
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                        📍 {p.name} ({p.code})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-
-              {/* Super Admin Action Button */}
-              {isSuperAdmin && (
-                <button
-                  type="button"
-                  id="btn-edit-inventory-budget"
-                  onClick={handleOpenBudgetModal}
-                  className="ml-1 px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[10.5px] font-bold flex items-center space-x-1 transition cursor-pointer"
-                  title="Atur / Sesuaikan Nilai Budget / Saldo Lokasi Ini (Khusus Super Admin)"
-                >
-                  <Edit3 className="w-3 h-3" />
-                  <span>Atur Budget</span>
-                </button>
-              )}
-            </div>
-
-            {/* Project Site Selector */}
-            <div className="flex items-center space-x-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
-              <Building2 className="w-4 h-4 text-amber-400 shrink-0" />
-              <select
-                id="inventory-project-select"
-                value={activeProjectFilter}
-                onChange={(e) => setActiveProjectFilter(e.target.value)}
-                className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-2"
-              >
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id} className="bg-slate-900 text-white">
-                    📍 {p.name} ({p.code})
-                  </option>
-                ))}
-              </select>
-            </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -1172,7 +1196,7 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
             }`}
           >
             <BarChart3 className="w-4 h-4" />
-            <span>Katalog Master Chemical & Alat</span>
+            <span>Katalog Master Chemical & Alat (Semua Lokasi)</span>
           </button>
         </div>
       </div>
@@ -1865,14 +1889,17 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
         <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden p-4 space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-bold text-white text-base">Katalog Master Chemical, Alat & APD</h3>
                 <span className="px-2 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 rounded-full text-xs font-black font-mono">
                   {inventoryItems.length} Item
                 </span>
+                <span className="px-2.5 py-0.5 bg-purple-500/15 text-purple-300 border border-purple-500/30 rounded-full text-[11px] font-bold">
+                  🌐 Berlaku untuk Semua Lokasi / Proyek
+                </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Daftar standarisasi bahan kimia pembersih, alat operasional, dan perlengkapan safety PT Rajawali.
+              <p className="text-xs text-slate-400 mt-1">
+                Standarisasi item chemical pembersih, alat operasional, dan perlengkapan APD berlaku seragam untuk seluruh lokasi proyek PT Rajawali. Penambahan data katalog master hanya diizinkan untuk user yang dipilih & diotorisasi oleh Super Admin.
               </p>
             </div>
 
@@ -1910,30 +1937,41 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
                 <span>Export Master (.xlsx)</span>
               </button>
 
-              {/* Bulk Upload Button */}
-              <button
-                id="btn-open-bulk-upload-inventory"
-                onClick={() => {
-                  setShowBulkModal(true);
-                  setBulkFile(null);
-                  setBulkParsedList([]);
-                  setBulkErrorMessage(null);
-                }}
-                className="flex items-center space-x-1.5 px-3.5 py-2 bg-blue-100 hover:bg-blue-200 text-blue-950 font-black text-xs rounded-xl border border-blue-300 shadow-sm transition cursor-pointer"
-              >
-                <Upload className="w-4 h-4 text-blue-950" />
-                <span>Upload Massal (Excel / CSV)</span>
-              </button>
+              {/* Bulk Upload & Add Master - Only for Authorized Users */}
+              {canManageMaster ? (
+                <>
+                  <button
+                    id="btn-open-bulk-upload-inventory"
+                    onClick={() => {
+                      setShowBulkModal(true);
+                      setBulkFile(null);
+                      setBulkParsedList([]);
+                      setBulkErrorMessage(null);
+                    }}
+                    className="flex items-center space-x-1.5 px-3.5 py-2 bg-blue-100 hover:bg-blue-200 text-blue-950 font-black text-xs rounded-xl border border-blue-300 shadow-sm transition cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4 text-blue-950" />
+                    <span>Upload Massal (Excel / CSV)</span>
+                  </button>
 
-              {/* Single Master Add */}
-              <button
-                id="add-master-item-btn"
-                onClick={() => setShowAddMasterModal(true)}
-                className="flex items-center space-x-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ Tambah Master</span>
-              </button>
+                  <button
+                    id="add-master-item-btn"
+                    onClick={() => setShowAddMasterModal(true)}
+                    className="flex items-center space-x-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Tambah Master</span>
+                  </button>
+                </>
+              ) : (
+                <div
+                  className="flex items-center space-x-2 px-3 py-2 bg-slate-950/80 text-slate-400 border border-slate-800 rounded-xl text-xs font-semibold"
+                  title="Hanya user yang dipilih dan diotorisasi oleh Super Admin yang dapat menambahkan isi Katalog Master Chemical, Alat & APD"
+                >
+                  <Lock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Tambah Master: Khusus User Pilihan Super Admin</span>
+                </div>
+              )}
             </div>
           </div>
 

@@ -268,6 +268,7 @@ export const AccessControl: React.FC<AccessControlProps> = ({
     canDeleteSops: boolean;
     canApproveMaterialRequests: boolean;
     canReviseMaterialRequests: boolean;
+    canManageMasterCatalog: boolean;
   }>({
     username: '',
     name: '',
@@ -293,7 +294,8 @@ export const AccessControl: React.FC<AccessControlProps> = ({
     canDeleteTasks: false,
     canDeleteSops: false,
     canApproveMaterialRequests: false,
-    canReviseMaterialRequests: false
+    canReviseMaterialRequests: false,
+    canManageMasterCatalog: false
   });
 
   const showToast = (msg: string) => {
@@ -363,6 +365,22 @@ export const AccessControl: React.FC<AccessControlProps> = ({
     });
     onUpdateUsers(updated);
     showToast(`Hak revisi kuota Material Request untuk ${target?.name || 'pengguna'} berhasil diperbarui.`);
+  };
+
+  // Toggle Master Catalog Management Permission directly in matrix
+  const handleToggleManageMasterCatalog = (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === 'Super Admin (HQ)') {
+      showToast('Super Admin selalu memiliki hak mengelola Katalog Master Chemical, Alat & APD.');
+      return;
+    }
+    const updated = users.map((u) => {
+      if (u.id !== userId) return u;
+      const nextVal = !u.canManageMasterCatalog;
+      return { ...u, canManageMasterCatalog: nextVal };
+    });
+    onUpdateUsers(updated);
+    showToast(`Hak kelola Katalog Master untuk ${target?.name || 'pengguna'} berhasil diperbarui.`);
   };
 
   // Toggle specific menu permission for a user directly in the matrix
@@ -509,6 +527,7 @@ export const AccessControl: React.FC<AccessControlProps> = ({
       canDeleteSops: newUserForm.role === 'Super Admin (HQ)' ? true : newUserForm.canDeleteSops,
       canApproveMaterialRequests: newUserForm.role === 'Super Admin (HQ)' ? true : newUserForm.canApproveMaterialRequests,
       canReviseMaterialRequests: newUserForm.role === 'Super Admin (HQ)' ? true : newUserForm.canReviseMaterialRequests,
+      canManageMasterCatalog: newUserForm.role === 'Super Admin (HQ)' ? true : newUserForm.canManageMasterCatalog,
       status: newUserForm.status || 'Aktif'
     };
 
@@ -529,7 +548,8 @@ export const AccessControl: React.FC<AccessControlProps> = ({
       canDeleteTasks: false,
       canDeleteSops: false,
       canApproveMaterialRequests: false,
-      canReviseMaterialRequests: false
+      canReviseMaterialRequests: false,
+      canManageMasterCatalog: false
     });
     showToast(`Akun pengguna baru ${newUser.name} berhasil dibuat.`);
   };
@@ -908,6 +928,12 @@ export const AccessControl: React.FC<AccessControlProps> = ({
                       <span className="text-[10px] normal-case text-sky-300 font-bold">Revisi Mat-Req</span>
                     </div>
                   </th>
+                  <th className="py-3.5 px-2 text-center min-w-[115px] bg-purple-950/30 border-r border-purple-900/30" title="Izin Menambah & Mengisi Katalog Master Chemical, Alat & APD">
+                    <div className="flex flex-col items-center justify-center space-y-1">
+                      <PackageCheck className="w-3.5 h-3.5 text-purple-400" />
+                      <span className="text-[10px] normal-case text-purple-300 font-bold">Kelola Master</span>
+                    </div>
+                  </th>
                   <th className="py-3.5 px-3 text-center min-w-[120px]">Aksi Akun</th>
                 </tr>
               </thead>
@@ -919,6 +945,7 @@ export const AccessControl: React.FC<AccessControlProps> = ({
                   const canDelTask = isSuperAdmin || Boolean(u.canDeleteTasks);
                   const canApproveMR = isSuperAdmin || Boolean(u.canApproveMaterialRequests);
                   const canReviseMR = isSuperAdmin || Boolean(u.canReviseMaterialRequests);
+                  const canManageMaster = isSuperAdmin || Boolean(u.canManageMasterCatalog);
 
                   return (
                     <tr key={u.id} className="hover:bg-slate-800/40 transition-colors">
@@ -1110,6 +1137,27 @@ export const AccessControl: React.FC<AccessControlProps> = ({
                           } ${isSuperAdmin ? 'opacity-80 cursor-default' : ''}`}
                         >
                           {canReviseMR ? <Check className="w-4 h-4" /> : <X className="w-3.5 h-3.5" />}
+                        </button>
+                      </td>
+
+                      {/* Toggle: Izin Kelola Master Katalog */}
+                      <td className="py-3 px-2 text-center bg-purple-950/20 border-r border-purple-900/30">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleManageMasterCatalog(u.id)}
+                          disabled={isSuperAdmin}
+                          title={
+                            isSuperAdmin
+                              ? 'Super Admin selalu memiliki hak mengelola Katalog Master Chemical, Alat & APD'
+                              : `Klik untuk ${canManageMaster ? 'Mencabut' : 'Memberikan'} izin menambah/mengisi Katalog Master`
+                          }
+                          className={`w-7 h-7 rounded-lg inline-flex items-center justify-center transition-all cursor-pointer ${
+                            canManageMaster
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50 hover:bg-rose-500/20 hover:text-rose-400'
+                              : 'bg-slate-800/80 text-slate-500 border border-slate-700 hover:bg-purple-500/20 hover:text-purple-300'
+                          } ${isSuperAdmin ? 'opacity-80 cursor-default' : ''}`}
+                        >
+                          {canManageMaster ? <Check className="w-4 h-4" /> : <X className="w-3.5 h-3.5" />}
                         </button>
                       </td>
 
@@ -1471,6 +1519,15 @@ export const AccessControl: React.FC<AccessControlProps> = ({
                             }
                           >
                             • Revisi Mat-Req: {isSuperAdmin || u.canReviseMaterialRequests ? 'Ya' : 'Tidak'}
+                          </span>
+                          <span
+                            className={
+                              isSuperAdmin || u.canManageMasterCatalog
+                                ? 'text-purple-400 font-semibold'
+                                : 'text-slate-500 line-through'
+                            }
+                          >
+                            • Kelola Master: {isSuperAdmin || u.canManageMasterCatalog ? 'Ya' : 'Tidak'}
                           </span>
                         </div>
                       </td>
@@ -2089,6 +2146,53 @@ export const AccessControl: React.FC<AccessControlProps> = ({
                         </label>
                       </div>
                     </div>
+
+                    {/* Special Permissions: Master Catalog Management */}
+                    <div className="bg-slate-950/80 border border-slate-800 p-3.5 rounded-xl space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 text-xs font-bold text-purple-400">
+                          <PackageCheck className="w-4 h-4" />
+                          <span>Otorisasi Katalog Master Chemical, Alat & APD (Pusat)</span>
+                        </div>
+                        {selectedUserForEdit.role === 'Super Admin (HQ)' && (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold">
+                            Super Admin (Hak Penuh)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Katalog Master berlaku universal untuk seluruh lokasi proyek. Hanya user yang diotorisasi Super Admin yang dapat menambah item baru atau upload masal ke Katalog Master.
+                      </p>
+
+                      <div className="pt-1">
+                        <label
+                          className={`flex items-center space-x-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                            selectedUserForEdit.canManageMasterCatalog || selectedUserForEdit.role === 'Super Admin (HQ)'
+                              ? 'bg-purple-500/10 border-purple-500/40 text-white'
+                              : 'bg-slate-900/60 border-slate-800 text-slate-400'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            disabled={selectedUserForEdit.role === 'Super Admin (HQ)'}
+                            checked={Boolean(selectedUserForEdit.canManageMasterCatalog) || selectedUserForEdit.role === 'Super Admin (HQ)'}
+                            onChange={(e) =>
+                              setSelectedUserForEdit({
+                                ...selectedUserForEdit,
+                                canManageMasterCatalog: e.target.checked
+                              })
+                            }
+                            className="rounded border-slate-700 bg-slate-900 text-purple-500 focus:ring-purple-400"
+                          />
+                          <div>
+                            <span className="font-bold text-purple-300 block">Izin Tambah / Kelola Katalog Master</span>
+                            <span className="text-[10px] text-slate-400">
+                              Dapat menambahkan item master baru dan upload masal spreadsheet ke Katalog Master
+                            </span>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2653,6 +2757,53 @@ export const AccessControl: React.FC<AccessControlProps> = ({
                           <div>
                             <span className="font-bold text-sky-300 block">Izin Revisi Qty Barang</span>
                             <span className="text-[10px] text-slate-400">Bisa menyesuaikan kuota qty item diajukan</span>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Special Permissions for New User: Master Catalog Management */}
+                    <div className="bg-slate-950/80 border border-slate-800 p-3.5 rounded-xl space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 text-xs font-bold text-purple-400">
+                          <PackageCheck className="w-4 h-4" />
+                          <span>Otorisasi Katalog Master Chemical, Alat & APD (Pusat)</span>
+                        </div>
+                        {newUserForm.role === 'Super Admin (HQ)' && (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-bold">
+                            Super Admin (Otomatis Aktif)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Katalog Master berlaku universal untuk seluruh lokasi proyek. Hanya user yang diotorisasi Super Admin yang dapat menambah item baru atau upload masal ke Katalog Master.
+                      </p>
+
+                      <div className="pt-1">
+                        <label
+                          className={`flex items-center space-x-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                            newUserForm.canManageMasterCatalog || newUserForm.role === 'Super Admin (HQ)'
+                              ? 'bg-purple-500/10 border-purple-500/40 text-white'
+                              : 'bg-slate-900/60 border-slate-800 text-slate-400'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            disabled={newUserForm.role === 'Super Admin (HQ)'}
+                            checked={newUserForm.canManageMasterCatalog || newUserForm.role === 'Super Admin (HQ)'}
+                            onChange={(e) =>
+                              setNewUserForm({
+                                ...newUserForm,
+                                canManageMasterCatalog: e.target.checked
+                              })
+                            }
+                            className="rounded border-slate-700 bg-slate-900 text-purple-500 focus:ring-purple-400"
+                          />
+                          <div>
+                            <span className="font-bold text-purple-300 block">Izin Tambah / Kelola Katalog Master</span>
+                            <span className="text-[10px] text-slate-400">
+                              Dapat menambahkan item master baru dan upload masal spreadsheet ke Katalog Master
+                            </span>
                           </div>
                         </label>
                       </div>

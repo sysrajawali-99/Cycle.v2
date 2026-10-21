@@ -374,7 +374,8 @@ export const INITIAL_USERS: UserAccount[] = [
     canDeleteTasks: true,
     canDeleteSops: true,
     canApproveMaterialRequests: true,
-    canReviseMaterialRequests: true
+    canReviseMaterialRequests: true,
+    canManageMasterCatalog: true
   },
   {
     id: 'user-finance',

@@ -41,7 +41,8 @@ import {
   MaterialRequestItem,
   MaterialRequestStatus,
   MaterialRequestPriority,
-  CompanyProfile
+  CompanyProfile,
+  InventoryCategory
 } from '../../types';
 import { formatCurrency, formatNumber, formatDateDDMMYYYY } from '../../utils/formatters';
 import { generateMaterialRequestPDF } from '../../utils/pdfExport';
@@ -804,17 +805,24 @@ export const MaterialRequestTab: React.FC<MaterialRequestTabProps> = ({
           request={requestForApproval}
           currentUser={currentUser}
           onClose={() => setRequestForApproval(null)}
-          onConfirm={(notes, applyStockImmediately) => {
+          onConfirm={(notes, applyStockImmediately, finalItems) => {
             const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
-            const updatedItems = requestForApproval.items.map((it) => ({
+            const sourceItems = finalItems || requestForApproval.items;
+            const updatedItems = sourceItems.map((it) => ({
               ...it,
               approvedQty: it.approvedQty !== undefined ? it.approvedQty : it.requestedQty
             }));
+
+            const totalEstimatedCost = updatedItems.reduce(
+              (acc, cur) => acc + (cur.unitPrice || 0) * (cur.approvedQty !== undefined ? cur.approvedQty : cur.requestedQty),
+              0
+            );
 
             const approvedRequest: MaterialRequest = {
               ...requestForApproval,
               status: 'APPROVED',
               items: updatedItems,
+              totalEstimatedCost,
               reviewedById: currentUser?.id,
               reviewedByName: currentUser?.name || 'Super Admin (HQ)',
               reviewedByRole: currentUser?.role || 'Super Admin (HQ)',
@@ -1002,43 +1010,25 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
     itemId: string;
     itemCode: string;
     itemName: string;
-    category: any;
+    category: InventoryCategory;
     unit: string;
     currentStock: number;
     requestedQty: number;
     unitPrice: number;
     notes: string;
+    isManual?: boolean;
   }
 
-  const [items, setItems] = useState<DraftItem[]>(() => {
-    const firstItem = inventoryItems[0];
-    if (!firstItem) return [];
-
-    const stock = projectStocks.find(
-      (ps) => ps.itemId === firstItem.id && ps.projectId === (defaultProjectId || projects[0]?.id || '')
-    );
-
-    return [
-      {
-        tempId: `ditem-${Date.now()}`,
-        itemId: firstItem.id,
-        itemCode: firstItem.code,
-        itemName: firstItem.name,
-        category: firstItem.category,
-        unit: firstItem.unit,
-        currentStock: stock ? stock.currentStock : 0,
-        requestedQty: 1,
-        unitPrice: firstItem.unitPrice || 0,
-        notes: ''
-      }
-    ];
-  });
+  // Daftar Item Barang yang Diajukan dikosongkan terlebih dahulu (tidak diisi dari sumber manapun)
+  const [items, setItems] = useState<DraftItem[]>([]);
+  const [activeSearchId, setActiveSearchId] = useState<string | null>(null);
 
   // When project changes, refresh the currentStock display of existing draft items
   const handleProjectChange = (newProjId: string) => {
     setProjectId(newProjId);
     setItems((prev) =>
       prev.map((it) => {
+        if (it.isManual || !it.itemId) return it;
         const stock = projectStocks.find(
           (ps) => ps.itemId === it.itemId && ps.projectId === newProjId
         );
@@ -1050,58 +1040,129 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
     );
   };
 
-  // Add new item row
+  // Add new blank item row
   const handleAddItemRow = () => {
-    // Pick an item from master that isn't already added, or default to first
-    const unusedItem =
-      inventoryItems.find((inv) => !items.some((it) => it.itemId === inv.id)) || inventoryItems[0];
-
-    if (!unusedItem) return;
-
-    const stock = projectStocks.find(
-      (ps) => ps.itemId === unusedItem.id && ps.projectId === projectId
-    );
-
+    const newId = `ditem-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     setItems((prev) => [
       ...prev,
       {
-        tempId: `ditem-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-        itemId: unusedItem.id,
-        itemCode: unusedItem.code,
-        itemName: unusedItem.name,
-        category: unusedItem.category,
-        unit: unusedItem.unit,
-        currentStock: stock ? stock.currentStock : 0,
+        tempId: newId,
+        itemId: '',
+        itemCode: '',
+        itemName: '',
+        category: 'Chemical',
+        unit: 'Pcs',
+        currentStock: 0,
         requestedQty: 1,
-        unitPrice: unusedItem.unitPrice || 0,
-        notes: ''
+        unitPrice: 0,
+        notes: '',
+        isManual: false
       }
     ]);
+    setActiveSearchId(newId);
   };
 
-  // Change selected item in a row
-  const handleRowItemSelect = (tempId: string, selectedItemId: string) => {
-    const found = inventoryItems.find((inv) => inv.id === selectedItemId);
-    if (!found) return;
-
+  // Select item from Master Catalog suggestion
+  const handleSelectMasterItem = (tempId: string, item: InventoryItem) => {
     const stock = projectStocks.find(
-      (ps) => ps.itemId === found.id && ps.projectId === projectId
+      (ps) => ps.itemId === item.id && ps.projectId === projectId
     );
-
     setItems((prev) =>
       prev.map((row) => {
         if (row.tempId !== tempId) return row;
         return {
           ...row,
-          itemId: found.id,
-          itemCode: found.code,
-          itemName: found.name,
-          category: found.category,
-          unit: found.unit,
+          itemId: item.id,
+          itemCode: item.code,
+          itemName: item.name,
+          category: item.category,
+          unit: item.unit,
           currentStock: stock ? stock.currentStock : 0,
-          unitPrice: found.unitPrice || 0
+          unitPrice: item.unitPrice || 0,
+          isManual: false
         };
       })
+    );
+    setActiveSearchId(null);
+  };
+
+  // Set item as Manual / Non-Master
+  const handleSetManualItem = (tempId: string, customName: string) => {
+    setItems((prev) =>
+      prev.map((row) => {
+        if (row.tempId !== tempId) return row;
+        return {
+          ...row,
+          itemId: `manual-${tempId}`,
+          itemCode: 'MANUAL',
+          itemName: customName,
+          category: row.category || 'Lainnya',
+          unit: row.unit || 'Pcs',
+          currentStock: 0,
+          unitPrice: row.unitPrice || 0,
+          isManual: true
+        };
+      })
+    );
+    setActiveSearchId(null);
+  };
+
+  // Handle typing inside item name column
+  const handleRowItemNameChange = (tempId: string, val: string) => {
+    setItems((prev) =>
+      prev.map((row) => {
+        if (row.tempId !== tempId) return row;
+        // Check if val matches a master item name exactly
+        const exactMatch = inventoryItems.find(
+          (inv) => inv.name.trim().toLowerCase() === val.trim().toLowerCase()
+        );
+        if (exactMatch) {
+          const stock = projectStocks.find(
+            (ps) => ps.itemId === exactMatch.id && ps.projectId === projectId
+          );
+          return {
+            ...row,
+            itemId: exactMatch.id,
+            itemCode: exactMatch.code,
+            itemName: val,
+            category: exactMatch.category,
+            unit: exactMatch.unit,
+            currentStock: stock ? stock.currentStock : 0,
+            unitPrice: exactMatch.unitPrice || 0,
+            isManual: false
+          };
+        }
+
+        return {
+          ...row,
+          itemName: val,
+          itemId: row.isManual ? row.itemId : '',
+          itemCode: row.isManual ? 'MANUAL' : '',
+          isManual: row.isManual || false
+        };
+      })
+    );
+  };
+
+  // Update row category
+  const handleRowCategoryChange = (tempId: string, cat: InventoryCategory) => {
+    setItems((prev) =>
+      prev.map((row) => (row.tempId === tempId ? { ...row, category: cat } : row))
+    );
+  };
+
+  // Update row unit
+  const handleRowUnitChange = (tempId: string, val: string) => {
+    setItems((prev) =>
+      prev.map((row) => (row.tempId === tempId ? { ...row, unit: val } : row))
+    );
+  };
+
+  // Update row unit price (bisa diisi sekarang atau nanti sebelum approval)
+  const handleRowPriceChange = (tempId: string, valStr: string) => {
+    const val = Math.max(0, parseInt(valStr, 10) || 0);
+    setItems((prev) =>
+      prev.map((row) => (row.tempId === tempId ? { ...row, unitPrice: val } : row))
     );
   };
 
@@ -1113,19 +1174,8 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
     );
   };
 
-  // Update row notes
-  const handleRowNotesChange = (tempId: string, val: string) => {
-    setItems((prev) =>
-      prev.map((row) => (row.tempId === tempId ? { ...row, notes: val } : row))
-    );
-  };
-
   // Remove row
   const handleRemoveRow = (tempId: string) => {
-    if (items.length <= 1) {
-      alert('Permintaan barang harus memiliki minimal 1 item!');
-      return;
-    }
     setItems((prev) => prev.filter((it) => it.tempId !== tempId));
   };
 
@@ -1182,24 +1232,34 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
       return;
     }
 
+    const emptyNameRow = items.find((it) => !it.itemName.trim());
+    if (emptyNameRow) {
+      alert('Mohon isi nama barang untuk semua baris item pengajuan!');
+      return;
+    }
+
     const selectedProj = projects.find((p) => p.id === projectId);
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const yearMonth = dateStr.replace('-', '').substring(0, 6);
     const requestCode = `MR-${yearMonth}-${String(existingRequestsCount + 1).padStart(3, '0')}`;
 
-    const formattedItems: MaterialRequestItem[] = items.map((it) => ({
-      id: `mri-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      itemId: it.itemId,
-      itemCode: it.itemCode,
-      itemName: it.itemName,
-      category: it.category,
-      unit: it.unit,
-      currentStockAtProject: it.currentStock,
-      requestedQty: it.requestedQty,
-      unitPrice: it.unitPrice,
-      notes: it.notes.trim() || undefined
-    }));
+    const formattedItems: MaterialRequestItem[] = items.map((it, idx) => {
+      const isManual = Boolean(it.isManual || !it.itemId || it.itemCode === 'MANUAL');
+      return {
+        id: `mri-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
+        itemId: it.itemId || `manual-${it.tempId}`,
+        itemCode: isManual ? 'MANUAL' : (it.itemCode || 'ITM'),
+        itemName: it.itemName.trim(),
+        category: it.category || 'Chemical',
+        unit: it.unit || 'Pcs',
+        currentStockAtProject: it.currentStock || 0,
+        requestedQty: Math.max(1, Number(it.requestedQty) || 1),
+        unitPrice: Math.max(0, Number(it.unitPrice) || 0),
+        notes: it.notes?.trim() || undefined,
+        isManual
+      };
+    });
 
     const newRequest: MaterialRequest = {
       id: `mr-${Date.now()}`,
@@ -1538,136 +1598,293 @@ const CreateMaterialRequestModal: React.FC<CreateMaterialRequestModalProps> = ({
                   Daftar Item Barang yang Diajukan ({items.length} item)
                 </span>
                 <span className="text-[11px] text-slate-400">
-                  Pilih item dari Katalog Master. Harga satuan otomatis termuat dan subtotal terhitung otomatis.
+                  Ketik nama atau kode barang untuk mencari di Katalog Master, atau ketik manual untuk barang baru/lainnya.
                 </span>
               </div>
               <button
                 type="button"
                 onClick={handleAddItemRow}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center space-x-1 transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center space-x-1.5 transition-colors cursor-pointer shadow-md shadow-amber-500/20"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Tambah Baris Item</span>
+                <span>+ Tambah Baris Item</span>
               </button>
             </div>
 
-            {/* Item Rows Container */}
-            <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
-              {items.map((row, index) => {
-                const rowSubtotal = (row.unitPrice || 0) * (row.requestedQty || 0);
-                return (
-                  <div
-                    key={row.tempId}
-                    className="bg-slate-950/80 border border-slate-800 p-3.5 rounded-xl flex flex-col md:flex-row items-start md:items-center gap-3"
-                  >
-                    {/* Index */}
-                    <div className="w-6 h-6 rounded-lg bg-slate-800 text-slate-400 text-xs font-bold flex items-center justify-center shrink-0">
-                      {index + 1}
-                    </div>
+            {/* Empty State when list is cleared initially */}
+            {items.length === 0 ? (
+              <div className="bg-slate-950/60 border border-dashed border-slate-800 rounded-2xl p-7 text-center space-y-3">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 mx-auto flex items-center justify-center">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div className="max-w-md mx-auto">
+                  <h4 className="font-bold text-white text-xs sm:text-sm">
+                    Daftar Item Barang Belum Ada (Kosong)
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                    Ketik langsung nama atau kode item barang di kolom pencarian. Jika barang tidak ada di Katalog Master, Anda dapat mengetik secara manual dan harga satuan dapat diisi nanti sebelum disetujui (approval).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddItemRow}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 inline-flex items-center space-x-1.5 cursor-pointer shadow-lg shadow-amber-500/20 transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Tambah Baris Item Pertama</span>
+                </button>
+              </div>
+            ) : (
+              /* Item Rows Container */
+              <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                {items.map((row, index) => {
+                  const rowSubtotal = (row.unitPrice || 0) * (row.requestedQty || 0);
+                  const isManualRow = Boolean(row.isManual || row.itemCode === 'MANUAL' || (!row.itemId && row.itemName.trim()));
 
-                    {/* Dropdown Item Selection from Master Catalog */}
-                    <div className="flex-1 min-w-[200px]">
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                        Pilih Master Item Chemical / Alat / APD
-                      </label>
-                      <select
-                        value={row.itemId}
-                        onChange={(e) => handleRowItemSelect(row.tempId, e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500/50"
-                      >
-                        {inventoryItems.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            [{item.code}] {item.name} ({item.unit}) - {item.category} {item.unitPrice ? `• ${formatCurrency(item.unitPrice)}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="flex items-center space-x-2 text-[10px] text-slate-400 mt-1">
-                        <span>Kategori: <strong className="text-slate-300">{row.category}</strong></span>
-                        <span>•</span>
-                        <span>Stok Proyek: <strong className="text-amber-400">{row.currentStock} {row.unit}</strong></span>
+                  // Search filter logic for typeahead
+                  const q = (row.itemName || '').toLowerCase().trim();
+                  const matchedItems = inventoryItems.filter(
+                    (inv) =>
+                      !q ||
+                      inv.name.toLowerCase().includes(q) ||
+                      inv.code.toLowerCase().includes(q) ||
+                      inv.category.toLowerCase().includes(q)
+                  ).slice(0, 8);
+
+                  return (
+                    <div
+                      key={row.tempId}
+                      className="bg-slate-950/90 border border-slate-800 p-3.5 rounded-xl flex flex-col md:flex-row items-start md:items-center gap-3 relative"
+                    >
+                      {/* Index */}
+                      <div className="w-6 h-6 rounded-lg bg-slate-800 text-slate-400 text-xs font-bold flex items-center justify-center shrink-0">
+                        {index + 1}
+                      </div>
+
+                      {/* Typeahead Search / Manual Input for Item */}
+                      <div className="flex-1 min-w-[240px] relative">
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[10px] font-semibold text-slate-400">
+                            Pilih Master Item Chemical / Alat / APD
+                          </label>
+                          {isManualRow ? (
+                            <span className="text-[9px] font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
+                              ✍️ Manual / Lainnya
+                            </span>
+                          ) : row.itemId ? (
+                            <span className="text-[9px] font-bold text-emerald-300 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                              ⭐ Katalog Master
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {/* Searchable input box */}
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={row.itemName}
+                            onFocus={() => setActiveSearchId(row.tempId)}
+                            onChange={(e) => {
+                              handleRowItemNameChange(row.tempId, e.target.value);
+                              setActiveSearchId(row.tempId);
+                            }}
+                            placeholder="Ketik huruf / angka barang (cth: Cl, Karbol, APD)..."
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 pr-7"
+                            required
+                          />
+                          {row.itemName && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleRowItemNameChange(row.tempId, '');
+                                setActiveSearchId(row.tempId);
+                              }}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs font-bold"
+                              title="Kosongkan ketikan"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Dropdown Suggestions List (Typeahead) */}
+                        {activeSearchId === row.tempId && (
+                          <div className="absolute z-40 left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-slate-800 text-xs">
+                            {matchedItems.length > 0 ? (
+                              matchedItems.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    handleSelectMasterItem(row.tempId, item);
+                                  }}
+                                  className="w-full text-left p-2.5 hover:bg-slate-800 flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-white truncate flex items-center gap-1.5">
+                                      <span>{item.name}</span>
+                                      <span className="text-[10px] font-mono text-amber-400">[{item.code}]</span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-400">
+                                      {item.category} • Satuan: <strong className="text-slate-300">{item.unit}</strong>
+                                    </div>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <span className="text-amber-400 font-mono font-bold text-xs block">
+                                      {formatCurrency(item.unitPrice || 0)}
+                                    </span>
+                                  </div>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="p-2.5 text-center text-slate-400 text-[11px]">
+                                Tidak ditemukan di Katalog Master
+                              </div>
+                            )}
+
+                            {/* Option to use custom/manual item if typed */}
+                            {row.itemName.trim() && (
+                              <button
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleSetManualItem(row.tempId, row.itemName.trim());
+                                }}
+                                className="w-full text-left p-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 flex items-center space-x-2 transition-colors cursor-pointer font-semibold border-t border-slate-800"
+                              >
+                                <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                <span className="truncate">
+                                  Ketik manual: <strong>"{row.itemName.trim()}"</strong> (Non-Master / Lainnya)
+                                </span>
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Metadata bawah input */}
+                        <div className="flex items-center space-x-2 text-[10px] text-slate-400 mt-1">
+                          {isManualRow ? (
+                            <div className="flex items-center space-x-1.5">
+                              <span>Kategori:</span>
+                              <select
+                                value={row.category}
+                                onChange={(e) => handleRowCategoryChange(row.tempId, e.target.value as InventoryCategory)}
+                                className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-slate-200"
+                              >
+                                <option value="Chemical">Chemical</option>
+                                <option value="Equipment">Equipment</option>
+                                <option value="Consumable">Consumable</option>
+                                <option value="Safety / APD">Safety / APD</option>
+                                <option value="Lainnya">Lainnya</option>
+                              </select>
+                            </div>
+                          ) : (
+                            <>
+                              <span>Kategori: <strong className="text-slate-300">{row.category}</strong></span>
+                              <span>•</span>
+                              <span>Stok Proyek: <strong className="text-amber-400">{row.currentStock} {row.unit}</strong></span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Satuan */}
+                      <div className="w-24 shrink-0">
+                        <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                          Satuan
+                        </label>
+                        {isManualRow ? (
+                          <input
+                            type="text"
+                            value={row.unit}
+                            onChange={(e) => handleRowUnitChange(row.tempId, e.target.value)}
+                            placeholder="Pcs"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-amber-300 text-center focus:outline-none focus:border-amber-500"
+                          />
+                        ) : (
+                          <div className="bg-slate-900/80 border border-slate-800 px-2 py-1.5 rounded-lg text-xs font-bold text-amber-300 truncate text-center">
+                            {row.unit}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Qty Input */}
+                      <div className="w-20 shrink-0">
+                        <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                          Qty Barang *
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={row.requestedQty}
+                          onChange={(e) => handleRowQtyChange(row.tempId, e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-500 text-center"
+                          required
+                        />
+                      </div>
+
+                      {/* Harga Satuan (Bisa diisi nanti sebelum approval) */}
+                      <div className="w-32 shrink-0">
+                        <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                          Harga Satuan (Rp)
+                        </label>
+                        {isManualRow || row.unitPrice === 0 ? (
+                          <div>
+                            <input
+                              type="number"
+                              min="0"
+                              value={row.unitPrice || ''}
+                              placeholder="0 (isi nanti)"
+                              onChange={(e) => handleRowPriceChange(row.tempId, e.target.value)}
+                              className="w-full bg-slate-900 border border-amber-500/40 rounded-lg px-2 py-1.5 text-xs font-mono font-bold text-amber-300 text-right focus:outline-none focus:border-amber-500"
+                            />
+                            <span className="text-[9px] text-slate-500 block text-right mt-0.5">
+                              Bisa diisi nanti
+                            </span>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="bg-slate-900/80 border border-slate-800 px-2 py-1.5 rounded-lg text-xs font-mono font-bold text-amber-300 truncate text-right">
+                              {formatCurrency(row.unitPrice || 0)}
+                            </div>
+                            <span className="text-[9px] text-slate-500 block text-right mt-0.5">
+                              per {row.unit}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Subtotal Item */}
+                      <div className="w-28 shrink-0">
+                        <label className="block text-[10px] font-semibold text-slate-400 mb-1">
+                          Subtotal (Rp)
+                        </label>
+                        <div className="bg-slate-900/90 border border-slate-800 px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold text-emerald-400 truncate text-right">
+                          {formatCurrency(rowSubtotal)}
+                        </div>
+                        <span className="text-[9px] text-slate-500 block text-right mt-0.5">
+                          {row.requestedQty} × {formatCurrency(row.unitPrice || 0)}
+                        </span>
+                      </div>
+
+
+                      {/* Delete Action */}
+                      <div className="flex items-center shrink-0 pt-3 md:pt-4">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveRow(row.tempId)}
+                          className="p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="Hapus baris item ini"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-
-                    {/* Satuan (Auto Displayed) */}
-                    <div className="w-20 shrink-0">
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                        Satuan
-                      </label>
-                      <div className="bg-slate-900/80 border border-slate-800 px-2 py-1.5 rounded-lg text-xs font-bold text-amber-300 truncate text-center">
-                        {row.unit}
-                      </div>
-                    </div>
-
-                    {/* Qty Input */}
-                    <div className="w-24 shrink-0">
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                        Qty Barang *
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={row.requestedQty}
-                        onChange={(e) => handleRowQtyChange(row.tempId, e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-amber-500/50 text-center"
-                        required
-                      />
-                    </div>
-
-                    {/* Harga Satuan dari Master Catalog */}
-                    <div className="w-32 shrink-0">
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                        Harga Satuan (Rp)
-                      </label>
-                      <div className="bg-slate-900/80 border border-slate-800 px-2 py-1.5 rounded-lg text-xs font-mono font-bold text-amber-300 truncate text-right">
-                        {formatCurrency(row.unitPrice || 0)}
-                      </div>
-                      <span className="text-[9px] text-slate-500 block text-right mt-0.5">
-                        per {row.unit}
-                      </span>
-                    </div>
-
-                    {/* Subtotal Item */}
-                    <div className="w-32 shrink-0">
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                        Subtotal (Rp)
-                      </label>
-                      <div className="bg-slate-900/90 border border-slate-800 px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold text-emerald-400 truncate text-right">
-                        {formatCurrency(rowSubtotal)}
-                      </div>
-                      <span className="text-[9px] text-slate-500 block text-right mt-0.5">
-                        {row.requestedQty} × {formatCurrency(row.unitPrice || 0)}
-                      </span>
-                    </div>
-
-                    {/* Notes per item */}
-                    <div className="flex-1 min-w-[140px]">
-                      <label className="block text-[10px] font-semibold text-slate-400 mb-1">
-                        Catatan (Opsional)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Contoh: khusus lantai 3"
-                        value={row.notes}
-                        onChange={(e) => handleRowNotesChange(row.tempId, e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
-                      />
-                    </div>
-
-                    {/* Delete Action */}
-                    <div className="flex items-center shrink-0 pt-3 md:pt-0">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveRow(row.tempId)}
-                        className="p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
-                        title="Hapus baris item ini"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Total Items, Quantity & Grand Total Price Summary Bar */}
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
@@ -1790,6 +2007,13 @@ const ReviseMaterialRequestModal: React.FC<ReviseMaterialRequestModalProps> = ({
     );
   };
 
+  const handlePriceChange = (itemId: string, val: string) => {
+    const price = Math.max(0, parseInt(val, 10) || 0);
+    setItems((prev) =>
+      prev.map((it) => (it.id === itemId ? { ...it, unitPrice: price } : it))
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -1800,7 +2024,7 @@ const ReviseMaterialRequestModal: React.FC<ReviseMaterialRequestModalProps> = ({
 
     const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
 
-    // Recalculate total estimated cost with revised qty
+    // Recalculate total estimated cost with revised qty and prices
     const totalEstimatedCost = items.reduce(
       (acc, cur) => acc + (cur.unitPrice || 0) * (cur.approvedQty !== undefined ? cur.approvedQty : cur.requestedQty),
       0
@@ -1852,17 +2076,17 @@ const ReviseMaterialRequestModal: React.FC<ReviseMaterialRequestModalProps> = ({
           <div className="bg-sky-950/30 border border-sky-500/30 p-3.5 rounded-xl text-xs text-sky-200">
             <div className="font-bold flex items-center space-x-1.5 text-sky-300">
               <Info className="w-4 h-4" />
-              <span>Otorisasi Penyesuaian Kuota (Super Admin / Approver)</span>
+              <span>Otorisasi Penyesuaian Kuota & Harga (Super Admin / Approver)</span>
             </div>
             <p className="text-slate-300 mt-1 leading-relaxed">
-              Anda dapat menyesuaikan jumlah kuota barang yang disetujui (misalnya disesuaikan dengan ketersediaan gudang logistik atau efisiensi anggaran lokasi).
+              Anda dapat menyesuaikan jumlah kuota barang yang disetujui serta mengisi / merevisi harga satuan jika barang diajukan secara manual atau belum memiliki harga.
             </p>
           </div>
 
           {/* Table of Items for Revision */}
           <div className="space-y-3">
             <label className="block text-xs font-bold text-white">
-              Daftar Penyesuaian Qty Item Barang
+              Daftar Penyesuaian Qty & Harga Item Barang
             </label>
             <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
               {items.map((item, idx) => {
@@ -1875,14 +2099,21 @@ const ReviseMaterialRequestModal: React.FC<ReviseMaterialRequestModalProps> = ({
                     key={item.id || idx}
                     className="bg-slate-950 border border-slate-800 p-3 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
                   >
-                    <div className="min-w-[200px]">
-                      <div className="font-bold text-white text-xs">{item.itemName}</div>
+                    <div className="min-w-[180px] flex-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-white text-xs">{item.itemName}</span>
+                        {(item.isManual || item.itemCode === 'MANUAL') && (
+                          <span className="text-[9px] font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
+                            Manual
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-slate-400">
                         Kode: {item.itemCode} • Satuan: <span className="text-amber-400 font-bold">{item.unit}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-4">
+                    <div className="flex flex-wrap items-center gap-3">
                       {/* Original Requested */}
                       <div className="text-center">
                         <span className="text-[10px] text-slate-500 block">Qty Diajukan</span>
@@ -1891,10 +2122,10 @@ const ReviseMaterialRequestModal: React.FC<ReviseMaterialRequestModalProps> = ({
                         </span>
                       </div>
 
-                      <ArrowRight className="w-4 h-4 text-slate-600" />
+                      <ArrowRight className="w-3.5 h-3.5 text-slate-600 hidden sm:block" />
 
                       {/* Approved / Revised Input */}
-                      <div className="text-center w-28">
+                      <div className="text-center w-24">
                         <span className="text-[10px] font-bold text-sky-300 block">Qty Disetujui *</span>
                         <input
                           type="number"
@@ -1906,8 +2137,21 @@ const ReviseMaterialRequestModal: React.FC<ReviseMaterialRequestModalProps> = ({
                         />
                       </div>
 
+                      {/* Harga Satuan Input */}
+                      <div className="text-center w-28">
+                        <span className="text-[10px] font-bold text-amber-300 block">Harga (Rp)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.unitPrice || ''}
+                          placeholder="0"
+                          onChange={(e) => handlePriceChange(item.id, e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono font-bold text-right text-amber-300 focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+
                       {/* Delta Indicator */}
-                      <div className="text-center min-w-[70px]">
+                      <div className="text-center min-w-[55px]">
                         <span className="text-[10px] text-slate-500 block">Selisih</span>
                         <span
                           className={`text-xs font-bold ${
@@ -1993,7 +2237,7 @@ interface ApproveModalProps {
   request: MaterialRequest;
   currentUser: UserAccount | null;
   onClose: () => void;
-  onConfirm: (notes: string, applyStockImmediately: boolean) => void;
+  onConfirm: (notes: string, applyStockImmediately: boolean, updatedItems?: MaterialRequestItem[]) => void;
 }
 
 const ApproveMaterialRequestModal: React.FC<ApproveModalProps> = ({
@@ -2004,14 +2248,36 @@ const ApproveMaterialRequestModal: React.FC<ApproveModalProps> = ({
 }) => {
   const [notes, setNotes] = useState<string>('Disetujui untuk pengadaan stok lokasi proyek.');
   const [applyStockImmediately, setApplyStockImmediately] = useState<boolean>(true);
+  const [approvalItems, setApprovalItems] = useState<MaterialRequestItem[]>(() =>
+    request.items.map((it) => ({ ...it }))
+  );
+
+  const handlePriceChange = (itemId: string, val: string) => {
+    const price = Math.max(0, parseInt(val, 10) || 0);
+    setApprovalItems((prev) =>
+      prev.map((it) => (it.id === itemId ? { ...it, unitPrice: price } : it))
+    );
+  };
+
+  const currentTotal = useMemo(() => {
+    return approvalItems.reduce(
+      (acc, cur) => acc + (cur.unitPrice || 0) * (cur.approvedQty !== undefined ? cur.approvedQty : cur.requestedQty),
+      0
+    );
+  }, [approvalItems]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="bg-slate-950/80 px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 my-8">
+        <div className="bg-slate-950/80 px-6 py-4 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center space-x-2.5 text-emerald-400">
             <CheckCircle2 className="w-5 h-5" />
-            <h3 className="font-bold text-white text-base">Persetujuan Material Request</h3>
+            <div>
+              <h3 className="font-bold text-white text-base">Persetujuan Material Request</h3>
+              <p className="text-[11px] text-slate-400">
+                {request.requestCode} • {request.projectName}
+              </p>
+            </div>
           </div>
           <button
             type="button"
@@ -2022,10 +2288,72 @@ const ApproveMaterialRequestModal: React.FC<ApproveModalProps> = ({
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
           <p className="text-xs text-slate-300 leading-relaxed">
-            Anda akan menyetujui Material Request <strong>{request.requestCode}</strong> untuk lokasi <strong>{request.projectName}</strong> dengan total <strong>{request.totalItems} item</strong>.
+            Anda akan menyetujui Material Request <strong>{request.requestCode}</strong> untuk lokasi <strong>{request.projectName}</strong>. Jika terdapat barang manual atau harga belum ditentukan, Anda dapat mengisi / menyesuaikan harga satuan sebelum menyetujui.
           </p>
+
+          {/* Table of items with editable prices */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-white">
+              <span>Daftar Item & Verifikasi Harga Satuan:</span>
+              <span className="text-[11px] text-amber-400 font-mono">
+                Total Estimasi: {formatCurrency(currentTotal)}
+              </span>
+            </div>
+
+            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+              {approvalItems.map((item, idx) => {
+                const isManual = item.isManual || item.itemCode === 'MANUAL';
+                const subtotal = (item.unitPrice || 0) * (item.approvedQty !== undefined ? item.approvedQty : item.requestedQty);
+
+                return (
+                  <div
+                    key={item.id || idx}
+                    className="bg-slate-950 border border-slate-800 p-2.5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-white truncate">{item.itemName}</span>
+                        {isManual && (
+                          <span className="text-[9px] font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
+                            Manual
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        Qty: <strong className="text-amber-400">{item.requestedQty} {item.unit}</strong> • Kategori: {item.category}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 w-full sm:w-auto justify-end">
+                      <div className="w-32">
+                        <span className="text-[9px] text-slate-400 block mb-0.5">Harga Satuan (Rp)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.unitPrice || ''}
+                          placeholder="0 (isi harga)"
+                          onChange={(e) => handlePriceChange(item.id, e.target.value)}
+                          className={`w-full bg-slate-900 border rounded-lg px-2 py-1 text-xs font-mono font-bold text-right text-white focus:outline-none ${
+                            !item.unitPrice || item.unitPrice === 0
+                              ? 'border-amber-500/60 text-amber-300'
+                              : 'border-slate-700'
+                          }`}
+                        />
+                      </div>
+                      <div className="text-right min-w-[90px]">
+                        <span className="text-[9px] text-slate-400 block mb-0.5">Subtotal</span>
+                        <span className="font-mono font-bold text-emerald-400 text-xs block">
+                          {formatCurrency(subtotal)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-1">
@@ -2060,14 +2388,14 @@ const ApproveMaterialRequestModal: React.FC<ApproveModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
             >
               Batal
             </button>
             <button
               type="button"
-              onClick={() => onConfirm(notes, applyStockImmediately)}
-              className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20"
+              onClick={() => onConfirm(notes, applyStockImmediately, approvalItems)}
+              className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 cursor-pointer"
             >
               Konfirmasi Setujui
             </button>
