@@ -623,11 +623,12 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     const hourlyRate = employee.dailyRate > 0 ? Math.round(employee.dailyRate / 8) : 0;
     const lemburPay = Math.round(hourlyRate * lemburHours);
 
-    // Jika belum diinput manual di modal, otomatis gunakan lemburPay
-    const effectiveBonus = bonus > 0 ? bonus : lemburPay;
-    const bonusReason = bonusReasons.length > 0 
-      ? bonusReasons.join('; ') 
-      : (lemburHours > 0 ? `Lembur ${lemburHours} Jam` : '');
+    // Aturan: Jika data lembur tidak ada (lembur === 0 dan lemburHours === 0), insentif lembur harus kosong (0)
+    const hasLemburData = lembur > 0 || lemburHours > 0;
+    const effectiveBonus = hasLemburData ? (bonus > 0 ? bonus : lemburPay) : 0;
+    const bonusReason = hasLemburData
+      ? (bonusReasons.length > 0 ? bonusReasons.join('; ') : (lemburHours > 0 ? `Lembur ${lemburHours} Jam` : ''))
+      : '';
 
     const grossPay = hadir * employee.dailyRate + effectiveBonus;
     const netPay = Math.max(0, grossPay - deduction);
@@ -1779,17 +1780,20 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
 
                       <button
                         id={`edit-deduction-btn-${emp.id}`}
-                        onClick={() =>
+                        onClick={() => {
+                          const periodOvertime = getEmployeePeriodOvertime(emp);
+                          const hasLembur = periodOvertime.totalHours > 0 || stats.lembur > 0;
+                          const initialBonus = hasLembur ? (stats.bonus > 0 ? stats.bonus : stats.lemburPay) : 0;
                           setEditingDeduction({
                             employee: emp,
                             targetMonth: endMonth,
                             targetYear: endYear,
                             amount: stats.deduction,
                             reason: stats.deductionReason,
-                            bonus: stats.bonus > 0 ? stats.bonus : stats.lemburPay,
-                            bonusReason: stats.bonusReason
-                          })
-                        }
+                            bonus: initialBonus,
+                            bonusReason: hasLembur ? stats.bonusReason : ''
+                          });
+                        }}
                         className="flex items-center space-x-1 text-amber-400 hover:underline font-semibold cursor-pointer"
                       >
                         <Edit3 className="w-3 h-3" />
@@ -2079,17 +2083,20 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                             )}
                             <button
                               id={`matrix-edit-deduction-btn-${emp.id}`}
-                              onClick={() =>
+                              onClick={() => {
+                                const periodOvertime = getEmployeePeriodOvertime(emp);
+                                const hasLembur = periodOvertime.totalHours > 0 || stats.lembur > 0;
+                                const initialBonus = hasLembur ? (stats.bonus > 0 ? stats.bonus : stats.lemburPay) : 0;
                                 setEditingDeduction({
                                   employee: emp,
                                   targetMonth: endMonth,
                                   targetYear: endYear,
                                   amount: stats.deduction,
                                   reason: stats.deductionReason,
-                                  bonus: stats.bonus > 0 ? stats.bonus : stats.lemburPay,
-                                  bonusReason: stats.bonusReason
-                                })
-                              }
+                                  bonus: initialBonus,
+                                  bonusReason: hasLembur ? stats.bonusReason : ''
+                                });
+                              }}
                               className="text-[11px] font-bold text-amber-400 hover:text-amber-300 hover:underline cursor-pointer flex items-center gap-1 mt-0.5"
                             >
                               <Edit3 className="w-3 h-3" />
@@ -2210,11 +2217,11 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       type="number"
                       min="0"
                       step="5000"
-                      value={editingDeduction.amount}
+                      value={editingDeduction.amount === 0 ? '' : editingDeduction.amount}
                       onChange={(e) =>
                         setEditingDeduction({
                           ...editingDeduction,
-                          amount: Number(e.target.value)
+                          amount: e.target.value === '' ? 0 : Number(e.target.value)
                         })
                       }
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-rose-300 focus:outline-none focus:border-rose-500"
@@ -2296,17 +2303,22 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       type="number"
                       min="0"
                       step="5000"
-                      value={editingDeduction.bonus}
+                      value={editingDeduction.bonus === 0 ? '' : editingDeduction.bonus}
                       onChange={(e) =>
                         setEditingDeduction({
                           ...editingDeduction,
-                          bonus: Number(e.target.value)
+                          bonus: e.target.value === '' ? 0 : Number(e.target.value)
                         })
                       }
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
                       placeholder="0"
                     />
                   </div>
+                  {periodOvertime.totalHours === 0 && (
+                    <p className="text-[10px] text-slate-400 mt-1 italic">
+                      *Data lembur tidak tercatat pada periode ini (0 Jam). Kolom dibiarkan kosong bila tidak ada lembur.
+                    </p>
+                  )}
                 </div>
 
                 {/* Alasan / Keterangan Insentif / Tambahan Lembur */}

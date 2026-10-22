@@ -451,25 +451,23 @@ function countActiveRecords(data: any): number {
 
 function checkServerGuard(key: string, oldData: any, incomingData: any, finalData: any): void {
   if (Array.isArray(oldData) && oldData.length > 0) {
-    // 1. Guard mengosongkan key yang berisi
-    if (Array.isArray(incomingData) && incomingData.length === 0) {
+    // 1. Guard pengosongan data jika server memiliki record tersimpan
+    if (Array.isArray(finalData) && finalData.length === 0) {
       console.warn(
-        `[GUARD] Ditolak: Kiriman array kosong untuk key=${key} sedangkan server memiliki ${oldData.length} record.`
+        `[GUARD] Ditolak: finalData kosong untuk key=${key} sedangkan server memiliki ${oldData.length} record.`
       );
       throw new Error(
         `[GUARD] Kiriman ditolak karena array kosong berpotensi menimpa data server (${oldData.length} data tersimpan).`
       );
     }
 
-    // 2. Guard pengurangan record non-deletedAt
-    const oldActiveCount = countActiveRecords(oldData);
-    const finalActiveCount = countActiveRecords(finalData);
-    if (finalActiveCount < oldActiveCount) {
+    // 2. Guard pengurangan record total (Rule 4: record terhapus tetap berada di array dengan deletedAt)
+    if (Array.isArray(finalData) && finalData.length < oldData.length) {
       console.warn(
-        `[GUARD] Ditolak: Jumlah record non-deletedAt untuk key=${key} berkurang. Sebelum=${oldActiveCount}, Sesudah=${finalActiveCount}.`
+        `[GUARD] Ditolak: Jumlah record untuk key=${key} berkurang dari ${oldData.length} menjadi ${finalData.length}. Record lama wajib dipertahankan atau menggunakan deletedAt.`
       );
       throw new Error(
-        `[GUARD] Ditolak: Jumlah record non-deletedAt untuk key=${key} berkurang dari ${oldActiveCount} menjadi ${finalActiveCount}.`
+        `[GUARD] Ditolak: Jumlah record untuk key=${key} berkurang dari ${oldData.length} menjadi ${finalData.length}.`
       );
     }
   }
@@ -530,6 +528,15 @@ export async function saveVpsState(
         [key]
       );
       const oldData = res.rows.length > 0 ? res.rows[0].data : null;
+
+      // Guard: Kiriman array kosong tidak boleh menimpa data server yang tidak kosong (PROTOKOL_DATA Rule 6)
+      if (Array.isArray(oldData) && oldData.length > 0 && Array.isArray(data) && data.length === 0) {
+        console.warn(
+          `[VPS GUARD] Kiriman array kosong untuk key=${key} dicegah menimpa ${oldData.length} record tersimpan di server. Mengembalikan data server utuh.`
+        );
+        await client.query('COMMIT');
+        return oldData;
+      }
 
       // Merge data
       let finalData = data;
@@ -608,6 +615,14 @@ export async function saveVpsState(
     const store = readLocalStore();
     const oldData = store[key];
 
+    // Guard: Kiriman array kosong tidak boleh menimpa data server yang tidak kosong (PROTOKOL_DATA Rule 6)
+    if (Array.isArray(oldData) && oldData.length > 0 && Array.isArray(data) && data.length === 0) {
+      console.warn(
+        `[VPS GUARD] Kiriman array kosong untuk key=${key} dicegah menimpa ${oldData.length} record tersimpan di server. Mengembalikan data server utuh.`
+      );
+      return oldData;
+    }
+
     let finalData = data;
     if (Array.isArray(oldData) && Array.isArray(data)) {
       finalData = mergeIdArrays(oldData, data);
@@ -656,6 +671,14 @@ export async function saveVpsState(
   // 3. Fallback: Only used if engine = local_file
   const store = readLocalStore();
   const oldData = store[key];
+
+  // Guard: Kiriman array kosong tidak boleh menimpa data server yang tidak kosong (PROTOKOL_DATA Rule 6)
+  if (Array.isArray(oldData) && oldData.length > 0 && Array.isArray(data) && data.length === 0) {
+    console.warn(
+      `[VPS GUARD] Kiriman array kosong untuk key=${key} dicegah menimpa ${oldData.length} record tersimpan di server. Mengembalikan data server utuh.`
+    );
+    return oldData;
+  }
 
   let finalData = data;
   if (Array.isArray(oldData) && Array.isArray(data)) {

@@ -295,6 +295,11 @@ export default function App() {
     });
   };
 
+  const handleUpdateInventoryLogs = (updated: InventoryLog[]) => {
+    setInventoryLogs(updated);
+    storageService.saveInventoryLogs(updated);
+  };
+
   const handleAddMasterItem = (item: InventoryItem) => {
     setInventoryItems((prev) => {
       const nextItems = [...prev, item];
@@ -922,6 +927,7 @@ export default function App() {
                 selectedProjectId={selectedProjectId}
                 onUpdateStocks={handleUpdateStocks}
                 onAddLog={handleAddInventoryLog}
+                onUpdateLogs={handleUpdateInventoryLogs}
                 onAddMasterItem={handleAddMasterItem}
                 onUpdateInventoryItems={handleUpdateInventoryItems}
                 userRole={currentUser.role}

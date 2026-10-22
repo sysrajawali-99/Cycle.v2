@@ -336,8 +336,8 @@ function writeProcessedRecords<T extends Record<string, any>>(
             deletedAt: old.deletedAt,
             updatedAt: old.updatedAt || now
           });
-        } else if (incomingRecords.length > 0) {
-          // Explicit user deletion: incoming list is non-empty and missing this item
+        } else {
+          // Explicit user deletion: item is missing from incoming list, mark as soft-deleted
           preservedDeleted.push({
             ...old,
             id: oldId,
@@ -413,6 +413,13 @@ function writeStorageRecords<T extends Record<string, any>>(
   }
 
   const fullData = writeProcessedRecords<T>(storageKey, incomingData, actionKey);
+
+  // Guard Rule 6: JANGAN PERNAH menulis atau mengirim array kosong ke storage bila ada record tersimpan
+  if (Array.isArray(fullData) && fullData.length === 0 && existingCount > 0) {
+    console.warn(`[Storage Guard] Attempted to write empty array to ${storageKey} while ${existingCount} items exist. Aborted.`);
+    return;
+  }
+
   applyStorageUpdate(actionKey, storageKey, fullData, customEvent, 'user_action');
 }
 
@@ -537,7 +544,28 @@ export const storageService = {
       initStorageQuietly(STORAGE_KEYS.TIMESHEETS, initialTS);
       return readProcessedRecords<TimesheetMonthRecord>(initialTS);
     }
-    return readStorageRecords<TimesheetMonthRecord>(STORAGE_KEYS.TIMESHEETS, []);
+    const list = readStorageRecords<TimesheetMonthRecord>(STORAGE_KEYS.TIMESHEETS, []);
+    let needsUpdate = false;
+    const sanitized = list.map((ts) => {
+      if (ts && typeof ts === 'object' && ts.bonusAmount && ts.bonusAmount > 0) {
+        const hasL = Object.values(ts.days || {}).some(
+          (v) => v === 'L' || v === 'HL' || (v as string) === 'H+L'
+        );
+        const hasOvt = ts.overtimeHours && Object.values(ts.overtimeHours).some((h) => Number(h) > 0);
+        if (!hasL && !hasOvt && !ts.bonusReason) {
+          needsUpdate = true;
+          return { ...ts, bonusAmount: 0 };
+        }
+      }
+      return ts;
+    });
+
+    if (needsUpdate) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.TIMESHEETS, JSON.stringify(sanitized));
+      } catch {}
+    }
+    return sanitized;
   },
 
   saveTimesheets(data: TimesheetMonthRecord[]) {

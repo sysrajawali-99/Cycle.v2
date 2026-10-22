@@ -71,6 +71,7 @@ interface SmartInventoryProps {
   selectedProjectId: string;
   onUpdateStocks: (updated: ProjectStock[]) => void;
   onAddLog: (log: InventoryLog) => void;
+  onUpdateLogs?: (logs: InventoryLog[]) => void;
   onAddMasterItem: (item: InventoryItem) => void;
   onUpdateInventoryItems?: (items: InventoryItem[]) => void;
   userRole: UserRole;
@@ -91,6 +92,7 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
   selectedProjectId = 'ALL',
   onUpdateStocks,
   onAddLog,
+  onUpdateLogs,
   onAddMasterItem,
   onUpdateInventoryItems,
   userRole,
@@ -170,6 +172,13 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
     itemName: string;
   } | null>(null);
   const [clearLocationConfirm, setClearLocationConfirm] = useState<boolean>(false);
+
+  // Super Admin Delete Menu Modal State
+  const [deleteTabModal, setDeleteTabModal] = useState<
+    'stocks' | 'requests' | 'recap' | 'logs' | 'catalog' | null
+  >(null);
+  const [deleteScope, setDeleteScope] = useState<'active_location' | 'all'>('active_location');
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -484,6 +493,93 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
     onUpdateStocks(next);
     showToast(`Seluruh data stok di lokasi ${activeProjectObj?.name || ''} telah dikosongkan.`);
     setClearLocationConfirm(false);
+  };
+
+  const handleOpenDeleteMenuModal = (
+    tab: 'stocks' | 'requests' | 'recap' | 'logs' | 'catalog'
+  ) => {
+    if (!isSuperAdmin) return;
+    setDeleteTabModal(tab);
+    setDeleteScope('active_location');
+  };
+
+  const handleExecuteDeleteMenuData = () => {
+    if (!isSuperAdmin || !deleteTabModal) return;
+
+    if (deleteTabModal === 'stocks') {
+      let nextStocks: ProjectStock[];
+      if (deleteScope === 'active_location') {
+        nextStocks = projectStocks.filter((ps) => ps.projectId !== activeProjectFilter);
+      } else {
+        nextStocks = [];
+      }
+      onUpdateStocks(nextStocks);
+      storageService.saveProjectStocks(nextStocks);
+      showToast(
+        deleteScope === 'active_location'
+          ? `Data stok lokasi ${activeProjectObj?.name || ''} berhasil dikosongkan.`
+          : 'Seluruh data stok di semua lokasi berhasil dikosongkan.'
+      );
+    } else if (deleteTabModal === 'requests') {
+      let nextRequests: MaterialRequest[];
+      if (deleteScope === 'active_location') {
+        nextRequests = materialRequests.filter((r) => r.projectId !== activeProjectFilter);
+      } else {
+        nextRequests = [];
+      }
+      if (onUpdateMaterialRequests) {
+        onUpdateMaterialRequests(nextRequests);
+      }
+      storageService.saveMaterialRequests(nextRequests);
+      showToast(
+        deleteScope === 'active_location'
+          ? `Pengajuan permintaan barang lokasi ${activeProjectObj?.name || ''} berhasil dihapus.`
+          : 'Seluruh pengajuan permintaan barang berhasil dihapus.'
+      );
+    } else if (deleteTabModal === 'recap') {
+      let nextLogs: InventoryLog[];
+      if (deleteScope === 'active_location') {
+        nextLogs = inventoryLogs.filter(
+          (l) => !(l.projectId === activeProjectFilter && l.type === 'OUT')
+        );
+      } else {
+        nextLogs = inventoryLogs.filter((l) => l.type !== 'OUT');
+      }
+      if (onUpdateLogs) {
+        onUpdateLogs(nextLogs);
+      }
+      storageService.saveInventoryLogs(nextLogs);
+      showToast(
+        deleteScope === 'active_location'
+          ? `Data pemakaian harian lokasi ${activeProjectObj?.name || ''} berhasil dihapus.`
+          : 'Seluruh data pemakaian harian berhasil dihapus.'
+      );
+    } else if (deleteTabModal === 'logs') {
+      let nextLogs: InventoryLog[];
+      if (deleteScope === 'active_location') {
+        nextLogs = inventoryLogs.filter((l) => l.projectId !== activeProjectFilter);
+      } else {
+        nextLogs = [];
+      }
+      if (onUpdateLogs) {
+        onUpdateLogs(nextLogs);
+      }
+      storageService.saveInventoryLogs(nextLogs);
+      showToast(
+        deleteScope === 'active_location'
+          ? `Riwayat keluar/masuk lokasi ${activeProjectObj?.name || ''} berhasil dihapus.`
+          : 'Seluruh riwayat keluar/masuk berhasil dihapus.'
+      );
+    } else if (deleteTabModal === 'catalog') {
+      const nextItems: InventoryItem[] = [];
+      if (onUpdateInventoryItems) {
+        onUpdateInventoryItems(nextItems);
+      }
+      storageService.saveInventoryItems(nextItems);
+      showToast('Seluruh katalog master chemical & alat berhasil dikosongkan.');
+    }
+
+    setDeleteTabModal(null);
   };
 
   // Helper to get stock for an item in current selected project
@@ -1121,83 +1217,197 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
 
         {/* Tab Navigation */}
         <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-800">
-          <button
-            id="tab-stocks-btn"
-            onClick={() => setActiveTab('stocks')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-              activeTab === 'stocks'
-                ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <Package className="w-4 h-4" />
-            <span>Stok di Lokasi ({stockRows.length})</span>
-          </button>
-
-          {/* MATERIAL REQUEST (PERMINTAAN BARANG) TAB */}
-          <button
-            id="tab-requests-btn"
-            onClick={() => setActiveTab('requests')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-              activeTab === 'requests'
-                ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <FileCheck className="w-4 h-4 text-amber-400" />
-            <span>Material Request (Permintaan Barang)</span>
-            <span
-              className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                pendingRequestsCount > 0
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
-                  : 'bg-slate-800 text-slate-400'
+          {/* 1. STOK DI LOKASI */}
+          <div className="inline-flex items-center">
+            <button
+              id="tab-stocks-btn"
+              onClick={() => setActiveTab('stocks')}
+              className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                isSuperAdmin ? 'rounded-l-xl' : 'rounded-xl'
+              } ${
+                activeTab === 'stocks'
+                  ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
             >
-              {materialRequests.length}
-            </span>
-          </button>
+              <Package className="w-4 h-4" />
+              <span>Stok di Lokasi ({stockRows.length})</span>
+            </button>
+            {isSuperAdmin && (
+              <button
+                type="button"
+                id="trash-tab-stocks-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenDeleteMenuModal('stocks');
+                }}
+                className={`p-2 rounded-r-xl border-l text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'stocks'
+                    ? 'bg-amber-500 text-slate-950 hover:bg-rose-600 hover:text-white border-amber-600/30'
+                    : 'bg-slate-900 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 border-slate-800'
+                }`}
+                title="Hapus / Kosongkan Data Stok di Lokasi (Khusus Super Admin)"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-          {/* REKAP PEMAKAIAN HARIAN TAB */}
-          <button
-            id="tab-recap-btn"
-            onClick={() => setActiveTab('recap')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-              activeTab === 'recap'
-                ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            <span>Rekap Pemakaian Harian (PDF)</span>
-            <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded text-[10px] font-bold">
-              {recapUsageLogs.length}
-            </span>
-          </button>
+          {/* 2. MATERIAL REQUEST (PERMINTAAN BARANG) */}
+          <div className="inline-flex items-center">
+            <button
+              id="tab-requests-btn"
+              onClick={() => setActiveTab('requests')}
+              className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                isSuperAdmin ? 'rounded-l-xl' : 'rounded-xl'
+              } ${
+                activeTab === 'requests'
+                  ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <FileCheck className="w-4 h-4 text-amber-400" />
+              <span>Material Request (Permintaan Barang)</span>
+              <span
+                className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                  pendingRequestsCount > 0
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                    : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {materialRequests.length}
+              </span>
+            </button>
+            {isSuperAdmin && (
+              <button
+                type="button"
+                id="trash-tab-requests-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenDeleteMenuModal('requests');
+                }}
+                className={`p-2 rounded-r-xl border-l text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'requests'
+                    ? 'bg-amber-500 text-slate-950 hover:bg-rose-600 hover:text-white border-amber-600/30'
+                    : 'bg-slate-900 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 border-slate-800'
+                }`}
+                title="Hapus / Kosongkan Data Permintaan Barang (Khusus Super Admin)"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-          <button
-            id="tab-logs-btn"
-            onClick={() => setActiveTab('logs')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-              activeTab === 'logs'
-                ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <History className="w-4 h-4" />
-            <span>Riwayat Keluar / Masuk ({inventoryLogs.filter(l => l.projectId === activeProjectFilter).length})</span>
-          </button>
-          <button
-            id="tab-catalog-btn"
-            onClick={() => setActiveTab('catalog')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-              activeTab === 'catalog'
-                ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>Katalog Master Chemical & Alat (Semua Lokasi)</span>
-          </button>
+          {/* 3. REKAP PEMAKAIAN HARIAN (PDF) */}
+          <div className="inline-flex items-center">
+            <button
+              id="tab-recap-btn"
+              onClick={() => setActiveTab('recap')}
+              className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                isSuperAdmin ? 'rounded-l-xl' : 'rounded-xl'
+              } ${
+                activeTab === 'recap'
+                  ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <span>Rekap Pemakaian Harian (PDF)</span>
+              <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded text-[10px] font-bold">
+                {recapUsageLogs.length}
+              </span>
+            </button>
+            {isSuperAdmin && (
+              <button
+                type="button"
+                id="trash-tab-recap-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenDeleteMenuModal('recap');
+                }}
+                className={`p-2 rounded-r-xl border-l text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'recap'
+                    ? 'bg-amber-500 text-slate-950 hover:bg-rose-600 hover:text-white border-amber-600/30'
+                    : 'bg-slate-900 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 border-slate-800'
+                }`}
+                title="Hapus / Kosongkan Data Rekap Pemakaian Harian (Khusus Super Admin)"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* 4. RIWAYAT KELUAR / MASUK */}
+          <div className="inline-flex items-center">
+            <button
+              id="tab-logs-btn"
+              onClick={() => setActiveTab('logs')}
+              className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                isSuperAdmin ? 'rounded-l-xl' : 'rounded-xl'
+              } ${
+                activeTab === 'logs'
+                  ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              <span>Riwayat Keluar / Masuk ({inventoryLogs.filter(l => l.projectId === activeProjectFilter).length})</span>
+            </button>
+            {isSuperAdmin && (
+              <button
+                type="button"
+                id="trash-tab-logs-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenDeleteMenuModal('logs');
+                }}
+                className={`p-2 rounded-r-xl border-l text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'logs'
+                    ? 'bg-amber-500 text-slate-950 hover:bg-rose-600 hover:text-white border-amber-600/30'
+                    : 'bg-slate-900 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 border-slate-800'
+                }`}
+                title="Hapus / Kosongkan Riwayat Keluar/Masuk (Khusus Super Admin)"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* 5. KATALOG MASTER CHEMICAL & ALAT (SEMUA LOKASI) */}
+          <div className="inline-flex items-center">
+            <button
+              id="tab-catalog-btn"
+              onClick={() => setActiveTab('catalog')}
+              className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                isSuperAdmin ? 'rounded-l-xl' : 'rounded-xl'
+              } ${
+                activeTab === 'catalog'
+                  ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Katalog Master Chemical & Alat (Semua Lokasi)</span>
+            </button>
+            {isSuperAdmin && (
+              <button
+                type="button"
+                id="trash-tab-catalog-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenDeleteMenuModal('catalog');
+                }}
+                className={`p-2 rounded-r-xl border-l text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'catalog'
+                    ? 'bg-amber-500 text-slate-950 hover:bg-rose-600 hover:text-white border-amber-600/30'
+                    : 'bg-slate-900 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 border-slate-800'
+                }`}
+                title="Hapus / Kosongkan Seluruh Katalog Master (Khusus Super Admin)"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -3346,6 +3556,158 @@ export const SmartInventory: React.FC<SmartInventoryProps> = ({
         onConfirm={confirmClearLocationStock}
         onCancel={() => setClearLocationConfirm(false)}
       />
+
+      {/* Modal Hapus Data Menu Smart Inventory (Khusus Super Admin) */}
+      {deleteTabModal && (
+        <div
+          id="delete-inventory-menu-modal-backdrop"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200"
+        >
+          <div
+            id="delete-inventory-menu-modal-card"
+            className="bg-slate-900 border border-rose-500/40 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-rose-500/10 text-rose-400 rounded-xl border border-rose-500/20">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-sm font-bold text-white">
+                      {deleteTabModal === 'stocks' && 'Hapus Data Stok di Lokasi'}
+                      {deleteTabModal === 'requests' && 'Hapus Data Material Request'}
+                      {deleteTabModal === 'recap' && 'Hapus Data Rekap Pemakaian Harian'}
+                      {deleteTabModal === 'logs' && 'Hapus Riwayat Keluar / Masuk'}
+                      {deleteTabModal === 'catalog' && 'Hapus Katalog Master Chemical & Alat'}
+                    </h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      Super Admin
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Otoritas Super Admin: Kosongkan data dalam menu ini
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteTabModal(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scope Selection (for tabs that can be filtered per location or all) */}
+            {deleteTabModal !== 'catalog' ? (
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-300">
+                  Pilih Cakupan Penghapusan Data:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteScope('active_location')}
+                    className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                      deleteScope === 'active_location'
+                        ? 'bg-rose-500/10 border-rose-500/50 text-white shadow-sm'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <div className="text-xs font-bold flex items-center justify-between">
+                      <span>Lokasi Aktif</span>
+                      {deleteScope === 'active_location' && (
+                        <span className="w-2 h-2 rounded-full bg-rose-400" />
+                      )}
+                    </div>
+                    <div className="text-[11px] text-amber-400 font-semibold truncate mt-1">
+                      📍 {activeProjectObj?.name || 'Lokasi Terpilih'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      {deleteTabModal === 'stocks' && `${projectStocks.filter((ps) => ps.projectId === activeProjectFilter).length} item stok`}
+                      {deleteTabModal === 'requests' && `${materialRequests.filter((r) => r.projectId === activeProjectFilter).length} pengajuan`}
+                      {deleteTabModal === 'recap' && `${inventoryLogs.filter((l) => l.projectId === activeProjectFilter && l.type === 'OUT').length} log pemakaian`}
+                      {deleteTabModal === 'logs' && `${inventoryLogs.filter((l) => l.projectId === activeProjectFilter).length} mutasi log`}
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeleteScope('all')}
+                    className={`p-3 rounded-xl border text-left transition cursor-pointer ${
+                      deleteScope === 'all'
+                        ? 'bg-rose-500/10 border-rose-500/50 text-white shadow-sm'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <div className="text-xs font-bold flex items-center justify-between">
+                      <span>Semua Lokasi</span>
+                      {deleteScope === 'all' && (
+                        <span className="w-2 h-2 rounded-full bg-rose-400" />
+                      )}
+                    </div>
+                    <div className="text-[11px] text-rose-300 font-semibold truncate mt-1">
+                      🌐 Seluruh Lokasi Proyek
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      {deleteTabModal === 'stocks' && `${projectStocks.length} total item stok`}
+                      {deleteTabModal === 'requests' && `${materialRequests.length} total pengajuan`}
+                      {deleteTabModal === 'recap' && `${inventoryLogs.filter((l) => l.type === 'OUT').length} total log pemakaian`}
+                      {deleteTabModal === 'logs' && `${inventoryLogs.length} total mutasi log`}
+                    </div>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                <div className="text-xs font-bold text-slate-300">
+                  Cakupan: Seluruh Katalog Master Chemical, Alat & APD
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Sebanyak <span className="text-rose-400 font-bold">{inventoryItems.length} Master Item</span> akan dihapus dari katalog master sistem.
+                </div>
+              </div>
+            )}
+
+            {/* Warning Message */}
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start space-x-2 text-xs text-rose-300">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Peringatan Penghapusan Permanen:</span>
+                <span>
+                  {deleteTabModal === 'stocks' && 'Seluruh data stok barang pada cakupan yang dipilih akan dikosongkan. Data yang telah dihapus tidak dapat dipulihkan.'}
+                  {deleteTabModal === 'requests' && 'Seluruh tiket pengajuan permintaan barang pada cakupan yang dipilih akan dihapus permanen dari sistem.'}
+                  {deleteTabModal === 'recap' && 'Catatan riwayat pemakaian barang harian (tipe OUT) pada cakupan ini akan dihapus dari database rekap.'}
+                  {deleteTabModal === 'logs' && 'Seluruh riwayat mutasi masuk dan keluar pada cakupan ini akan dihapus dari log audit inventory.'}
+                  {deleteTabModal === 'catalog' && 'Seluruh daftar barang di katalog master akan dihapus. Anda dapat menambahkan kembali secara manual atau melalui upload spreadsheet kapan saja.'}
+                </span>
+              </div>
+            </div>
+
+            {/* Footer buttons */}
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setDeleteTabModal(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                id="btn-confirm-delete-menu-data"
+                onClick={handleExecuteDeleteMenuData}
+                className="flex items-center space-x-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-rose-600/30 transition cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus Data Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

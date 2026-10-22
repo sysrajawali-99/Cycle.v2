@@ -241,10 +241,12 @@ export function calculatePayrollSummary(
     });
 
     // Jika bonusAmount manual belum diinput tapi lembur pekerja ada di matrix, gunakan nilai lemburPay
-    const effectiveBonus = bonusAmount > 0 ? bonusAmount : lemburPay;
-    const effectiveBonusReason = bonusReasons.length > 0 
-      ? bonusReasons.join('; ') 
-      : (lemburHours > 0 ? `Lembur ${lemburHours} Jam` : '');
+    // Aturan: Jika data lembur tidak ada (lemburCount === 0 dan lemburHours === 0), insentif lembur harus kosong (0)
+    const hasOvertime = lemburCount > 0 || lemburHours > 0;
+    const effectiveBonus = hasOvertime ? (bonusAmount > 0 ? bonusAmount : lemburPay) : 0;
+    const effectiveBonusReason = hasOvertime
+      ? (bonusReasons.length > 0 ? bonusReasons.join('; ') : (lemburHours > 0 ? `Lembur ${lemburHours} Jam` : ''))
+      : '';
 
     const grossPay = hadirCount * emp.dailyRate + effectiveBonus;
     const netPay = Math.max(0, grossPay - deductionAmount);

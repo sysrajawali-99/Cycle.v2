@@ -116,6 +116,21 @@ io.on('connection', (socket) => {
   socket.on('sync_state', async (payload: { key: string; data: any; meta?: any }) => {
     try {
       if (payload?.key) {
+        // Guard Rule 6: Kiriman array kosong dicegah menimpa data server
+        const existingData = await getVpsState(payload.key);
+        if (Array.isArray(existingData) && existingData.length > 0 && Array.isArray(payload.data) && payload.data.length === 0) {
+          console.warn(
+            `[Socket sync_state] Kiriman array kosong untuk key=${payload.key} dicegah. Mengembalikan ${existingData.length} data server.`
+          );
+          socket.emit('state_updated', {
+            key: payload.key,
+            data: existingData,
+            senderId: 'server_guard',
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
         const mergedData = await saveVpsState(payload.key, payload.data, payload.meta);
         io.emit('state_updated', {
           key: payload.key,

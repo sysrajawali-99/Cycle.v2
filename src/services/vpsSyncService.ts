@@ -219,6 +219,13 @@ class VpsSyncService {
     this.syncQueue.clear();
 
     for (const [key, { data, user }] of items) {
+      // Guard Rule 6: Jangan pernah mengirim array kosong ke server jika berpotensi menimpa data
+      if (Array.isArray(data) && data.length === 0) {
+        console.warn(`[VPS Sync Guard] Refusing to send empty array for key ${key} to server.`);
+        outboxService.removeEntry(key);
+        continue;
+      }
+
       const meta = {
         userId: user?.id,
         userName: user?.name
@@ -390,6 +397,10 @@ class VpsSyncService {
       // Check and flush any pending unconfirmed changes from outbox
       const pendingOutbox = outboxService.getEntries();
       for (const [outboxKey, entry] of Object.entries(pendingOutbox)) {
+        if (Array.isArray(entry?.data) && entry.data.length === 0) {
+          outboxService.removeEntry(outboxKey);
+          continue;
+        }
         this.queueStateSync(
           outboxKey as StorageActionType,
           entry.data,
