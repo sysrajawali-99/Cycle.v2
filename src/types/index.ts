@@ -1,4 +1,4 @@
-export type AttendanceStatus = 'H' | 'A' | 'I' | 'S' | 'O' | '';
+export type AttendanceStatus = 'H' | 'A' | 'I' | 'S' | 'L' | 'HL' | 'OFF' | 'O' | '';
 
 export type EmployeePosition = 
   | 'Cleaner'
@@ -80,9 +80,11 @@ export interface TimesheetMonthRecord {
   month: number; // 1 - 12
   year: number;  // e.g. 2026
   days: Record<number, AttendanceStatus>; // 1 -> 'H', 2 -> 'A', etc.
+  overtimeHours?: Record<number, number>; // Jam lembur per hari, misal { 3: 2 } untuk tgl 3 lembur 2 jam
   deductionAmount: number; // Nilai potongan dalam rupiah
   deductionReason: string; // Catatan alasan potongan
   bonusAmount: number;     // Insentif / tambahan lembur
+  bonusReason?: string;    // Catatan alasan insentif / lembur
   notes: string;
 }
 

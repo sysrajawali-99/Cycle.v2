@@ -150,6 +150,21 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     amount: number;
     reason: string;
     bonus: number;
+    bonusReason: string;
+  } | null>(null);
+
+  // Matrix Cell Selection / Edit Modal State (untuk H, A, I, S, L, HL, OFF & Jam Lembur)
+  const [selectedCell, setSelectedCell] = useState<{
+    employee: Employee;
+    day: number;
+    month: number;
+    year: number;
+    dateKey: string;
+    dmy: string;
+    dayName: string;
+    currentStatus: AttendanceStatus | '';
+    overtimeHours: number;
+    includeHadir?: boolean;
   } | null>(null);
 
   // PDF Export / Print Modal State
@@ -296,7 +311,40 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     return rec?.days[day] || '';
   };
 
-  // Set status presensi langsung (untuk tombol touch mobile Hadir, Alpa, Izin, Off)
+  // Helper membaca jumlah jam lembur karyawan pada hari tertentu
+  const getOvertimeHoursForEmployeeDate = (
+    employeeId: string,
+    day: number,
+    month: number,
+    year: number
+  ): number => {
+    const rec = timesheets.find(
+      (ts) => ts.employeeId === employeeId && ts.month === month && ts.year === year
+    );
+    return rec?.overtimeHours?.[day] !== undefined ? rec.overtimeHours[day] : 2;
+  };
+
+  // Helper menghitung total jam lembur dan nominal lembur pekerja selama periode buka-tutup timesheet
+  const getEmployeePeriodOvertime = (emp: Employee) => {
+    let totalHours = 0;
+    let totalDays = 0;
+
+    activePeriodDays.forEach((pDay) => {
+      const st = getStatusForEmployeeDate(emp.id, pDay.day, pDay.month, pDay.year);
+      if (st === 'L' || st === 'HL' || (st as string) === 'H+L') {
+        totalDays++;
+        const hrs = getOvertimeHoursForEmployeeDate(emp.id, pDay.day, pDay.month, pDay.year);
+        totalHours += hrs;
+      }
+    });
+
+    const hourlyRate = emp.dailyRate > 0 ? Math.round(emp.dailyRate / 8) : 0;
+    const totalAmount = Math.round(hourlyRate * totalHours);
+
+    return { totalDays, totalHours, hourlyRate, totalAmount };
+  };
+
+  // Set status presensi langsung (untuk tombol touch mobile Hadir, Alpa, Izin, Lembur, Off)
   const handleSetStatusDirect = (
     employeeId: string,
     day: number,
@@ -306,18 +354,48 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
   ) => {
     const currentRecord = getRecordForEmployeeMonth(employeeId, month, year);
     const existingStatus = currentRecord.days[day] || '';
-    const finalStatus = existingStatus === newStatus ? '' : newStatus;
+
+    let finalStatus: AttendanceStatus | '' = newStatus;
+
+    // Logika kombinasi H dan L pada hari yang sama:
+    // 1. Jika sudah H dan klik L -> jadi HL (Hadir + Lembur)
+    // 2. Jika sudah L dan klik H -> jadi HL (Hadir + Lembur)
+    // 3. Jika sudah HL dan klik H -> jadi L (lepas Hadir)
+    // 4. Jika sudah HL dan klik L -> jadi H (lepas Lembur)
+    // 5. Jika klik status yang sama -> kosongkan ('')
+    if (existingStatus === newStatus) {
+      finalStatus = '';
+    } else if (existingStatus === 'H' && newStatus === 'L') {
+      finalStatus = 'HL';
+    } else if (existingStatus === 'L' && newStatus === 'H') {
+      finalStatus = 'HL';
+    } else if (existingStatus === 'HL' && newStatus === 'H') {
+      finalStatus = 'L';
+    } else if (existingStatus === 'HL' && newStatus === 'L') {
+      finalStatus = 'H';
+    } else {
+      finalStatus = newStatus;
+    }
 
     const newDays = { ...currentRecord.days };
+    const newOvertime = { ...(currentRecord.overtimeHours || {}) };
+
     if (finalStatus === '') {
       delete newDays[day];
+      delete newOvertime[day];
     } else {
       newDays[day] = finalStatus as AttendanceStatus;
+      if (finalStatus === 'L' || finalStatus === 'HL') {
+        if (!newOvertime[day]) newOvertime[day] = 2; // Default 2 jam sesuai contoh user
+      } else {
+        delete newOvertime[day];
+      }
     }
 
     const updatedRecord: TimesheetMonthRecord = {
       ...currentRecord,
-      days: newDays
+      days: newDays,
+      overtimeHours: newOvertime
     };
 
     const nextTimesheets = [...timesheets];
@@ -334,29 +412,21 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     onUpdateTimesheets(nextTimesheets);
   };
 
-  // Siklus status presensi saat klik sel: '' -> 'H' -> 'A' -> 'I' -> 'S' -> 'O' -> ''
-  const handleCellClick = (employeeId: string, day: number, month: number, year: number) => {
+  // Atur jam lembur harian untuk status 'L' / 'HL'
+  const handleSetOvertimeHours = (
+    employeeId: string,
+    day: number,
+    month: number,
+    year: number,
+    hours: number
+  ) => {
     const currentRecord = getRecordForEmployeeMonth(employeeId, month, year);
-    const currentStatus = currentRecord.days[day] || '';
-
-    let nextStatus: AttendanceStatus = 'H';
-    if (currentStatus === '') nextStatus = 'H';
-    else if (currentStatus === 'H') nextStatus = 'A';
-    else if (currentStatus === 'A') nextStatus = 'I';
-    else if (currentStatus === 'I') nextStatus = 'S';
-    else if (currentStatus === 'S') nextStatus = 'O';
-    else if (currentStatus === 'O') nextStatus = '';
-
-    const newDays = { ...currentRecord.days };
-    if (nextStatus === '') {
-      delete newDays[day];
-    } else {
-      newDays[day] = nextStatus;
-    }
+    const newOvertime = { ...(currentRecord.overtimeHours || {}) };
+    newOvertime[day] = Math.max(0.5, hours);
 
     const updatedRecord: TimesheetMonthRecord = {
       ...currentRecord,
-      days: newDays
+      overtimeHours: newOvertime
     };
 
     const nextTimesheets = [...timesheets];
@@ -371,6 +441,71 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     }
 
     onUpdateTimesheets(nextTimesheets);
+  };
+
+  // Simpan status dan jam dari kotak dialog Matrix
+  const handleSaveCellStatus = (
+    employeeId: string,
+    day: number,
+    month: number,
+    year: number,
+    status: AttendanceStatus | '',
+    hours?: number
+  ) => {
+    const currentRecord = getRecordForEmployeeMonth(employeeId, month, year);
+    const newDays = { ...currentRecord.days };
+    const newOvertime = { ...(currentRecord.overtimeHours || {}) };
+
+    if (status === '') {
+      delete newDays[day];
+      delete newOvertime[day];
+    } else {
+      newDays[day] = status;
+      if (status === 'L' || status === 'HL') {
+        newOvertime[day] = hours !== undefined && hours > 0 ? hours : (newOvertime[day] || 2);
+      } else {
+        delete newOvertime[day];
+      }
+    }
+
+    const updatedRecord: TimesheetMonthRecord = {
+      ...currentRecord,
+      days: newDays,
+      overtimeHours: newOvertime
+    };
+
+    const nextTimesheets = [...timesheets];
+    const existingIdx = nextTimesheets.findIndex(
+      (ts) => ts.employeeId === employeeId && ts.month === month && ts.year === year
+    );
+
+    if (existingIdx >= 0) {
+      nextTimesheets[existingIdx] = updatedRecord;
+    } else {
+      nextTimesheets.push(updatedRecord);
+    }
+
+    onUpdateTimesheets(nextTimesheets);
+    setSelectedCell(null);
+  };
+
+  // Saat klik sel di Matrix: buka modal pilihan presensi & input jam lembur
+  const handleCellClick = (emp: Employee, pDay: PeriodDay) => {
+    const currentStatus = getStatusForEmployeeDate(emp.id, pDay.day, pDay.month, pDay.year);
+    const currentHours = getOvertimeHoursForEmployeeDate(emp.id, pDay.day, pDay.month, pDay.year);
+
+    setSelectedCell({
+      employee: emp,
+      day: pDay.day,
+      month: pDay.month,
+      year: pDay.year,
+      dateKey: pDay.dateKey,
+      dmy: pDay.dmy,
+      dayName: pDay.dayName,
+      currentStatus,
+      overtimeHours: currentHours > 0 ? currentHours : 2,
+      includeHadir: currentStatus === 'HL' || currentStatus === 'H'
+    });
   };
 
   // Bulk action: Hadirkan semua personil aktif untuk tanggal tertentu
@@ -435,6 +570,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     let alpa = 0;
     let izin = 0;
     let sakit = 0;
+    let lembur = 0;
+    let lemburHours = 0;
     let off = 0;
 
     // Hitung presensi tepat di dalam rentang tanggal aktif
@@ -444,7 +581,18 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       else if (st === 'A') alpa++;
       else if (st === 'I') izin++;
       else if (st === 'S') sakit++;
-      else if (st === 'O') off++;
+      else if (st === 'L') {
+        lembur++;
+        const hrs = getOvertimeHoursForEmployeeDate(employee.id, pDay.day, pDay.month, pDay.year);
+        lemburHours += hrs;
+      }
+      else if (st === 'HL' || (st as string) === 'H+L') {
+        hadir++; // Dihitung hadir juga
+        lembur++; // Dihitung lembur juga
+        const hrs = getOvertimeHoursForEmployeeDate(employee.id, pDay.day, pDay.month, pDay.year);
+        lemburHours += hrs;
+      }
+      else if (st === 'O' || st === 'OFF') off++;
     });
 
     // Kumpulkan bulan-bulan unik dalam rentang periode untuk agregasi potongan & bonus
@@ -456,6 +604,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     let deduction = 0;
     let bonus = 0;
     const deductionReasons: string[] = [];
+    const bonusReasons: string[] = [];
 
     distinctMonths.forEach((key) => {
       const [y, m] = key.split('-').map(Number);
@@ -466,10 +615,21 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
         if (rec.deductionAmount) deduction += rec.deductionAmount;
         if (rec.bonusAmount) bonus += rec.bonusAmount;
         if (rec.deductionReason) deductionReasons.push(rec.deductionReason);
+        if (rec.bonusReason) bonusReasons.push(rec.bonusReason);
       }
     });
 
-    const grossPay = hadir * employee.dailyRate + bonus;
+    // Perhitungan nilai lembur otomatis: (Upah Harian / 8) * Jam Lembur
+    const hourlyRate = employee.dailyRate > 0 ? Math.round(employee.dailyRate / 8) : 0;
+    const lemburPay = Math.round(hourlyRate * lemburHours);
+
+    // Jika belum diinput manual di modal, otomatis gunakan lemburPay
+    const effectiveBonus = bonus > 0 ? bonus : lemburPay;
+    const bonusReason = bonusReasons.length > 0 
+      ? bonusReasons.join('; ') 
+      : (lemburHours > 0 ? `Lembur ${lemburHours} Jam` : '');
+
+    const grossPay = hadir * employee.dailyRate + effectiveBonus;
     const netPay = Math.max(0, grossPay - deduction);
 
     return {
@@ -477,11 +637,16 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       alpa,
       izin,
       sakit,
+      lembur,
+      lemburHours,
+      lemburPay,
       off,
       grossPay,
       deduction,
       bonus,
+      effectiveBonus,
       deductionReason: deductionReasons.join('; '),
+      bonusReason,
       netPay
     };
   };
@@ -492,6 +657,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     let alpa = 0;
     let izin = 0;
     let sakit = 0;
+    let lembur = 0;
     let off = 0;
     let unrecorded = 0;
 
@@ -501,11 +667,16 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       else if (st === 'A') alpa++;
       else if (st === 'I') izin++;
       else if (st === 'S') sakit++;
-      else if (st === 'O') off++;
+      else if (st === 'L') lembur++;
+      else if (st === 'HL' || (st as string) === 'H+L') {
+        hadir++;
+        lembur++;
+      }
+      else if (st === 'O' || st === 'OFF') off++;
       else unrecorded++;
     });
 
-    return { hadir, alpa, izin, sakit, off, unrecorded, total: filteredEmployees.length };
+    return { hadir, alpa, izin, sakit, lembur, off, unrecorded, total: filteredEmployees.length };
   }, [filteredEmployees, timesheets, activeDayObj]);
 
   // Ringkasan konsolidasi KPI finansial & kehadiran untuk seluruh karyawan dalam periode terpilih
@@ -517,16 +688,22 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     let totalAlpaAll = 0;
     let totalIzinAll = 0;
     let totalSakitAll = 0;
+    let totalLemburDaysAll = 0;
+    let totalLemburHoursAll = 0;
+    let totalLemburPayAll = 0;
 
     filteredEmployees.forEach((emp) => {
       const stats = calculateRowStats(emp);
       totalPayrollAll += stats.netPay;
       totalDeductionsAll += stats.deduction;
-      totalBonusAll += stats.bonus;
+      totalBonusAll += stats.effectiveBonus;
       totalHadirAll += stats.hadir;
       totalAlpaAll += stats.alpa;
       totalIzinAll += stats.izin;
       totalSakitAll += stats.sakit;
+      totalLemburDaysAll += stats.lembur;
+      totalLemburHoursAll += stats.lemburHours;
+      totalLemburPayAll += stats.lemburPay;
     });
 
     return {
@@ -537,7 +714,10 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       totalHadirAll,
       totalAlpaAll,
       totalIzinAll,
-      totalSakitAll
+      totalSakitAll,
+      totalLemburDaysAll,
+      totalLemburHoursAll,
+      totalLemburPayAll
     };
   }, [filteredEmployees, timesheets, activePeriodDays]);
 
@@ -607,14 +787,15 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
   const handleSaveDeduction = () => {
     if (!editingDeduction) return;
 
-    const { employee, targetMonth, targetYear, amount, reason, bonus } = editingDeduction;
+    const { employee, targetMonth, targetYear, amount, reason, bonus, bonusReason } = editingDeduction;
     const currentRec = getRecordForEmployeeMonth(employee.id, targetMonth, targetYear);
 
     const updatedRec: TimesheetMonthRecord = {
       ...currentRec,
       deductionAmount: Number(amount) || 0,
       deductionReason: reason,
-      bonusAmount: Number(bonus) || 0
+      bonusAmount: Number(bonus) || 0,
+      bonusReason: bonusReason || ''
     };
 
     const nextTimesheets = [...timesheets];
@@ -1113,6 +1294,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
             <span className="text-rose-400 font-bold">A: Alpa</span>,{' '}
             <span className="text-amber-400 font-bold">I: Izin</span>,{' '}
             <span className="text-purple-400 font-bold">S: Sakit</span>,{' '}
+            <span className="text-blue-400 font-bold">L : Lembur</span>,{' '}
+            <span className="text-teal-300 font-bold">H+L: Hadir & Lembur</span>,{' '}
             <span className="text-slate-400 font-bold">OFF: Libur</span>
           </div>
           <button
@@ -1154,10 +1337,22 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                 <span className="text-slate-300"><b>Sakit (S)</b>: Surat Dokter / Keterangan Sakit</span>
               </div>
               <div className="flex items-center space-x-1.5">
+                <span className="w-6 h-6 rounded bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                  L
+                </span>
+                <span className="text-slate-300"><b>Lembur (L)</b>: (Upah Harian / 8) × Jam Lembur</span>
+              </div>
+              <div className="flex items-center space-x-1.5">
+                <span className="w-8 h-6 rounded bg-gradient-to-br from-emerald-500 to-blue-600 text-white flex items-center justify-center font-bold text-[10px] shadow-sm">
+                  H+L
+                </span>
+                <span className="text-slate-300"><b>Hadir & Lembur (H+L)</b>: Gaji Hadir Pokok + Upah Jam Lembur</span>
+              </div>
+              <div className="flex items-center space-x-1.5">
                 <span className="w-6 h-6 rounded bg-slate-700 text-slate-300 flex items-center justify-center font-bold text-xs shadow-sm">
                   OFF
                 </span>
-                <span className="text-slate-300"><b>Off (O)</b>: Jadwal Roster Libur</span>
+                <span className="text-slate-300"><b>Libur (OFF)</b>: Jadwal Roster Libur</span>
               </div>
             </div>
             <button
@@ -1402,22 +1597,27 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       </div>
                     </div>
 
-                    {/* Touch Attendance Action Buttons (H, A, I, S, O) */}
-                    <div className="grid grid-cols-5 gap-1.5 pt-1">
+                    {/* Touch Attendance Action Buttons (H, A, I, S, L, OFF) */}
+                    <div className="grid grid-cols-6 gap-1 pt-1">
                       {/* Hadir Button */}
                       <button
                         id={`btn-hadir-${emp.id}-${activeDayObj.dateKey}`}
                         onClick={() =>
                           handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, 'H')
                         }
-                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
-                          currentStatus === 'H'
+                        className={`flex flex-col items-center justify-center py-2 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
+                          currentStatus === 'HL'
+                            ? 'bg-emerald-600 text-white border-emerald-300 ring-2 ring-emerald-400 font-black shadow-md shadow-emerald-500/30'
+                            : currentStatus === 'H'
                             ? 'bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-500/30'
                             : 'bg-slate-950/80 text-emerald-400/80 border-emerald-500/30 hover:bg-emerald-950/40'
                         }`}
+                        title={currentStatus === 'HL' ? 'Hadir & Lembur Aktif (Klik untuk ubah)' : 'Tandai Hadir'}
                       >
-                        <span className="text-sm">✓</span>
-                        <span className="text-[10px] mt-0.5">Hadir</span>
+                        <span className="text-sm font-black">H</span>
+                        <span className="text-[9px] mt-0.5">
+                          {currentStatus === 'HL' ? 'Hadir (✓)' : 'Hadir'}
+                        </span>
                       </button>
 
                       {/* Alpa Button */}
@@ -1426,14 +1626,14 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         onClick={() =>
                           handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, 'A')
                         }
-                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
+                        className={`flex flex-col items-center justify-center py-2 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
                           currentStatus === 'A'
                             ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/30'
                             : 'bg-slate-950/80 text-rose-400/80 border-rose-500/30 hover:bg-rose-950/40'
                         }`}
                       >
-                        <span className="text-sm">✗</span>
-                        <span className="text-[10px] mt-0.5">Alpa</span>
+                        <span className="text-sm font-black">A</span>
+                        <span className="text-[9px] mt-0.5">Alpa</span>
                       </button>
 
                       {/* Izin Button */}
@@ -1442,14 +1642,14 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         onClick={() =>
                           handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, 'I')
                         }
-                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
+                        className={`flex flex-col items-center justify-center py-2 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
                           currentStatus === 'I'
                             ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/30 font-black'
                             : 'bg-slate-950/80 text-amber-400/80 border-amber-500/30 hover:bg-amber-950/40'
                         }`}
                       >
-                        <span className="text-sm">!</span>
-                        <span className="text-[10px] mt-0.5">Izin</span>
+                        <span className="text-sm font-black">I</span>
+                        <span className="text-[9px] mt-0.5">Izin</span>
                       </button>
 
                       {/* Sakit Button */}
@@ -1458,32 +1658,118 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         onClick={() =>
                           handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, 'S')
                         }
-                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
+                        className={`flex flex-col items-center justify-center py-2 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
                           currentStatus === 'S'
                             ? 'bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-500/30 font-black'
                             : 'bg-slate-950/80 text-purple-400/80 border-purple-500/30 hover:bg-purple-950/40'
                         }`}
                       >
                         <span className="text-sm font-black">S</span>
-                        <span className="text-[10px] mt-0.5">Sakit</span>
+                        <span className="text-[9px] mt-0.5">Sakit</span>
+                      </button>
+
+                      {/* Lembur Button */}
+                      <button
+                        id={`btn-lembur-${emp.id}-${activeDayObj.dateKey}`}
+                        onClick={() =>
+                          handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, 'L')
+                        }
+                        className={`flex flex-col items-center justify-center py-2 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
+                          currentStatus === 'HL'
+                            ? 'bg-blue-600 text-white border-blue-300 ring-2 ring-blue-400 font-black shadow-md shadow-blue-500/30'
+                            : currentStatus === 'L'
+                            ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/30 font-black'
+                            : 'bg-slate-950/80 text-blue-400/80 border-blue-500/30 hover:bg-blue-950/40'
+                        }`}
+                        title={currentStatus === 'HL' ? 'Hadir & Lembur Aktif (Klik untuk ubah)' : 'Tandai Lembur'}
+                      >
+                        <span className="text-sm font-black">{currentStatus === 'HL' ? 'H+L' : 'L'}</span>
+                        <span className="text-[9px] mt-0.5">
+                          {currentStatus === 'HL' ? 'Lembur (✓)' : 'Lembur'}
+                        </span>
                       </button>
 
                       {/* Off Button */}
                       <button
                         id={`btn-off-${emp.id}-${activeDayObj.dateKey}`}
                         onClick={() =>
-                          handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, 'O')
+                          handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, 'OFF')
                         }
-                        className={`flex flex-col items-center justify-center py-2.5 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
-                          currentStatus === 'O'
+                        className={`flex flex-col items-center justify-center py-2 rounded-xl border text-xs font-bold transition-all min-h-[44px] active:scale-95 cursor-pointer ${
+                          currentStatus === 'O' || currentStatus === 'OFF'
                             ? 'bg-slate-700 text-white border-slate-500 shadow-md'
                             : 'bg-slate-950/80 text-slate-400 border-slate-700 hover:bg-slate-800'
                         }`}
                       >
-                        <span className="text-[11px] font-mono">OFF</span>
-                        <span className="text-[10px] mt-0.5">Libur</span>
+                        <span className="text-xs font-mono font-bold">OFF</span>
+                        <span className="text-[9px] mt-0.5">Libur</span>
                       </button>
                     </div>
+
+                    {/* Kotak Kecil Isian Jam Lembur jika L atau HL dipilih pada Roll-Call */}
+                    {(currentStatus === 'L' || currentStatus === 'HL') && (() => {
+                      const otHours = getOvertimeHoursForEmployeeDate(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year);
+                      const otPay = Math.round((emp.dailyRate / 8) * otHours);
+                      const isHL = currentStatus === 'HL';
+
+                      return (
+                        <div className="p-2.5 bg-blue-950/40 border border-blue-500/40 rounded-xl space-y-2 text-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 text-blue-300 font-semibold">
+                              <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                              <span>Jam Lembur:</span>
+                              <input
+                                type="number"
+                                min="0.5"
+                                max="24"
+                                step="0.5"
+                                value={otHours}
+                                onChange={(e) =>
+                                  handleSetOvertimeHours(
+                                    emp.id,
+                                    activeDayObj.day,
+                                    activeDayObj.month,
+                                    activeDayObj.year,
+                                    Number(e.target.value) || 0
+                                  )
+                                }
+                                className="w-16 bg-slate-900 border border-blue-400/80 rounded-lg px-2 py-1 text-center font-bold text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 ml-1"
+                              />
+                              <span className="text-slate-400 text-xs font-mono">Jam</span>
+                            </div>
+
+                            {/* Checkbox Tambahkan Hadir (H) */}
+                            <label className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-900/40 hover:bg-blue-900/60 border border-blue-600/50 cursor-pointer select-none transition-colors">
+                              <input
+                                type="checkbox"
+                                id={`toggle-daily-include-hadir-${emp.id}`}
+                                checked={isHL}
+                                onChange={(e) => {
+                                  const nextSt: AttendanceStatus = e.target.checked ? 'HL' : 'L';
+                                  handleSetStatusDirect(emp.id, activeDayObj.day, activeDayObj.month, activeDayObj.year, nextSt);
+                                }}
+                                className="w-3.5 h-3.5 rounded text-blue-500 accent-blue-500 cursor-pointer"
+                              />
+                              <span className="text-white font-bold text-[11px] flex items-center gap-1">
+                                <span className="bg-emerald-500/20 text-emerald-300 px-1 py-0.2 rounded text-[9px] font-black">H+L</span>
+                                <span>Tambah Status Hadir (H) juga</span>
+                              </span>
+                            </label>
+                          </div>
+
+                          <div className="text-[11px] text-blue-200 font-mono bg-blue-900/30 p-1.5 rounded-lg border border-blue-800/40 flex flex-wrap items-center justify-between gap-1">
+                            <span>
+                              Tarif Lembur: ({formatCurrency(emp.dailyRate)}/8) × {otHours} = <b>{formatCurrency(otPay)}</b>
+                            </span>
+                            {isHL && (
+                              <span className="text-emerald-300 font-bold">
+                                + Hadir 1 Hari ({formatCurrency(emp.dailyRate)}) = Total {formatCurrency(emp.dailyRate + otPay)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Bottom Metadata & Edit Deduction Button */}
                     <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/80">
@@ -1500,17 +1786,14 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                             targetYear: endYear,
                             amount: stats.deduction,
                             reason: stats.deductionReason,
-                            bonus: stats.bonus
+                            bonus: stats.bonus > 0 ? stats.bonus : stats.lemburPay,
+                            bonusReason: stats.bonusReason
                           })
                         }
                         className="flex items-center space-x-1 text-amber-400 hover:underline font-semibold cursor-pointer"
                       >
                         <Edit3 className="w-3 h-3" />
-                        <span>
-                          {stats.deduction > 0 || stats.bonus > 0
-                            ? 'Edit Denda/Bonus'
-                            : '+ Potongan/Lembur'}
-                        </span>
+                        <span>Edit</span>
                       </button>
                     </div>
                   </div>
@@ -1628,8 +1911,11 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   <th className="p-3 text-center min-w-[50px] bg-slate-950 border-r border-slate-800 text-purple-400">
                     Sakit
                   </th>
-                  <th className="p-3 min-w-[130px] bg-slate-950 border-r border-slate-800 text-right text-rose-300 hidden sm:table-cell">
-                    Potongan (Rp)
+                  <th className="p-3 text-center min-w-[65px] bg-slate-950 border-r border-slate-800 text-blue-400">
+                    Lembur
+                  </th>
+                  <th className="p-3 min-w-[145px] bg-slate-950 border-r border-slate-800 text-right text-rose-300 hidden sm:table-cell">
+                    Potongan atau tambahan
                   </th>
                   <th className="p-3 min-w-[150px] bg-slate-950 text-right text-amber-400 sticky right-0 z-30 shadow-[-4px_0_10px_rgba(0,0,0,0.5)]">
                     Gaji Bersih
@@ -1641,7 +1927,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
               <tbody className="divide-y divide-slate-800/60 text-xs">
                 {filteredEmployees.length === 0 ? (
                   <tr>
-                    <td colSpan={activePeriodDays.length + 10} className="p-12 text-center text-slate-500">
+                    <td colSpan={activePeriodDays.length + 11} className="p-12 text-center text-slate-500">
                       <p className="text-base font-semibold text-slate-400">Tidak ada data karyawan yang cocok.</p>
                     </td>
                   </tr>
@@ -1685,13 +1971,14 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         {/* Presensi Tanggal Periode Terpilih */}
                         {activePeriodDays.map((pDay) => {
                           const status = getStatusForEmployeeDate(emp.id, pDay.day, pDay.month, pDay.year);
+                          const ovHours = getOvertimeHoursForEmployeeDate(emp.id, pDay.day, pDay.month, pDay.year);
 
                           return (
                             <td
                               key={pDay.dateKey}
                               id={`cell-${emp.id}-${pDay.dateKey}`}
-                              onClick={() => handleCellClick(emp.id, pDay.day, pDay.month, pDay.year)}
-                              title={`Klik untuk ubah kehadiran ${emp.name} (Tgl ${pDay.dmy})`}
+                              onClick={() => handleCellClick(emp, pDay)}
+                              title={`Klik untuk ubah presensi ${emp.name} (Tgl ${pDay.dmy})`}
                               className={`p-1 text-center border-r border-slate-800/50 cursor-pointer select-none transition-all ${
                                 pDay.isWeekend ? 'bg-amber-950/10' : ''
                               } hover:bg-amber-500/20 active:scale-95`}
@@ -1706,7 +1993,11 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                     ? 'bg-amber-500 text-slate-950 font-extrabold shadow-amber-500/30'
                                     : status === 'S'
                                     ? 'bg-purple-600 text-white font-extrabold shadow-purple-500/30'
-                                    : status === 'O'
+                                    : status === 'L'
+                                    ? 'bg-blue-600 text-white font-extrabold shadow-blue-500/30'
+                                    : status === 'HL' || (status as string) === 'H+L'
+                                    ? 'bg-gradient-to-br from-emerald-500 via-teal-600 to-blue-600 text-white font-extrabold shadow-blue-500/30 ring-1 ring-emerald-300'
+                                    : status === 'O' || status === 'OFF'
                                     ? 'bg-slate-800 text-slate-400 font-mono text-[10px]'
                                     : 'text-slate-700 hover:text-slate-400'
                                 }`}
@@ -1715,7 +2006,23 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                 {status === 'A' && '✗'}
                                 {status === 'I' && '!'}
                                 {status === 'S' && 'S'}
-                                {status === 'O' && 'OFF'}
+                                {status === 'L' && (
+                                  <div className="flex flex-col items-center justify-center leading-none">
+                                    <span className="text-[10px] font-black leading-none">L</span>
+                                    <span className="text-[7.5px] font-mono text-blue-200 mt-0.5 leading-none">
+                                      {ovHours}j
+                                    </span>
+                                  </div>
+                                )}
+                                {(status === 'HL' || (status as string) === 'H+L') && (
+                                  <div className="flex flex-col items-center justify-center leading-none">
+                                    <span className="text-[8.5px] font-black leading-none tracking-tighter">H+L</span>
+                                    <span className="text-[7px] font-mono text-emerald-100 mt-0.5 leading-none">
+                                      {ovHours}j
+                                    </span>
+                                  </div>
+                                )}
+                                {(status === 'O' || status === 'OFF') && 'OFF'}
                                 {status === '' && '·'}
                               </div>
                             </td>
@@ -1742,34 +2049,53 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                           {stats.sakit}
                         </td>
 
-                        {/* Kolom Potongan & Tombol Edit */}
-                        <td className="p-3 text-right bg-slate-950/40 border-r border-slate-800 hidden sm:table-cell">
-                          <button
-                            id={`matrix-edit-deduction-btn-${emp.id}`}
-                            onClick={() =>
-                              setEditingDeduction({
-                                employee: emp,
-                                targetMonth: endMonth,
-                                targetYear: endYear,
-                                amount: stats.deduction,
-                                reason: stats.deductionReason,
-                                bonus: stats.bonus
-                              })
-                            }
-                            className="text-right hover:text-amber-400 transition-colors w-full group/btn cursor-pointer"
-                          >
-                            <div className="font-semibold text-rose-400">
-                              {stats.deduction > 0 ? `- ${formatCurrency(stats.deduction)}` : 'Rp 0'}
+                        {/* Kolom Lembur */}
+                        <td className="p-3 text-center font-bold text-blue-400 bg-slate-950/40 border-r border-slate-800">
+                          {stats.lembur > 0 ? (
+                            <div>
+                              <span>{stats.lembur} hr</span>
+                              <div className="text-[10px] text-blue-300 font-normal">{stats.lemburHours} Jam</div>
                             </div>
-                            {stats.bonus > 0 && (
-                              <div className="text-[10px] text-emerald-400 font-medium">
-                                + {formatCurrency(stats.bonus)} (Bonus)
+                          ) : (
+                            '0'
+                          )}
+                        </td>
+
+                        {/* Kolom Potongan atau tambahan & Tombol Edit */}
+                        <td className="p-3 text-right bg-slate-950/40 border-r border-slate-800 hidden sm:table-cell">
+                          <div className="flex flex-col items-end gap-0.5">
+                            {stats.deduction > 0 && (
+                              <div className="font-semibold text-rose-400">
+                                - {formatCurrency(stats.deduction)}
                               </div>
                             )}
-                            <div className="text-[10px] text-slate-500 group-hover/btn:text-amber-400">
-                              {stats.deductionReason ? `(${stats.deductionReason})` : 'Edit Potongan'}
-                            </div>
-                          </button>
+                            {stats.effectiveBonus > 0 && (
+                              <div className="text-[10px] text-emerald-400 font-bold">
+                                + {formatCurrency(stats.effectiveBonus)}
+                              </div>
+                            )}
+                            {stats.deduction === 0 && stats.effectiveBonus === 0 && (
+                              <div className="text-slate-500 text-xs">Rp 0</div>
+                            )}
+                            <button
+                              id={`matrix-edit-deduction-btn-${emp.id}`}
+                              onClick={() =>
+                                setEditingDeduction({
+                                  employee: emp,
+                                  targetMonth: endMonth,
+                                  targetYear: endYear,
+                                  amount: stats.deduction,
+                                  reason: stats.deductionReason,
+                                  bonus: stats.bonus > 0 ? stats.bonus : stats.lemburPay,
+                                  bonusReason: stats.bonusReason
+                                })
+                              }
+                              className="text-[11px] font-bold text-amber-400 hover:text-amber-300 hover:underline cursor-pointer flex items-center gap-1 mt-0.5"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+                          </div>
                         </td>
 
                         {/* Kolom Gaji Bersih */}
@@ -1809,8 +2135,20 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   <td className="p-3 text-center font-black text-purple-400 bg-purple-950/40 border-r border-slate-800">
                     {summary.totalSakitAll}
                   </td>
-                  <td className="p-3 text-right font-black text-rose-300 bg-slate-950 border-r border-slate-800 hidden sm:table-cell">
-                    {formatCurrency(summary.totalDeductionsAll)}
+                  <td className="p-3 text-center font-black text-blue-400 bg-blue-950/40 border-r border-slate-800">
+                    <div>{summary.totalLemburDaysAll} hr</div>
+                    <div className="text-[10px] text-blue-300 font-normal">{summary.totalLemburHoursAll} Jam</div>
+                  </td>
+                  <td className="p-3 text-right font-black bg-slate-950 border-r border-slate-800 hidden sm:table-cell text-xs">
+                    {summary.totalDeductionsAll > 0 && (
+                      <div className="text-rose-300 font-mono">- {formatCurrency(summary.totalDeductionsAll)}</div>
+                    )}
+                    {summary.totalBonusAll > 0 && (
+                      <div className="text-emerald-400 font-mono">+ {formatCurrency(summary.totalBonusAll)}</div>
+                    )}
+                    {summary.totalDeductionsAll === 0 && summary.totalBonusAll === 0 && (
+                      <div className="text-slate-400">Rp 0</div>
+                    )}
                   </td>
                   <td className="p-3 text-right font-black text-amber-400 bg-amber-950/60 sticky right-0 z-30 shadow-[-4px_0_10px_rgba(0,0,0,0.5)] text-sm">
                     {formatCurrency(summary.totalPayrollAll)}
@@ -1825,118 +2163,521 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       {/* ========================================================================= */}
       {/* DEDUCTION / BONUS MODAL FORM                                              */}
       {/* ========================================================================= */}
-      {editingDeduction && (
+      {editingDeduction && (() => {
+        const periodOvertime = getEmployeePeriodOvertime(editingDeduction.employee);
+
+        return (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div>
+                  <h3 className="font-bold text-white text-base">Atur Potongan Denda & Lembur</h3>
+                  <p className="text-xs text-slate-400">
+                    {editingDeduction.employee.name} ({editingDeduction.employee.nik}) • Periode {formatDMY(startDay, startMonth, startYear)} s/d {formatDMY(endDay, endMonth, endYear)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setEditingDeduction(null)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                {/* Daily Rate Info & Overtime Rate */}
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
+                  <div>
+                    <span className="text-slate-400">Rate Pokok Harian: </span>
+                    <span className="font-bold text-slate-200">
+                      {formatCurrency(editingDeduction.employee.dailyRate)} / hari
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-blue-300">
+                    Tarif Lembur: <b>{formatCurrency(periodOvertime.hourlyRate)}</b>/jam
+                  </div>
+                </div>
+
+                {/* Deduction Amount Input */}
+                <div>
+                  <label className="block text-xs font-semibold text-rose-300 mb-1">
+                    Nominal Potongan Denda / Pelanggaran (Rp):
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-500">Rp</span>
+                    <input
+                      id="deduction-amount-input"
+                      type="number"
+                      min="0"
+                      step="5000"
+                      value={editingDeduction.amount}
+                      onChange={(e) =>
+                        setEditingDeduction({
+                          ...editingDeduction,
+                          amount: Number(e.target.value)
+                        })
+                      }
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-rose-300 focus:outline-none focus:border-rose-500"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
+                {/* Deduction Reason */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Alasan / Keterangan Potongan:
+                  </label>
+                  <textarea
+                    id="deduction-reason-input"
+                    rows={2}
+                    value={editingDeduction.reason}
+                    onChange={(e) =>
+                      setEditingDeduction({
+                        ...editingDeduction,
+                        reason: e.target.value
+                      })
+                    }
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    placeholder="Contoh: Terlambat hadir, atribut seragam tidak lengkap..."
+                  />
+                </div>
+
+                {/* Kolom Isian Otomatis Total Lembur Pekerja Periode Buka Tutup Timesheet */}
+                <div className="bg-slate-950 p-3 rounded-2xl border border-blue-500/40 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-blue-300 font-bold flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-blue-400" />
+                      <span>Total Lembur Periode Buka-Tutup:</span>
+                    </span>
+                    <span className="font-extrabold text-blue-200 bg-blue-900/50 px-2 py-0.5 rounded-md border border-blue-700/50">
+                      {periodOvertime.totalHours} Jam ({periodOvertime.totalDays} hari L)
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400">
+                      Jumlah Total Lembur Otomatis:
+                    </span>
+                    <span className="text-base font-black text-emerald-400 font-mono">
+                      {formatCurrency(periodOvertime.totalAmount)}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Logika: (Upah Harian {formatCurrency(editingDeduction.employee.dailyRate)} / 8) × {periodOvertime.totalHours} Jam Lembur
+                  </div>
+                  {periodOvertime.totalAmount > 0 && editingDeduction.bonus !== periodOvertime.totalAmount && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditingDeduction({
+                          ...editingDeduction,
+                          bonus: periodOvertime.totalAmount,
+                          bonusReason:
+                            editingDeduction.bonusReason ||
+                            `Lembur ${periodOvertime.totalHours} Jam Periode ${formatDMY(startDay, startMonth, startYear)} s/d ${formatDMY(endDay, endMonth, endYear)}`
+                        })
+                      }
+                      className="w-full py-1.5 px-3 bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-500/50 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <span>Terapkan Nilai Lembur Ini ke Insentif ({formatCurrency(periodOvertime.totalAmount)})</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Bonus / Lembur Amount */}
+                <div>
+                  <label className="block text-xs font-semibold text-emerald-300 mb-1">
+                    Insentif / Tambahan Lembur (Opsional - Rp):
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-500">Rp</span>
+                    <input
+                      id="bonus-amount-input"
+                      type="number"
+                      min="0"
+                      step="5000"
+                      value={editingDeduction.bonus}
+                      onChange={(e) =>
+                        setEditingDeduction({
+                          ...editingDeduction,
+                          bonus: Number(e.target.value)
+                        })
+                      }
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
+                {/* Alasan / Keterangan Insentif / Tambahan Lembur */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Alasan / Keterangan Insentif / Tambahan Lembur:
+                  </label>
+                  <textarea
+                    id="bonus-reason-input"
+                    rows={2}
+                    value={editingDeduction.bonusReason}
+                    onChange={(e) =>
+                      setEditingDeduction({
+                        ...editingDeduction,
+                        bonusReason: e.target.value
+                      })
+                    }
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    placeholder="Contoh: Lembur proyek akhir pekan, insentif target kebersihan..."
+                  />
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
+                <button
+                  onClick={() => setEditingDeduction(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  id="save-deduction-btn"
+                  onClick={handleSaveDeduction}
+                  className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-colors cursor-pointer"
+                >
+                  Simpan Potongan & Lembur
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ========================================================================= */}
+      {/* MATRIX CELL STATUS & OVERTIME POPUP DIALOG                                */}
+      {/* ========================================================================= */}
+      {selectedCell && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-sm p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
               <div>
-                <h3 className="font-bold text-white text-base">Atur Potongan Denda & Lembur</h3>
+                <h4 className="font-bold text-white text-sm flex items-center gap-1.5">
+                  <CalendarCheck2 className="w-4 h-4 text-amber-400" />
+                  <span>Presensi Harian</span>
+                </h4>
                 <p className="text-xs text-slate-400">
-                  {editingDeduction.employee.name} ({editingDeduction.employee.nik}) • Periode {formatDMY(startDay, startMonth, startYear)} s/d {formatDMY(endDay, endMonth, endYear)}
+                  {selectedCell.employee.name} • Tgl {selectedCell.dmy} ({selectedCell.dayName})
                 </p>
               </div>
               <button
-                onClick={() => setEditingDeduction(null)}
+                onClick={() => setSelectedCell(null)}
                 className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              {/* Daily Rate Info */}
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between text-xs">
-                <span className="text-slate-400">Rate Gaji Pokok Harian:</span>
+            {/* Info Upah */}
+            <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-[11px] flex justify-between items-center">
+              <div>
+                <span className="text-slate-400">Rate Pokok: </span>
                 <span className="font-bold text-slate-200">
-                  {formatCurrency(editingDeduction.employee.dailyRate)} / hari
+                  {formatCurrency(selectedCell.employee.dailyRate)} / hari
                 </span>
               </div>
-
-              {/* Deduction Amount Input */}
-              <div>
-                <label className="block text-xs font-semibold text-rose-300 mb-1">
-                  Nominal Potongan Denda / Pelanggaran (Rp):
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-slate-500">Rp</span>
-                  <input
-                    id="deduction-amount-input"
-                    type="number"
-                    min="0"
-                    step="5000"
-                    value={editingDeduction.amount}
-                    onChange={(e) =>
-                      setEditingDeduction({
-                        ...editingDeduction,
-                        amount: Number(e.target.value)
-                      })
-                    }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-rose-300 focus:outline-none focus:border-rose-500"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-
-              {/* Deduction Reason */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Alasan / Keterangan Potongan:
-                </label>
-                <textarea
-                  id="deduction-reason-input"
-                  rows={2}
-                  value={editingDeduction.reason}
-                  onChange={(e) =>
-                    setEditingDeduction({
-                      ...editingDeduction,
-                      reason: e.target.value
-                    })
-                  }
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                  placeholder="Contoh: Terlambat hadir, atribut seragam tidak lengkap..."
-                />
-              </div>
-
-              {/* Bonus / Lembur Amount */}
-              <div>
-                <label className="block text-xs font-semibold text-emerald-300 mb-1">
-                  Insentif / Tambahan Lembur (Opsional - Rp):
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-slate-500">Rp</span>
-                  <input
-                    id="bonus-amount-input"
-                    type="number"
-                    min="0"
-                    step="10000"
-                    value={editingDeduction.bonus}
-                    onChange={(e) =>
-                      setEditingDeduction({
-                        ...editingDeduction,
-                        bonus: Number(e.target.value)
-                      })
-                    }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
-                    placeholder="0"
-                  />
-                </div>
+              <div className="text-blue-300">
+                Tarif Lembur: <b>{formatCurrency(Math.round(selectedCell.employee.dailyRate / 8))}</b>/jam
               </div>
             </div>
 
+            {/* Status Buttons Grid */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-2">
+                Pilih Status Presensi:
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {/* H: Hadir */}
+                <button
+                  onClick={() => {
+                    if (selectedCell.currentStatus === 'L') {
+                      // Jika sedang L, klik H menambahkan Hadir jadi HL
+                      setSelectedCell({
+                        ...selectedCell,
+                        currentStatus: 'HL',
+                        includeHadir: true
+                      });
+                    } else if (selectedCell.currentStatus === 'HL') {
+                      // Jika sudah HL, klik H melepas Hadir kembali ke L
+                      setSelectedCell({
+                        ...selectedCell,
+                        currentStatus: 'L',
+                        includeHadir: false
+                      });
+                    } else {
+                      // Langsung simpan Hadir reguler
+                      handleSaveCellStatus(
+                        selectedCell.employee.id,
+                        selectedCell.day,
+                        selectedCell.month,
+                        selectedCell.year,
+                        'H'
+                      );
+                    }
+                  }}
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold flex flex-col items-center justify-center cursor-pointer transition-all ${
+                    selectedCell.currentStatus === 'HL'
+                      ? 'bg-emerald-600 text-white border-emerald-300 ring-2 ring-emerald-400 shadow-md shadow-emerald-500/30'
+                      : selectedCell.currentStatus === 'H'
+                      ? 'bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-500/30'
+                      : 'bg-slate-950 text-emerald-400 border-slate-700 hover:bg-emerald-950/30'
+                  }`}
+                  title={selectedCell.currentStatus === 'HL' ? 'Hadir & Lembur Aktif' : 'Pilih Hadir'}
+                >
+                  <span className="text-base font-black">H</span>
+                  <span className="text-[10px]">
+                    {selectedCell.currentStatus === 'HL' ? 'Hadir (✓)' : 'Hadir'}
+                  </span>
+                </button>
+
+                {/* A: Alpa */}
+                <button
+                  onClick={() =>
+                    handleSaveCellStatus(
+                      selectedCell.employee.id,
+                      selectedCell.day,
+                      selectedCell.month,
+                      selectedCell.year,
+                      'A'
+                    )
+                  }
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold flex flex-col items-center justify-center cursor-pointer transition-all ${
+                    selectedCell.currentStatus === 'A'
+                      ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/30'
+                      : 'bg-slate-950 text-rose-400 border-slate-700 hover:bg-rose-950/30'
+                  }`}
+                >
+                  <span className="text-base font-black">A</span>
+                  <span className="text-[10px]">Alpa</span>
+                </button>
+
+                {/* I: Izin */}
+                <button
+                  onClick={() =>
+                    handleSaveCellStatus(
+                      selectedCell.employee.id,
+                      selectedCell.day,
+                      selectedCell.month,
+                      selectedCell.year,
+                      'I'
+                    )
+                  }
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold flex flex-col items-center justify-center cursor-pointer transition-all ${
+                    selectedCell.currentStatus === 'I'
+                      ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/30'
+                      : 'bg-slate-950 text-amber-400 border-slate-700 hover:bg-amber-950/30'
+                  }`}
+                >
+                  <span className="text-base font-black">I</span>
+                  <span className="text-[10px]">Izin</span>
+                </button>
+
+                {/* S: Sakit */}
+                <button
+                  onClick={() =>
+                    handleSaveCellStatus(
+                      selectedCell.employee.id,
+                      selectedCell.day,
+                      selectedCell.month,
+                      selectedCell.year,
+                      'S'
+                    )
+                  }
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold flex flex-col items-center justify-center cursor-pointer transition-all ${
+                    selectedCell.currentStatus === 'S'
+                      ? 'bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-500/30'
+                      : 'bg-slate-950 text-purple-400 border-slate-700 hover:bg-purple-950/30'
+                  }`}
+                >
+                  <span className="text-base font-black">S</span>
+                  <span className="text-[10px]">Sakit</span>
+                </button>
+
+                {/* L: Lembur */}
+                <button
+                  onClick={() => {
+                    const wasHadir = selectedCell.currentStatus === 'H' || selectedCell.currentStatus === 'HL' || selectedCell.includeHadir;
+                    setSelectedCell({
+                      ...selectedCell,
+                      currentStatus: wasHadir ? 'HL' : 'L',
+                      includeHadir: wasHadir,
+                      overtimeHours: selectedCell.overtimeHours || 2
+                    });
+                  }}
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold flex flex-col items-center justify-center cursor-pointer transition-all ${
+                    selectedCell.currentStatus === 'HL'
+                      ? 'bg-blue-600 text-white border-blue-300 ring-2 ring-blue-400 shadow-md shadow-blue-500/30'
+                      : selectedCell.currentStatus === 'L'
+                      ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/30'
+                      : 'bg-slate-950 text-blue-400 border-slate-700 hover:bg-blue-950/30'
+                  }`}
+                  title={selectedCell.currentStatus === 'HL' ? 'Hadir & Lembur Aktif' : 'Pilih Lembur'}
+                >
+                  <span className="text-base font-black">
+                    {selectedCell.currentStatus === 'HL' ? 'H+L' : 'L'}
+                  </span>
+                  <span className="text-[10px]">
+                    {selectedCell.currentStatus === 'HL' ? 'Lembur (✓)' : 'Lembur'}
+                  </span>
+                </button>
+
+                {/* OFF: Libur */}
+                <button
+                  onClick={() =>
+                    handleSaveCellStatus(
+                      selectedCell.employee.id,
+                      selectedCell.day,
+                      selectedCell.month,
+                      selectedCell.year,
+                      'OFF'
+                    )
+                  }
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold flex flex-col items-center justify-center cursor-pointer transition-all ${
+                    selectedCell.currentStatus === 'OFF' || selectedCell.currentStatus === 'O'
+                      ? 'bg-slate-700 text-white border-slate-500 shadow-md'
+                      : 'bg-slate-950 text-slate-400 border-slate-700 hover:bg-slate-800'
+                  }`}
+                >
+                  <span className="text-sm font-mono font-bold">OFF</span>
+                  <span className="text-[10px]">Libur</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Kotak Kecil Isian Jam Lembur jika L atau HL dipilih */}
+            {(selectedCell.currentStatus === 'L' || selectedCell.currentStatus === 'HL') && (() => {
+              const isHL = selectedCell.currentStatus === 'HL' || selectedCell.includeHadir === true;
+              const hours = selectedCell.overtimeHours || 0;
+              const otPay = Math.round((selectedCell.employee.dailyRate / 8) * hours);
+              const dailyRate = selectedCell.employee.dailyRate;
+              const totalToday = isHL ? dailyRate + otPay : otPay;
+
+              return (
+                <div className="p-3 bg-blue-950/50 border border-blue-500/60 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block text-xs font-bold text-blue-300">
+                      Jumlah Jam Lembur:
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min="0.5"
+                        max="24"
+                        step="0.5"
+                        value={selectedCell.overtimeHours}
+                        onChange={(e) =>
+                          setSelectedCell({
+                            ...selectedCell,
+                            overtimeHours: Number(e.target.value) || 0
+                          })
+                        }
+                        className="w-20 bg-slate-950 border border-blue-400 rounded-xl px-2.5 py-1 text-center font-bold text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        placeholder="2"
+                      />
+                      <span className="text-xs font-semibold text-slate-300">Jam</span>
+                    </div>
+                  </div>
+
+                  {/* Checkbox Tambahkan Status Hadir (H) pada hari yang sama */}
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-blue-900/40 hover:bg-blue-900/60 border border-blue-600/60 cursor-pointer select-none transition-all">
+                    <input
+                      type="checkbox"
+                      id="toggle-modal-include-hadir"
+                      checked={isHL}
+                      onChange={(e) => {
+                        const isChecked = e.target.checked;
+                        setSelectedCell({
+                          ...selectedCell,
+                          includeHadir: isChecked,
+                          currentStatus: isChecked ? 'HL' : 'L'
+                        });
+                      }}
+                      className="w-4 h-4 mt-0.5 rounded text-blue-500 accent-blue-500 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded text-[10px] font-black border border-emerald-500/30">H + L</span>
+                        <span>Tambahkan status Hadir (H) juga pada hari ini</span>
+                      </div>
+                      <p className="text-[10px] text-blue-200 mt-0.5 leading-normal">
+                        Pekerja dihitung <b>Hadir kerja reguler</b> (1 hari) sekaligus <b>Lembur</b> ({hours} jam).
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Rincian Perhitungan Upah & Logika */}
+                  <div className="text-[11px] text-blue-200 bg-blue-900/40 p-2.5 rounded-xl border border-blue-800/60 space-y-1">
+                    <div>
+                      Logika Lembur: <b>({formatCurrency(dailyRate)} / 8) × {hours} Jam</b> = <b className="text-white font-mono">{formatCurrency(otPay)}</b>
+                    </div>
+                    {isHL ? (
+                      <div className="pt-1 border-t border-blue-800/60 text-emerald-300 font-bold flex justify-between items-center">
+                        <span>+ Upah Hadir Pokok 1 Hari:</span>
+                        <span className="font-mono">{formatCurrency(dailyRate)}</span>
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-slate-400 italic pt-0.5">
+                        * Tanpa upah hadir pokok (hanya upah lembur saja)
+                      </div>
+                    )}
+                    <div className="pt-1 border-t border-blue-800/60 font-bold text-white flex justify-between items-center text-xs">
+                      <span>Total Nilai Hari Ini:</span>
+                      <span className="font-mono text-amber-300">{formatCurrency(totalToday)}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      const finalSt: AttendanceStatus = isHL ? 'HL' : 'L';
+                      handleSaveCellStatus(
+                        selectedCell.employee.id,
+                        selectedCell.day,
+                        selectedCell.month,
+                        selectedCell.year,
+                        finalSt,
+                        selectedCell.overtimeHours || 2
+                      );
+                    }}
+                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-600/30 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <span>
+                      {isHL
+                        ? `Simpan Hadir & Lembur (${selectedCell.overtimeHours || 2} Jam)`
+                        : `Simpan Lembur Saja (${selectedCell.overtimeHours || 2} Jam)`}
+                    </span>
+                  </button>
+                </div>
+              );
+            })()}
+
             {/* Modal Actions */}
-            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
               <button
-                onClick={() => setEditingDeduction(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                onClick={() =>
+                  handleSaveCellStatus(
+                    selectedCell.employee.id,
+                    selectedCell.day,
+                    selectedCell.month,
+                    selectedCell.year,
+                    ''
+                  )
+                }
+                className="text-slate-500 hover:text-rose-400 font-semibold cursor-pointer"
               >
-                Batal
+                Kosongkan
               </button>
               <button
-                id="save-deduction-btn"
-                onClick={handleSaveDeduction}
-                className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-colors cursor-pointer"
+                onClick={() => setSelectedCell(null)}
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl cursor-pointer"
               >
-                Simpan Potongan
+                Batal
               </button>
             </div>
           </div>
@@ -2052,6 +2793,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                 let totalAlpaSum = 0;
                 let totalIzinSum = 0;
                 let totalSakitSum = 0;
+                let totalLemburSum = 0;
+                let totalLemburHoursSum = 0;
                 let totalDeductionSum = 0;
                 let totalGrossSum = 0;
                 let totalNetSum = 0;
@@ -2063,6 +2806,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   totalAlpaSum += stats.alpa;
                   totalIzinSum += stats.izin;
                   totalSakitSum += stats.sakit;
+                  totalLemburSum += stats.lembur;
+                  totalLemburHoursSum += stats.lemburHours;
                   totalDeductionSum += stats.deduction;
                   totalGrossSum += stats.grossPay;
                   totalNetSum += stats.netPay;
@@ -2204,8 +2949,11 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                             <th className="py-2 px-1.5 text-center border-r border-slate-700 bg-purple-900 text-purple-100 w-8">
                               S
                             </th>
-                            <th className="py-2 px-2 text-right border-r border-slate-700 bg-slate-900 text-rose-300 min-w-[75px]">
-                              Potongan (Rp)
+                            <th className="py-2 px-1.5 text-center border-r border-slate-700 bg-blue-900 text-blue-100 w-10">
+                              L
+                            </th>
+                            <th className="py-2 px-2 text-right border-r border-slate-700 bg-slate-900 text-amber-200 min-w-[95px]">
+                              Potongan atau tambahan
                             </th>
                             <th className="py-2 px-2 text-right bg-slate-950 text-amber-300 min-w-[85px] font-black">
                               Gaji Bersih
@@ -2216,7 +2964,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         <tbody className="divide-y divide-slate-200">
                           {rowsData.length === 0 ? (
                             <tr>
-                              <td colSpan={activePeriodDays.length + 10} className="py-8 text-center text-slate-400 font-semibold">
+                              <td colSpan={activePeriodDays.length + 11} className="py-8 text-center text-slate-400 font-semibold">
                                 Tidak ada data personil pada lokasi ini.
                               </td>
                             </tr>
@@ -2251,6 +2999,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                 {/* Period Day Cells */}
                                 {activePeriodDays.map((pDay) => {
                                   const status = getStatusForEmployeeDate(row.emp.id, pDay.day, pDay.month, pDay.year);
+                                  const otHours = getOvertimeHoursForEmployeeDate(row.emp.id, pDay.day, pDay.month, pDay.year);
 
                                   let cellBg = '';
                                   let textColor = 'text-slate-700';
@@ -2264,8 +3013,14 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                     cellBg = 'bg-amber-100 text-amber-800 font-bold';
                                   } else if (status === 'S') {
                                     cellBg = 'bg-purple-100 text-purple-800 font-black';
-                                  } else if (status === 'O') {
-                                    cellBg = 'bg-slate-100 text-slate-400';
+                                  } else if (status === 'L') {
+                                    cellBg = 'bg-blue-100 text-blue-800 font-black';
+                                    displayTxt = `L:${otHours}j`;
+                                  } else if (status === 'HL' || (status as string) === 'H+L') {
+                                    cellBg = 'bg-emerald-100 text-emerald-950 font-black border border-emerald-300';
+                                    displayTxt = `H+L:${otHours}j`;
+                                  } else if (status === 'OFF' || status === 'O') {
+                                    cellBg = 'bg-slate-100 text-slate-400 font-medium';
                                     displayTxt = 'OFF';
                                   } else if (pDay.isWeekend) {
                                     cellBg = 'bg-amber-50/50';
@@ -2293,8 +3048,23 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                 <td className="py-1.5 px-1.5 text-center font-bold text-purple-800 bg-purple-50/50 border-r border-slate-200">
                                   {row.stats.sakit}
                                 </td>
-                                <td className="py-1.5 px-2 text-right font-mono text-rose-700 border-r border-slate-200">
-                                  {row.stats.deduction > 0 ? formatCurrency(row.stats.deduction) : '-'}
+                                <td className="py-1.5 px-1 text-center font-bold text-blue-800 bg-blue-50/50 border-r border-slate-200 text-[9px]">
+                                  {row.stats.lembur > 0 ? `${row.stats.lembur} (${row.stats.lemburHours}j)` : '0'}
+                                </td>
+                                <td className="py-1.5 px-2 text-right font-mono text-[9px] border-r border-slate-200">
+                                  {row.stats.deduction > 0 && (row.stats.bonus > 0 || row.stats.lemburPay > 0) ? (
+                                    <div className="leading-tight">
+                                      <span className="text-emerald-700">+{formatCurrency(row.stats.bonus > 0 ? row.stats.bonus : row.stats.lemburPay)}</span>
+                                      <br />
+                                      <span className="text-rose-700">-{formatCurrency(row.stats.deduction)}</span>
+                                    </div>
+                                  ) : row.stats.deduction > 0 ? (
+                                    <span className="text-rose-700">-{formatCurrency(row.stats.deduction)}</span>
+                                  ) : (row.stats.bonus > 0 || row.stats.lemburPay > 0) ? (
+                                    <span className="text-emerald-700">+{formatCurrency(row.stats.bonus > 0 ? row.stats.bonus : row.stats.lemburPay)}</span>
+                                  ) : (
+                                    <span className="text-slate-400">-</span>
+                                  )}
                                 </td>
                                 <td className="py-1.5 px-2 text-right font-mono font-black text-slate-900 bg-slate-50">
                                   {formatCurrency(row.stats.netPay)}
@@ -2328,8 +3098,11 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                             <td className="py-2.5 px-1.5 text-center text-purple-800 bg-purple-100 border-r border-slate-300">
                               {totalSakitSum}
                             </td>
-                            <td className="py-2.5 px-2 text-right font-mono text-rose-800 bg-rose-50 border-r border-slate-300">
-                              {formatCurrency(totalDeductionSum)}
+                            <td className="py-2.5 px-1.5 text-center text-blue-800 bg-blue-100 border-r border-slate-300 text-[9px]">
+                              {totalLemburSum} ({totalLemburHoursSum}j)
+                            </td>
+                            <td className="py-2.5 px-2 text-right font-mono text-slate-700 bg-slate-50 border-r border-slate-300 text-[9px]">
+                              -{formatCurrency(totalDeductionSum)}
                             </td>
                             <td className="py-2.5 px-2 text-right font-mono text-slate-950 bg-amber-200 text-xs font-black">
                               {formatCurrency(totalNetSum)}

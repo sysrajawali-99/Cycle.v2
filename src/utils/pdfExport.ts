@@ -191,7 +191,7 @@ export const generateTimesheetPDF = ({
   doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
   doc.text(
-    `Laporan resmi akumulasi presensi kerja harian dan perhitungan take home pay personil cleaning service (H: Hadir, A: Alpa, I: Izin, S: Sakit, OFF: Libur).`,
+    `Laporan resmi akumulasi presensi kerja harian dan perhitungan take home pay personil cleaning service (H: Hadir, A: Alpa, I: Izin, S: Sakit, L: Lembur, OFF: Libur).`,
     14,
     33.5
   );
@@ -242,6 +242,7 @@ export const generateTimesheetPDF = ({
   let grandTotalAlpa = 0;
   let grandTotalIzin = 0;
   let grandTotalSakit = 0;
+  let grandTotalLembur = 0;
   let grandTotalDeductions = 0;
 
   const isCustomMode = customDays && customDays.length > 0;
@@ -268,7 +269,8 @@ export const generateTimesheetPDF = ({
       'A',
       'I',
       'S',
-      'Potongan (Rp)',
+      'L',
+      'Potongan atau tambahan',
       'Gaji Bersih (THP)'
     ]
   ];
@@ -279,6 +281,8 @@ export const generateTimesheetPDF = ({
     let alpa = 0;
     let izin = 0;
     let sakit = 0;
+    let lembur = 0;
+    let lemburHours = 0;
     const dayCells: string[] = [];
 
     let deduction = 0;
@@ -304,7 +308,18 @@ export const generateTimesheetPDF = ({
         } else if (st === 'S') {
           sakit++;
           dayCells.push('S');
-        } else if (st === 'O') {
+        } else if (st === 'L') {
+          lembur++;
+          const hrs = rec?.overtimeHours?.[cd.day] || 2;
+          lemburHours += hrs;
+          dayCells.push(`L:${hrs}j`);
+        } else if (st === 'HL' || (st as string) === 'H+L') {
+          hadir++;
+          lembur++;
+          const hrs = rec?.overtimeHours?.[cd.day] || 2;
+          lemburHours += hrs;
+          dayCells.push(`H+L:${hrs}j`);
+        } else if (st === 'OFF' || st === 'O') {
           dayCells.push('OFF');
         } else {
           dayCells.push('');
@@ -331,6 +346,7 @@ export const generateTimesheetPDF = ({
         month,
         year,
         days: {},
+        overtimeHours: {},
         deductionAmount: 0,
         deductionReason: '',
         bonusAmount: 0,
@@ -352,7 +368,18 @@ export const generateTimesheetPDF = ({
           } else if (st === 'S') {
             sakit++;
             dayCells.push('S');
-          } else if (st === 'O') {
+          } else if (st === 'L') {
+            lembur++;
+            const hrs = rec.overtimeHours?.[d] || 2;
+            lemburHours += hrs;
+            dayCells.push(`L:${hrs}j`);
+          } else if (st === 'HL' || (st as string) === 'H+L') {
+            hadir++;
+            lembur++;
+            const hrs = rec.overtimeHours?.[d] || 2;
+            lemburHours += hrs;
+            dayCells.push(`H+L:${hrs}j`);
+          } else if (st === 'OFF' || st === 'O') {
             dayCells.push('OFF');
           } else {
             dayCells.push('');
@@ -365,13 +392,16 @@ export const generateTimesheetPDF = ({
       bonus = rec.bonusAmount || 0;
     }
 
-    const gross = hadir * emp.dailyRate + bonus;
+    const calculatedLemburPay = Math.round((emp.dailyRate / 8) * lemburHours);
+    const effectiveBonus = bonus > 0 ? bonus : calculatedLemburPay;
+    const gross = hadir * emp.dailyRate + effectiveBonus;
     const net = Math.max(0, gross - deduction);
 
     grandTotalHadir += hadir;
     grandTotalAlpa += alpa;
     grandTotalIzin += izin;
     grandTotalSakit += sakit;
+    grandTotalLembur += lembur;
     grandTotalDeductions += deduction;
     grandTotalNet += net;
 
@@ -385,6 +415,16 @@ export const generateTimesheetPDF = ({
       ? 'Malam'
       : 'Gen';
 
+    // Format adjustment (potongan / tambahan)
+    let adjText = '-';
+    if (deduction > 0 && effectiveBonus > 0) {
+      adjText = `+${formatCurrency(effectiveBonus)}\n-${formatCurrency(deduction)}`;
+    } else if (deduction > 0) {
+      adjText = `-${formatCurrency(deduction)}`;
+    } else if (effectiveBonus > 0) {
+      adjText = `+${formatCurrency(effectiveBonus)}`;
+    }
+
     return [
       String(index + 1),
       `${emp.name}\n[${emp.position} • ${emp.nik}]`,
@@ -395,7 +435,8 @@ export const generateTimesheetPDF = ({
       String(alpa),
       String(izin),
       String(sakit),
-      deduction > 0 ? formatCurrency(deduction) : '-',
+      lembur > 0 ? `${lembur} (${lemburHours}j)` : '0',
+      adjText,
       formatCurrency(net)
     ];
   });
@@ -412,6 +453,15 @@ export const generateTimesheetPDF = ({
   doc.text(formatCurrency(grandTotalNet), 14 + (boxW + 3) * 3 + 3, boxY + 8.5);
 
   // 3. GENERATE PROFESSIONAL TABLE VIA AUTOTABLE
+  const colOffsetDays = 4;
+  const colIdxH = colOffsetDays + numDays;
+  const colIdxA = colIdxH + 1;
+  const colIdxI = colIdxH + 2;
+  const colIdxS = colIdxH + 3;
+  const colIdxL = colIdxH + 4;
+  const colIdxAdj = colIdxH + 5;
+  const colIdxNet = colIdxH + 6;
+
   autoTable(doc, {
     head: tableHead,
     body: tableBody,
@@ -426,6 +476,7 @@ export const generateTimesheetPDF = ({
         String(grandTotalAlpa),
         String(grandTotalIzin),
         String(grandTotalSakit),
+        String(grandTotalLembur),
         formatCurrency(grandTotalDeductions),
         formatCurrency(grandTotalNet)
       ]
@@ -434,8 +485,8 @@ export const generateTimesheetPDF = ({
     margin: { left: 10, right: 10, bottom: 35 },
     theme: 'grid',
     styles: {
-      fontSize: 5.5,
-      cellPadding: 0.8,
+      fontSize: 5,
+      cellPadding: 0.7,
       lineColor: [203, 213, 225],
       lineWidth: 0.15,
       font: 'helvetica',
@@ -445,7 +496,7 @@ export const generateTimesheetPDF = ({
     headStyles: {
       fillColor: [15, 39, 68], // Deep Corporate Navy
       textColor: [255, 255, 255],
-      fontSize: 5.5,
+      fontSize: 5,
       fontStyle: 'bold',
       halign: 'center',
       valign: 'middle'
@@ -454,30 +505,31 @@ export const generateTimesheetPDF = ({
       fillColor: [241, 245, 249],
       textColor: [15, 23, 42],
       fontStyle: 'bold',
-      fontSize: 6,
+      fontSize: 5.5,
       halign: 'center',
       valign: 'middle'
     },
     columnStyles: {
       0: { cellWidth: 7, halign: 'center' }, // No
-      1: { cellWidth: 32, halign: 'left', fontStyle: 'bold' }, // Name
-      2: { cellWidth: 15, halign: 'center' }, // Proj/Shift
-      3: { cellWidth: 15, halign: 'right', fontStyle: 'bold' }, // Rate
-      // 31 days columns (index 4 to 34)
-      ...Array.from({ length: 31 }, (_, i) => i + 4).reduce((acc, colIdx) => {
-        acc[colIdx] = { cellWidth: 3.9, halign: 'center', fontSize: 4.8 };
+      1: { cellWidth: 30, halign: 'left', fontStyle: 'bold' }, // Name
+      2: { cellWidth: 14, halign: 'center' }, // Proj/Shift
+      3: { cellWidth: 14, halign: 'right', fontStyle: 'bold' }, // Rate
+      // days columns (index 4 to colOffsetDays + numDays - 1)
+      ...Array.from({ length: numDays }, (_, i) => i + colOffsetDays).reduce((acc, colIdx) => {
+        acc[colIdx] = { cellWidth: Math.max(3.5, 120 / numDays), halign: 'center', fontSize: 4.5 };
         return acc;
       }, {} as any),
-      35: { cellWidth: 6, halign: 'center', fontStyle: 'bold', textColor: [5, 150, 105] }, // H
-      36: { cellWidth: 6, halign: 'center', fontStyle: 'bold', textColor: [220, 38, 38] }, // A
-      37: { cellWidth: 6, halign: 'center', fontStyle: 'bold', textColor: [217, 119, 6] }, // I
-      38: { cellWidth: 6, halign: 'center', fontStyle: 'bold', textColor: [126, 34, 206] }, // S
-      39: { cellWidth: 16, halign: 'right', textColor: [220, 38, 38] }, // Deduction
-      40: { cellWidth: 20, halign: 'right', fontStyle: 'bold', textColor: [15, 23, 42] } // Net Pay
+      [colIdxH]: { cellWidth: 5.5, halign: 'center', fontStyle: 'bold', textColor: [5, 150, 105] }, // H
+      [colIdxA]: { cellWidth: 5.5, halign: 'center', fontStyle: 'bold', textColor: [220, 38, 38] }, // A
+      [colIdxI]: { cellWidth: 5.5, halign: 'center', fontStyle: 'bold', textColor: [217, 119, 6] }, // I
+      [colIdxS]: { cellWidth: 5.5, halign: 'center', fontStyle: 'bold', textColor: [126, 34, 206] }, // S
+      [colIdxL]: { cellWidth: 7, halign: 'center', fontStyle: 'bold', textColor: [37, 99, 235] }, // L
+      [colIdxAdj]: { cellWidth: 16, halign: 'right', textColor: [15, 23, 42] }, // Potongan atau tambahan
+      [colIdxNet]: { cellWidth: 19, halign: 'right', fontStyle: 'bold', textColor: [15, 23, 42] } // Net Pay
     },
     didParseCell: (data) => {
       // Color-code day cells in table body
-      if (data.section === 'body' && data.column.index >= 4 && data.column.index <= 34) {
+      if (data.section === 'body' && data.column.index >= colOffsetDays && data.column.index < colOffsetDays + numDays) {
         const val = data.cell.raw;
         if (val === 'H') {
           data.cell.styles.fillColor = [220, 252, 231]; // Soft Green
@@ -494,6 +546,14 @@ export const generateTimesheetPDF = ({
         } else if (val === 'S') {
           data.cell.styles.fillColor = [243, 232, 255]; // Soft Purple
           data.cell.styles.textColor = [126, 34, 206]; // Dark Purple
+          data.cell.styles.fontStyle = 'bold';
+        } else if (typeof val === 'string' && val.startsWith('H+L')) {
+          data.cell.styles.fillColor = [209, 250, 229]; // Soft Emerald-Blue
+          data.cell.styles.textColor = [6, 95, 70]; // Dark Emerald
+          data.cell.styles.fontStyle = 'bold';
+        } else if (typeof val === 'string' && val.startsWith('L')) {
+          data.cell.styles.fillColor = [219, 234, 254]; // Soft Blue
+          data.cell.styles.textColor = [29, 78, 216]; // Dark Blue
           data.cell.styles.fontStyle = 'bold';
         } else if (val === 'OFF') {
           data.cell.styles.fillColor = [241, 245, 249];

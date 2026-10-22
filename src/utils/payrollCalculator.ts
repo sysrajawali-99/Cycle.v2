@@ -26,12 +26,16 @@ export interface PayrollRowItem {
   alpaCount: number;
   izinCount: number;
   sakitCount: number;
+  lemburCount: number;
+  lemburHours: number;
+  lemburPay: number;
   offCount: number;
   grossPay: number;
   netPay: number;
   deductionAmount: number;
   deductionReason: string;
   bonusAmount: number;
+  bonusReason?: string;
 }
 
 export interface PayrollSummaryResult {
@@ -43,6 +47,9 @@ export interface PayrollSummaryResult {
   totalAlpaDays: number;
   totalIzinDays: number;
   totalSakitDays: number;
+  totalLemburDays: number;
+  totalLemburHours: number;
+  totalLemburPay: number;
   totalOffDays: number;
   personnelCount: number;
   periodLabel: string;
@@ -173,6 +180,9 @@ export function calculatePayrollSummary(
     let alpaCount = 0;
     let izinCount = 0;
     let sakitCount = 0;
+    let lemburCount = 0;
+    let lemburHours = 0;
+    let lemburPay = 0;
     let offCount = 0;
 
     // Kehadiran in active period
@@ -182,7 +192,28 @@ export function calculatePayrollSummary(
       else if (st === 'A') alpaCount++;
       else if (st === 'I') izinCount++;
       else if (st === 'S') sakitCount++;
-      else if (st === 'O') offCount++;
+      else if (st === 'L') {
+        lemburCount++;
+        const rec = timesheets.find(
+          (ts) => ts.employeeId === emp.id && ts.month === pDay.month && ts.year === pDay.year
+        );
+        const hrs = rec?.overtimeHours?.[pDay.day] !== undefined ? rec.overtimeHours[pDay.day] : 2;
+        lemburHours += hrs;
+        // Rumus: (Upah Harian / 8) * Jam Lembur
+        lemburPay += Math.round((emp.dailyRate / 8) * hrs);
+      }
+      else if (st === 'HL' || (st as string) === 'H+L') {
+        hadirCount++; // Terhitung sebagai hadir juga
+        lemburCount++; // Terhitung sebagai lembur juga
+        const rec = timesheets.find(
+          (ts) => ts.employeeId === emp.id && ts.month === pDay.month && ts.year === pDay.year
+        );
+        const hrs = rec?.overtimeHours?.[pDay.day] !== undefined ? rec.overtimeHours[pDay.day] : 2;
+        lemburHours += hrs;
+        // Rumus: (Upah Harian / 8) * Jam Lembur
+        lemburPay += Math.round((emp.dailyRate / 8) * hrs);
+      }
+      else if (st === 'O' || st === 'OFF') offCount++;
     });
 
     // Distinct months in active period
@@ -194,6 +225,7 @@ export function calculatePayrollSummary(
     let deductionAmount = 0;
     let bonusAmount = 0;
     const deductionReasons: string[] = [];
+    const bonusReasons: string[] = [];
 
     distinctMonths.forEach((key) => {
       const [y, m] = key.split('-').map(Number);
@@ -204,10 +236,17 @@ export function calculatePayrollSummary(
         if (rec.deductionAmount) deductionAmount += rec.deductionAmount;
         if (rec.bonusAmount) bonusAmount += rec.bonusAmount;
         if (rec.deductionReason) deductionReasons.push(rec.deductionReason);
+        if (rec.bonusReason) bonusReasons.push(rec.bonusReason);
       }
     });
 
-    const grossPay = hadirCount * emp.dailyRate + bonusAmount;
+    // Jika bonusAmount manual belum diinput tapi lembur pekerja ada di matrix, gunakan nilai lemburPay
+    const effectiveBonus = bonusAmount > 0 ? bonusAmount : lemburPay;
+    const effectiveBonusReason = bonusReasons.length > 0 
+      ? bonusReasons.join('; ') 
+      : (lemburHours > 0 ? `Lembur ${lemburHours} Jam` : '');
+
+    const grossPay = hadirCount * emp.dailyRate + effectiveBonus;
     const netPay = Math.max(0, grossPay - deductionAmount);
 
     const representativeRec = timesheets.find(
@@ -221,7 +260,8 @@ export function calculatePayrollSummary(
       days: {},
       deductionAmount,
       deductionReason: deductionReasons.join('; '),
-      bonusAmount,
+      bonusAmount: effectiveBonus,
+      bonusReason: effectiveBonusReason,
       notes: ''
     };
 
@@ -231,18 +271,23 @@ export function calculatePayrollSummary(
         ...representativeRec,
         deductionAmount,
         deductionReason: deductionReasons.join('; '),
-        bonusAmount
+        bonusAmount: effectiveBonus,
+        bonusReason: effectiveBonusReason
       },
       hadirCount,
       alpaCount,
       izinCount,
       sakitCount,
+      lemburCount,
+      lemburHours,
+      lemburPay,
       offCount,
       grossPay,
       netPay,
       deductionAmount,
       deductionReason: deductionReasons.join('; '),
-      bonusAmount
+      bonusAmount: effectiveBonus,
+      bonusReason: effectiveBonusReason
     };
   });
 
@@ -254,6 +299,9 @@ export function calculatePayrollSummary(
   const totalAlpaDays = payrollRows.reduce((acc, row) => acc + row.alpaCount, 0);
   const totalIzinDays = payrollRows.reduce((acc, row) => acc + row.izinCount, 0);
   const totalSakitDays = payrollRows.reduce((acc, row) => acc + row.sakitCount, 0);
+  const totalLemburDays = payrollRows.reduce((acc, row) => acc + row.lemburCount, 0);
+  const totalLemburHours = payrollRows.reduce((acc, row) => acc + row.lemburHours, 0);
+  const totalLemburPay = payrollRows.reduce((acc, row) => acc + row.lemburPay, 0);
   const totalOffDays = payrollRows.reduce((acc, row) => acc + row.offCount, 0);
 
   return {
@@ -265,6 +313,9 @@ export function calculatePayrollSummary(
     totalAlpaDays,
     totalIzinDays,
     totalSakitDays,
+    totalLemburDays,
+    totalLemburHours,
+    totalLemburPay,
     totalOffDays,
     personnelCount: filteredEmployees.length,
     periodLabel,

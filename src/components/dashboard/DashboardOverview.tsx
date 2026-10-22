@@ -248,7 +248,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       else if (st === 'A') alpa++;
       else if (st === 'I') izin++;
       else if (st === 'S') sakit++;
-      else if (st === 'O') off++;
+      else if (st === 'O' || st === 'OFF') off++;
+      else if (st === 'L' || st === 'HL' || (st as string) === 'H+L') present++; // Lembur / Hadir+Lembur terhitung aktif hadir
       else unrecorded++;
     });
 
