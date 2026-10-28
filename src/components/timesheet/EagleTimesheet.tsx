@@ -147,12 +147,12 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     employee: Employee;
     targetMonth: number;
     targetYear: number;
-    amount: number;         // Potongan Deposit Seragam / Denda / Kasbon
-    reason: string;         // Alasan / Keterangan Potongan
-    overtimeAmount: number; // Tambahan Lembur (otomatis terisi jika ada "L" atau diisi manual)
-    overtimeReason: string; // Alasan / Keterangan Tambahan Lembur
-    incentiveAmount: number;// Tambahan Insentif
-    incentiveReason: string;// Alasan / Keterangan Insentif
+    amount: number | string;         // Potongan Deposit Seragam / Denda / Kasbon (dapat diisi manual & dirubah bebas)
+    reason: string;                  // Alasan / Keterangan Potongan
+    overtimeAmount: number | string; // Tambahan Lembur (otomatis terisi jika ada "L" atau diisi manual)
+    overtimeReason: string;          // Alasan / Keterangan Tambahan Lembur
+    incentiveAmount: number | string;// Tambahan Insentif (dapat diisi manual & dirubah bebas)
+    incentiveReason: string;         // Alasan / Keterangan Insentif
     bonus?: number;
     bonusReason?: string;
   } | null>(null);
@@ -605,39 +605,68 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       distinctMonths.add(`${pDay.year}-${pDay.month}`);
     });
 
+    // Authoritative target record for this active period (endMonth in cutoff mode, currentMonth otherwise)
+    const targetM = isCutoffMode ? endMonth : currentMonth;
+    const targetY = isCutoffMode ? endYear : currentYear;
+    const primaryRec = timesheets.find(
+      (ts) => ts.employeeId === employee.id && ts.month === targetM && ts.year === targetY
+    );
+
     let deduction = 0;
     let bonus = 0;
     let overtimeSum = 0;
     let incentiveSum = 0;
     let hasExplicitOvertime = false;
     let hasExplicitIncentive = false;
-    const deductionReasons: string[] = [];
-    const bonusReasons: string[] = [];
-    const overtimeReasons: string[] = [];
-    const incentiveReasons: string[] = [];
+    let deductionReason = '';
+    let bonusReason = '';
+    let overtimeReason = '';
+    let incentiveReason = '';
 
-    distinctMonths.forEach((key) => {
-      const [y, m] = key.split('-').map(Number);
-      const rec = timesheets.find(
-        (ts) => ts.employeeId === employee.id && ts.month === m && ts.year === y
-      );
-      if (rec) {
-        if (rec.deductionAmount) deduction += rec.deductionAmount;
-        if (rec.bonusAmount) bonus += rec.bonusAmount;
-        if (rec.overtimeAmount !== undefined && rec.overtimeAmount !== null) {
-          overtimeSum += rec.overtimeAmount;
-          hasExplicitOvertime = true;
-        }
-        if (rec.incentiveAmount !== undefined && rec.incentiveAmount !== null) {
-          incentiveSum += rec.incentiveAmount;
-          hasExplicitIncentive = true;
-        }
-        if (rec.deductionReason) deductionReasons.push(rec.deductionReason);
-        if (rec.bonusReason) bonusReasons.push(rec.bonusReason);
-        if (rec.overtimeReason) overtimeReasons.push(rec.overtimeReason);
-        if (rec.incentiveReason) incentiveReasons.push(rec.incentiveReason);
+    if (primaryRec) {
+      deduction = Number(primaryRec.deductionAmount) || 0;
+      deductionReason = primaryRec.deductionReason || '';
+      bonus = Number(primaryRec.bonusAmount) || 0;
+      bonusReason = primaryRec.bonusReason || '';
+      if (primaryRec.overtimeAmount !== undefined && primaryRec.overtimeAmount !== null) {
+        overtimeSum = Number(primaryRec.overtimeAmount) || 0;
+        hasExplicitOvertime = true;
+        overtimeReason = primaryRec.overtimeReason || '';
       }
-    });
+      if (primaryRec.incentiveAmount !== undefined && primaryRec.incentiveAmount !== null) {
+        incentiveSum = Number(primaryRec.incentiveAmount) || 0;
+        hasExplicitIncentive = true;
+        incentiveReason = primaryRec.incentiveReason || '';
+      }
+    } else {
+      // Fallback: search across active period months if target record not yet saved
+      for (const key of distinctMonths) {
+        const [y, m] = key.split('-').map(Number);
+        const rec = timesheets.find(
+          (ts) => ts.employeeId === employee.id && ts.month === m && ts.year === y
+        );
+        if (rec) {
+          if (rec.deductionAmount && deduction === 0) {
+            deduction = Number(rec.deductionAmount) || 0;
+            deductionReason = rec.deductionReason || '';
+          }
+          if (rec.bonusAmount && bonus === 0) {
+            bonus = Number(rec.bonusAmount) || 0;
+            bonusReason = rec.bonusReason || '';
+          }
+          if (rec.overtimeAmount !== undefined && rec.overtimeAmount !== null && !hasExplicitOvertime) {
+            overtimeSum = Number(rec.overtimeAmount) || 0;
+            hasExplicitOvertime = true;
+            overtimeReason = rec.overtimeReason || '';
+          }
+          if (rec.incentiveAmount !== undefined && rec.incentiveAmount !== null && !hasExplicitIncentive) {
+            incentiveSum = Number(rec.incentiveAmount) || 0;
+            hasExplicitIncentive = true;
+            incentiveReason = rec.incentiveReason || '';
+          }
+        }
+      }
+    }
 
     // Perhitungan nilai lembur otomatis: (Upah Harian / 8) * Jam Lembur
     const hourlyRate = employee.dailyRate > 0 ? Math.round(employee.dailyRate / 8) : 0;
@@ -649,18 +678,16 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       ? overtimeSum
       : (hasLemburData ? lemburPay : 0);
 
-    const effectiveOvertimeReason = overtimeReasons.length > 0
-      ? overtimeReasons.join('; ')
-      : (hasLemburData && lemburHours > 0 ? `Lembur ${lemburHours} Jam` : '');
+    const effectiveOvertimeReason = overtimeReason
+      || (hasLemburData && lemburHours > 0 ? `Lembur ${lemburHours} Jam` : '');
 
     // Nilai insentif efektif: gunakan incentiveSum jika ada, atau fallback dari bonus jika tidak ada lembur
     const effectiveIncentive = hasExplicitIncentive
       ? incentiveSum
       : (!hasLemburData && !hasExplicitOvertime && bonus > 0 ? bonus : 0);
 
-    const effectiveIncentiveReason = incentiveReasons.length > 0
-      ? incentiveReasons.join('; ')
-      : (!hasLemburData && !hasExplicitOvertime && bonusReasons.length > 0 ? bonusReasons.join('; ') : '');
+    const effectiveIncentiveReason = incentiveReason
+      || (!hasLemburData && !hasExplicitOvertime && bonusReason ? bonusReason : '');
 
     // Total tambahan = Lembur + Insentif (atau fallback ke bonus legacy)
     const effectiveBonus = (effectiveOvertime + effectiveIncentive) > 0
@@ -674,9 +701,9 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
     if (effectiveIncentive > 0) {
       bonusReasonParts.push(effectiveIncentiveReason ? `Insentif: ${effectiveIncentiveReason}` : `Insentif: ${formatCurrency(effectiveIncentive)}`);
     }
-    const bonusReason = bonusReasonParts.length > 0
+    const computedBonusReason = bonusReasonParts.length > 0
       ? bonusReasonParts.join(' • ')
-      : (bonusReasons.length > 0 ? bonusReasons.join('; ') : '');
+      : bonusReason;
 
     const grossPay = hadir * employee.dailyRate + effectiveBonus;
     const netPay = Math.max(0, grossPay - deduction);
@@ -698,8 +725,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       effectiveOvertimeReason,
       effectiveIncentive,
       effectiveIncentiveReason,
-      deductionReason: deductionReasons.join('; '),
-      bonusReason,
+      deductionReason,
+      bonusReason: computedBonusReason,
       netPay
     };
   };
@@ -879,7 +906,30 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       incentiveReason: incentiveReason || ''
     };
 
-    const nextTimesheets = [...timesheets];
+    // In cutoff mode, clear any old deduction/incentive from other months within this active cutoff period
+    // so that it doesn't double-count with targetMonth
+    const nextTimesheets = timesheets.map((ts) => {
+      if (ts.employeeId === employee.id) {
+        const isOtherMonthInCutoff = isCutoffMode &&
+          (ts.month !== targetMonth || ts.year !== targetYear) &&
+          activePeriodDays.some((p) => p.month === ts.month && p.year === ts.year);
+        if (isOtherMonthInCutoff) {
+          return {
+            ...ts,
+            deductionAmount: 0,
+            deductionReason: '',
+            overtimeAmount: 0,
+            overtimeReason: '',
+            incentiveAmount: 0,
+            incentiveReason: '',
+            bonusAmount: 0,
+            bonusReason: ''
+          };
+        }
+      }
+      return ts;
+    });
+
     const existingIdx = nextTimesheets.findIndex(
       (ts) => ts.employeeId === employee.id && ts.month === targetMonth && ts.year === targetYear
     );
@@ -1867,22 +1917,22 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                           const hasLembur = periodOvertime.totalHours > 0 || stats.lembur > 0;
                           const initOvertimeAmount = stats.effectiveOvertime > 0
                             ? stats.effectiveOvertime
-                            : (hasLembur ? (periodOvertime.totalAmount || stats.lemburPay) : 0);
+                            : (hasLembur ? (periodOvertime.totalAmount || stats.lemburPay) : '');
                           const initOvertimeReason = stats.effectiveOvertimeReason || (hasLembur && periodOvertime.totalHours > 0 ? `Lembur ${periodOvertime.totalHours} Jam Periode ${formatDMY(startDay, startMonth, startYear)} s/d ${formatDMY(endDay, endMonth, endYear)}` : '');
-                          const initIncentiveAmount = stats.effectiveIncentive || 0;
+                          const initIncentiveAmount = stats.effectiveIncentive > 0 ? stats.effectiveIncentive : '';
                           const initIncentiveReason = stats.effectiveIncentiveReason || '';
 
                           setEditingDeduction({
                             employee: emp,
                             targetMonth: targetM,
                             targetYear: targetY,
-                            amount: stats.deduction,
+                            amount: stats.deduction > 0 ? stats.deduction : '',
                             reason: stats.deductionReason,
                             overtimeAmount: initOvertimeAmount,
                             overtimeReason: initOvertimeReason,
                             incentiveAmount: initIncentiveAmount,
                             incentiveReason: initIncentiveReason,
-                            bonus: initOvertimeAmount + initIncentiveAmount,
+                            bonus: (Number(initOvertimeAmount) || 0) + (Number(initIncentiveAmount) || 0),
                             bonusReason: stats.bonusReason
                           });
                         }}
@@ -2208,22 +2258,22 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                 const hasLembur = periodOvertime.totalHours > 0 || stats.lembur > 0;
                                 const initOvertimeAmount = stats.effectiveOvertime > 0
                                   ? stats.effectiveOvertime
-                                  : (hasLembur ? (periodOvertime.totalAmount || stats.lemburPay) : 0);
+                                  : (hasLembur ? (periodOvertime.totalAmount || stats.lemburPay) : '');
                                 const initOvertimeReason = stats.effectiveOvertimeReason || (hasLembur && periodOvertime.totalHours > 0 ? `Lembur ${periodOvertime.totalHours} Jam Periode ${formatDMY(startDay, startMonth, startYear)} s/d ${formatDMY(endDay, endMonth, endYear)}` : '');
-                                const initIncentiveAmount = stats.effectiveIncentive || 0;
+                                const initIncentiveAmount = stats.effectiveIncentive > 0 ? stats.effectiveIncentive : '';
                                 const initIncentiveReason = stats.effectiveIncentiveReason || '';
 
                                 setEditingDeduction({
                                   employee: emp,
                                   targetMonth: targetM,
                                   targetYear: targetY,
-                                  amount: stats.deduction,
+                                  amount: stats.deduction > 0 ? stats.deduction : '',
                                   reason: stats.deductionReason,
                                   overtimeAmount: initOvertimeAmount,
                                   overtimeReason: initOvertimeReason,
                                   incentiveAmount: initIncentiveAmount,
                                   incentiveReason: initIncentiveReason,
-                                  bonus: initOvertimeAmount + initIncentiveAmount,
+                                  bonus: (Number(initOvertimeAmount) || 0) + (Number(initIncentiveAmount) || 0),
                                   bonusReason: stats.bonusReason
                                 });
                               }}
@@ -2366,12 +2416,12 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         id="deduction-amount-input"
                         type="number"
                         min="0"
-                        step="5000"
-                        value={editingDeduction.amount === 0 ? '' : editingDeduction.amount}
+                        step="any"
+                        value={editingDeduction.amount ?? ''}
                         onChange={(e) =>
                           setEditingDeduction({
                             ...editingDeduction,
-                            amount: e.target.value === '' ? 0 : Number(e.target.value)
+                            amount: e.target.value
                           })
                         }
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-rose-300 focus:outline-none focus:border-rose-500"
@@ -2426,7 +2476,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       <label className="text-[11px] font-semibold text-blue-300">
                         + Tambahan Lembur (Rp):
                       </label>
-                      {periodOvertime.totalAmount > 0 && editingDeduction.overtimeAmount !== periodOvertime.totalAmount && (
+                      {periodOvertime.totalAmount > 0 && Number(editingDeduction.overtimeAmount) !== periodOvertime.totalAmount && (
                         <button
                           type="button"
                           onClick={() =>
@@ -2450,12 +2500,12 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         id="overtime-amount-input"
                         type="number"
                         min="0"
-                        step="5000"
-                        value={editingDeduction.overtimeAmount === 0 ? '' : (editingDeduction.overtimeAmount ?? '')}
+                        step="any"
+                        value={editingDeduction.overtimeAmount ?? ''}
                         onChange={(e) =>
                           setEditingDeduction({
                             ...editingDeduction,
-                            overtimeAmount: e.target.value === '' ? 0 : Number(e.target.value)
+                            overtimeAmount: e.target.value
                           })
                         }
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-blue-300 focus:outline-none focus:border-blue-500"
@@ -2506,12 +2556,12 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         id="incentive-amount-input"
                         type="number"
                         min="0"
-                        step="5000"
-                        value={editingDeduction.incentiveAmount === 0 ? '' : (editingDeduction.incentiveAmount ?? '')}
+                        step="any"
+                        value={editingDeduction.incentiveAmount ?? ''}
                         onChange={(e) =>
                           setEditingDeduction({
                             ...editingDeduction,
-                            incentiveAmount: e.target.value === '' ? 0 : Number(e.target.value)
+                            incentiveAmount: e.target.value
                           })
                         }
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
@@ -2519,7 +2569,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       />
                     </div>
                     <p className="text-[10px] text-slate-400 mt-1">
-                      *Dapat diisi secara manual untuk insentif performa atau tunjangan khusus.
+                      *Dapat diisi secara manual dan dirubah sesuai kebutuhan untuk insentif performa, bonus, atau tunjangan khusus.
                     </p>
                   </div>
 
