@@ -36,6 +36,10 @@ export interface PayrollRowItem {
   deductionReason: string;
   bonusAmount: number;
   bonusReason?: string;
+  overtimeAmount?: number;
+  overtimeReason?: string;
+  incentiveAmount?: number;
+  incentiveReason?: string;
 }
 
 export interface PayrollSummaryResult {
@@ -224,8 +228,12 @@ export function calculatePayrollSummary(
 
     let deductionAmount = 0;
     let bonusAmount = 0;
+    let overtimeAmount = 0;
+    let incentiveAmount = 0;
     const deductionReasons: string[] = [];
     const bonusReasons: string[] = [];
+    const overtimeReasons: string[] = [];
+    const incentiveReasons: string[] = [];
 
     distinctMonths.forEach((key) => {
       const [y, m] = key.split('-').map(Number);
@@ -235,18 +243,25 @@ export function calculatePayrollSummary(
       if (rec) {
         if (rec.deductionAmount) deductionAmount += rec.deductionAmount;
         if (rec.bonusAmount) bonusAmount += rec.bonusAmount;
+        if (rec.overtimeAmount !== undefined && rec.overtimeAmount !== null) overtimeAmount += rec.overtimeAmount;
+        if (rec.incentiveAmount !== undefined && rec.incentiveAmount !== null) incentiveAmount += rec.incentiveAmount;
         if (rec.deductionReason) deductionReasons.push(rec.deductionReason);
         if (rec.bonusReason) bonusReasons.push(rec.bonusReason);
+        if (rec.overtimeReason) overtimeReasons.push(rec.overtimeReason);
+        if (rec.incentiveReason) incentiveReasons.push(rec.incentiveReason);
       }
     });
 
-    // Jika bonusAmount manual belum diinput tapi lembur pekerja ada di matrix, gunakan nilai lemburPay
-    // Aturan: Jika data lembur tidak ada (lemburCount === 0 dan lemburHours === 0), insentif lembur harus kosong (0)
     const hasOvertime = lemburCount > 0 || lemburHours > 0;
-    const effectiveBonus = hasOvertime ? (bonusAmount > 0 ? bonusAmount : lemburPay) : 0;
-    const effectiveBonusReason = hasOvertime
-      ? (bonusReasons.length > 0 ? bonusReasons.join('; ') : (lemburHours > 0 ? `Lembur ${lemburHours} Jam` : ''))
-      : '';
+    const effectiveBonus = (overtimeAmount + incentiveAmount) > 0
+      ? (overtimeAmount + incentiveAmount)
+      : (bonusAmount > 0 ? bonusAmount : (hasOvertime ? lemburPay : 0));
+
+    const effectiveBonusReason = (overtimeAmount + incentiveAmount) > 0
+      ? [overtimeReasons.join('; '), incentiveReasons.join('; ')].filter(Boolean).join(' • ')
+      : (bonusAmount > 0
+          ? (bonusReasons.length > 0 ? bonusReasons.join('; ') : 'Insentif / Tambahan Lembur')
+          : (hasOvertime ? (bonusReasons.length > 0 ? bonusReasons.join('; ') : (lemburHours > 0 ? `Lembur ${lemburHours} Jam` : '')) : ''));
 
     const grossPay = hadirCount * emp.dailyRate + effectiveBonus;
     const netPay = Math.max(0, grossPay - deductionAmount);

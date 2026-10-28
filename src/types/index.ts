@@ -85,6 +85,10 @@ export interface TimesheetMonthRecord {
   deductionReason: string; // Catatan alasan potongan
   bonusAmount: number;     // Insentif / tambahan lembur
   bonusReason?: string;    // Catatan alasan insentif / lembur
+  overtimeAmount?: number;  // Nominal tambahan lembur (terisi otomatis dari presensi L atau manual)
+  overtimeReason?: string;  // Alasan / keterangan tambahan lembur
+  incentiveAmount?: number; // Nominal tambahan insentif
+  incentiveReason?: string; // Alasan / keterangan insentif
   notes: string;
 }
 

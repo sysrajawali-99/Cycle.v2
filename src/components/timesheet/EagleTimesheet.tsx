@@ -142,15 +142,19 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
   const [filterPosition, setFilterPosition] = useState<string>('ALL');
   const [selectedDayToBulkKey, setSelectedDayToBulkKey] = useState<string>('');
 
-  // Deduction Modal State
+  // Deduction, Overtime & Incentive Modal State
   const [editingDeduction, setEditingDeduction] = useState<{
     employee: Employee;
     targetMonth: number;
     targetYear: number;
-    amount: number;
-    reason: string;
-    bonus: number;
-    bonusReason: string;
+    amount: number;         // Potongan Deposit Seragam / Denda / Kasbon
+    reason: string;         // Alasan / Keterangan Potongan
+    overtimeAmount: number; // Tambahan Lembur (otomatis terisi jika ada "L" atau diisi manual)
+    overtimeReason: string; // Alasan / Keterangan Tambahan Lembur
+    incentiveAmount: number;// Tambahan Insentif
+    incentiveReason: string;// Alasan / Keterangan Insentif
+    bonus?: number;
+    bonusReason?: string;
   } | null>(null);
 
   // Matrix Cell Selection / Edit Modal State (untuk H, A, I, S, L, HL, OFF & Jam Lembur)
@@ -603,8 +607,14 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
 
     let deduction = 0;
     let bonus = 0;
+    let overtimeSum = 0;
+    let incentiveSum = 0;
+    let hasExplicitOvertime = false;
+    let hasExplicitIncentive = false;
     const deductionReasons: string[] = [];
     const bonusReasons: string[] = [];
+    const overtimeReasons: string[] = [];
+    const incentiveReasons: string[] = [];
 
     distinctMonths.forEach((key) => {
       const [y, m] = key.split('-').map(Number);
@@ -614,21 +624,59 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       if (rec) {
         if (rec.deductionAmount) deduction += rec.deductionAmount;
         if (rec.bonusAmount) bonus += rec.bonusAmount;
+        if (rec.overtimeAmount !== undefined && rec.overtimeAmount !== null) {
+          overtimeSum += rec.overtimeAmount;
+          hasExplicitOvertime = true;
+        }
+        if (rec.incentiveAmount !== undefined && rec.incentiveAmount !== null) {
+          incentiveSum += rec.incentiveAmount;
+          hasExplicitIncentive = true;
+        }
         if (rec.deductionReason) deductionReasons.push(rec.deductionReason);
         if (rec.bonusReason) bonusReasons.push(rec.bonusReason);
+        if (rec.overtimeReason) overtimeReasons.push(rec.overtimeReason);
+        if (rec.incentiveReason) incentiveReasons.push(rec.incentiveReason);
       }
     });
 
     // Perhitungan nilai lembur otomatis: (Upah Harian / 8) * Jam Lembur
     const hourlyRate = employee.dailyRate > 0 ? Math.round(employee.dailyRate / 8) : 0;
     const lemburPay = Math.round(hourlyRate * lemburHours);
-
-    // Aturan: Jika data lembur tidak ada (lembur === 0 dan lemburHours === 0), insentif lembur harus kosong (0)
     const hasLemburData = lembur > 0 || lemburHours > 0;
-    const effectiveBonus = hasLemburData ? (bonus > 0 ? bonus : lemburPay) : 0;
-    const bonusReason = hasLemburData
-      ? (bonusReasons.length > 0 ? bonusReasons.join('; ') : (lemburHours > 0 ? `Lembur ${lemburHours} Jam` : ''))
-      : '';
+
+    // Nilai lembur efektif: gunakan overtimeSum jika ada, atau lemburPay dari presensi jika lembur tercatat
+    const effectiveOvertime = hasExplicitOvertime
+      ? overtimeSum
+      : (hasLemburData ? lemburPay : 0);
+
+    const effectiveOvertimeReason = overtimeReasons.length > 0
+      ? overtimeReasons.join('; ')
+      : (hasLemburData && lemburHours > 0 ? `Lembur ${lemburHours} Jam` : '');
+
+    // Nilai insentif efektif: gunakan incentiveSum jika ada, atau fallback dari bonus jika tidak ada lembur
+    const effectiveIncentive = hasExplicitIncentive
+      ? incentiveSum
+      : (!hasLemburData && !hasExplicitOvertime && bonus > 0 ? bonus : 0);
+
+    const effectiveIncentiveReason = incentiveReasons.length > 0
+      ? incentiveReasons.join('; ')
+      : (!hasLemburData && !hasExplicitOvertime && bonusReasons.length > 0 ? bonusReasons.join('; ') : '');
+
+    // Total tambahan = Lembur + Insentif (atau fallback ke bonus legacy)
+    const effectiveBonus = (effectiveOvertime + effectiveIncentive) > 0
+      ? (effectiveOvertime + effectiveIncentive)
+      : (bonus > 0 ? bonus : (hasLemburData ? lemburPay : 0));
+
+    const bonusReasonParts: string[] = [];
+    if (effectiveOvertime > 0) {
+      bonusReasonParts.push(effectiveOvertimeReason ? `Lembur: ${effectiveOvertimeReason}` : `Lembur: ${formatCurrency(effectiveOvertime)}`);
+    }
+    if (effectiveIncentive > 0) {
+      bonusReasonParts.push(effectiveIncentiveReason ? `Insentif: ${effectiveIncentiveReason}` : `Insentif: ${formatCurrency(effectiveIncentive)}`);
+    }
+    const bonusReason = bonusReasonParts.length > 0
+      ? bonusReasonParts.join(' • ')
+      : (bonusReasons.length > 0 ? bonusReasons.join('; ') : '');
 
     const grossPay = hadir * employee.dailyRate + effectiveBonus;
     const netPay = Math.max(0, grossPay - deduction);
@@ -646,6 +694,10 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       deduction,
       bonus,
       effectiveBonus,
+      effectiveOvertime,
+      effectiveOvertimeReason,
+      effectiveIncentive,
+      effectiveIncentiveReason,
       deductionReason: deductionReasons.join('; '),
       bonusReason,
       netPay
@@ -788,15 +840,43 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
   const handleSaveDeduction = () => {
     if (!editingDeduction) return;
 
-    const { employee, targetMonth, targetYear, amount, reason, bonus, bonusReason } = editingDeduction;
+    const {
+      employee,
+      targetMonth,
+      targetYear,
+      amount,
+      reason,
+      overtimeAmount,
+      overtimeReason,
+      incentiveAmount,
+      incentiveReason
+    } = editingDeduction;
     const currentRec = getRecordForEmployeeMonth(employee.id, targetMonth, targetYear);
+
+    const safeDeduction = Number(amount) || 0;
+    const safeOvertime = Number(overtimeAmount) || 0;
+    const safeIncentive = Number(incentiveAmount) || 0;
+    const totalBonus = safeOvertime + safeIncentive;
+
+    const reasonParts: string[] = [];
+    if (safeOvertime > 0) {
+      reasonParts.push(overtimeReason ? `Lembur: ${overtimeReason}` : `Lembur: ${formatCurrency(safeOvertime)}`);
+    }
+    if (safeIncentive > 0) {
+      reasonParts.push(incentiveReason ? `Insentif: ${incentiveReason}` : `Insentif: ${formatCurrency(safeIncentive)}`);
+    }
+    const combinedBonusReason = reasonParts.join(' • ');
 
     const updatedRec: TimesheetMonthRecord = {
       ...currentRec,
-      deductionAmount: Number(amount) || 0,
-      deductionReason: reason,
-      bonusAmount: Number(bonus) || 0,
-      bonusReason: bonusReason || ''
+      deductionAmount: safeDeduction,
+      deductionReason: reason || '',
+      bonusAmount: totalBonus,
+      bonusReason: combinedBonusReason,
+      overtimeAmount: safeOvertime,
+      overtimeReason: overtimeReason || '',
+      incentiveAmount: safeIncentive,
+      incentiveReason: incentiveReason || ''
     };
 
     const nextTimesheets = [...timesheets];
@@ -894,7 +974,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
         stats.sakit,
         stats.deduction,
         stats.deductionReason || '',
-        stats.bonus,
+        stats.effectiveBonus,
         stats.netPay
       ]);
     });
@@ -1781,17 +1861,29 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                       <button
                         id={`edit-deduction-btn-${emp.id}`}
                         onClick={() => {
+                          const targetM = isCutoffMode ? endMonth : currentMonth;
+                          const targetY = isCutoffMode ? endYear : currentYear;
                           const periodOvertime = getEmployeePeriodOvertime(emp);
                           const hasLembur = periodOvertime.totalHours > 0 || stats.lembur > 0;
-                          const initialBonus = hasLembur ? (stats.bonus > 0 ? stats.bonus : stats.lemburPay) : 0;
+                          const initOvertimeAmount = stats.effectiveOvertime > 0
+                            ? stats.effectiveOvertime
+                            : (hasLembur ? (periodOvertime.totalAmount || stats.lemburPay) : 0);
+                          const initOvertimeReason = stats.effectiveOvertimeReason || (hasLembur && periodOvertime.totalHours > 0 ? `Lembur ${periodOvertime.totalHours} Jam Periode ${formatDMY(startDay, startMonth, startYear)} s/d ${formatDMY(endDay, endMonth, endYear)}` : '');
+                          const initIncentiveAmount = stats.effectiveIncentive || 0;
+                          const initIncentiveReason = stats.effectiveIncentiveReason || '';
+
                           setEditingDeduction({
                             employee: emp,
-                            targetMonth: endMonth,
-                            targetYear: endYear,
+                            targetMonth: targetM,
+                            targetYear: targetY,
                             amount: stats.deduction,
                             reason: stats.deductionReason,
-                            bonus: initialBonus,
-                            bonusReason: hasLembur ? stats.bonusReason : ''
+                            overtimeAmount: initOvertimeAmount,
+                            overtimeReason: initOvertimeReason,
+                            incentiveAmount: initIncentiveAmount,
+                            incentiveReason: initIncentiveReason,
+                            bonus: initOvertimeAmount + initIncentiveAmount,
+                            bonusReason: stats.bonusReason
                           });
                         }}
                         className="flex items-center space-x-1 text-amber-400 hover:underline font-semibold cursor-pointer"
@@ -2069,13 +2161,39 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                         <td className="p-3 text-right bg-slate-950/40 border-r border-slate-800 hidden sm:table-cell">
                           <div className="flex flex-col items-end gap-0.5">
                             {stats.deduction > 0 && (
-                              <div className="font-semibold text-rose-400">
+                              <div className="font-semibold text-rose-400" title={stats.deductionReason || 'Potongan'}>
                                 - {formatCurrency(stats.deduction)}
+                                {stats.deductionReason && (
+                                  <span className="block text-[9px] text-rose-300/80 font-normal truncate max-w-[130px]">
+                                    {stats.deductionReason}
+                                  </span>
+                                )}
                               </div>
                             )}
-                            {stats.effectiveBonus > 0 && (
-                              <div className="text-[10px] text-emerald-400 font-bold">
+                            {stats.effectiveOvertime > 0 && (
+                              <div className="text-[10px] text-blue-400 font-bold" title={stats.effectiveOvertimeReason || 'Lembur'}>
+                                + {formatCurrency(stats.effectiveOvertime)}
+                                <span className="block text-[9px] text-blue-300/80 font-normal truncate max-w-[130px]">
+                                  {stats.effectiveOvertimeReason || 'Lembur'}
+                                </span>
+                              </div>
+                            )}
+                            {stats.effectiveIncentive > 0 && (
+                              <div className="text-[10px] text-emerald-400 font-bold" title={stats.effectiveIncentiveReason || 'Insentif'}>
+                                + {formatCurrency(stats.effectiveIncentive)}
+                                <span className="block text-[9px] text-emerald-300/80 font-normal truncate max-w-[130px]">
+                                  {stats.effectiveIncentiveReason || 'Insentif'}
+                                </span>
+                              </div>
+                            )}
+                            {stats.effectiveBonus > 0 && stats.effectiveOvertime === 0 && stats.effectiveIncentive === 0 && (
+                              <div className="text-[10px] text-emerald-400 font-bold" title={stats.bonusReason || 'Insentif / Tambahan Lembur'}>
                                 + {formatCurrency(stats.effectiveBonus)}
+                                {stats.bonusReason && (
+                                  <span className="block text-[9px] text-emerald-300/80 font-normal truncate max-w-[130px]">
+                                    {stats.bonusReason}
+                                  </span>
+                                )}
                               </div>
                             )}
                             {stats.deduction === 0 && stats.effectiveBonus === 0 && (
@@ -2084,17 +2202,29 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                             <button
                               id={`matrix-edit-deduction-btn-${emp.id}`}
                               onClick={() => {
+                                const targetM = isCutoffMode ? endMonth : currentMonth;
+                                const targetY = isCutoffMode ? endYear : currentYear;
                                 const periodOvertime = getEmployeePeriodOvertime(emp);
                                 const hasLembur = periodOvertime.totalHours > 0 || stats.lembur > 0;
-                                const initialBonus = hasLembur ? (stats.bonus > 0 ? stats.bonus : stats.lemburPay) : 0;
+                                const initOvertimeAmount = stats.effectiveOvertime > 0
+                                  ? stats.effectiveOvertime
+                                  : (hasLembur ? (periodOvertime.totalAmount || stats.lemburPay) : 0);
+                                const initOvertimeReason = stats.effectiveOvertimeReason || (hasLembur && periodOvertime.totalHours > 0 ? `Lembur ${periodOvertime.totalHours} Jam Periode ${formatDMY(startDay, startMonth, startYear)} s/d ${formatDMY(endDay, endMonth, endYear)}` : '');
+                                const initIncentiveAmount = stats.effectiveIncentive || 0;
+                                const initIncentiveReason = stats.effectiveIncentiveReason || '';
+
                                 setEditingDeduction({
                                   employee: emp,
-                                  targetMonth: endMonth,
-                                  targetYear: endYear,
+                                  targetMonth: targetM,
+                                  targetYear: targetY,
                                   amount: stats.deduction,
                                   reason: stats.deductionReason,
-                                  bonus: initialBonus,
-                                  bonusReason: hasLembur ? stats.bonusReason : ''
+                                  overtimeAmount: initOvertimeAmount,
+                                  overtimeReason: initOvertimeReason,
+                                  incentiveAmount: initIncentiveAmount,
+                                  incentiveReason: initIncentiveReason,
+                                  bonus: initOvertimeAmount + initIncentiveAmount,
+                                  bonusReason: stats.bonusReason
                                 });
                               }}
                               className="text-[11px] font-bold text-amber-400 hover:text-amber-300 hover:underline cursor-pointer flex items-center gap-1 mt-0.5"
@@ -2110,6 +2240,8 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                           <div className="text-sm">{formatCurrency(stats.netPay)}</div>
                           <div className="text-[10px] text-slate-500 font-normal">
                             {stats.hadir} x {formatCurrency(emp.dailyRate)}
+                            {stats.effectiveBonus > 0 && ` + ${formatCurrency(stats.effectiveBonus)}`}
+                            {stats.deduction > 0 && ` - ${formatCurrency(stats.deduction)}`}
                           </div>
                         </td>
                       </tr>
@@ -2168,14 +2300,23 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* DEDUCTION / BONUS MODAL FORM                                              */}
+      {/* DEDUCTION / OVERTIME / INCENTIVE MODAL FORM                              */}
       {/* ========================================================================= */}
       {editingDeduction && (() => {
         const periodOvertime = getEmployeePeriodOvertime(editingDeduction.employee);
+        const empStats = calculateRowStats(editingDeduction.employee);
+        const inputDeduction = Number(editingDeduction.amount) || 0;
+        const inputOvertime = Number(editingDeduction.overtimeAmount) || 0;
+        const inputIncentive = Number(editingDeduction.incentiveAmount) || 0;
+        const totalAdditions = inputOvertime + inputIncentive > 0
+          ? inputOvertime + inputIncentive
+          : (Number(editingDeduction.bonus) || 0);
+        const previewGross = empStats.hadir * editingDeduction.employee.dailyRate + totalAdditions;
+        const previewNet = Math.max(0, previewGross - inputDeduction);
 
         return (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
-            <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div>
                   <h3 className="font-bold text-white text-base">Atur Potongan Denda & Lembur</h3>
@@ -2184,178 +2325,284 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setEditingDeduction(null)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+                  className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer text-lg font-bold"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="space-y-3 text-xs">
-                {/* Daily Rate Info & Overtime Rate */}
+              <div className="space-y-4 text-xs">
+                {/* Rate Pokok Harian Info & Overtime Rate */}
                 <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
                   <div>
-                    <span className="text-slate-400">Rate Pokok Harian: </span>
+                    <span className="text-slate-400">Rate Pokok: </span>
                     <span className="font-bold text-slate-200">
                       {formatCurrency(editingDeduction.employee.dailyRate)} / hari
                     </span>
                   </div>
                   <div className="text-[11px] text-blue-300">
-                    Tarif Lembur: <b>{formatCurrency(periodOvertime.hourlyRate)}</b>/jam
+                    Tarif Lembur: <b>{formatCurrency(periodOvertime.hourlyRate)}</b>/jam (Upah ÷ 8)
                   </div>
                 </div>
 
-                {/* Deduction Amount Input */}
-                <div>
-                  <label className="block text-xs font-semibold text-rose-300 mb-1">
-                    Nominal Potongan Denda / Pelanggaran (Rp):
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-slate-500">Rp</span>
-                    <input
-                      id="deduction-amount-input"
-                      type="number"
-                      min="0"
-                      step="5000"
-                      value={editingDeduction.amount === 0 ? '' : editingDeduction.amount}
+                {/* ========================================================================= */}
+                {/* BAGIAN 1: POTONGAN DEPOSIT SERAGAM / DENDA / KASBON                      */}
+                {/* ========================================================================= */}
+                <div className="bg-slate-950/70 p-3.5 rounded-2xl border border-rose-500/30 space-y-2.5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-rose-400">
+                    <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+                    <span>Potongan Deposit Seragam / Denda / Kasbon</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-rose-300 mb-1">
+                      + Potongan Deposit Seragam / Denda / Kasbon (Rp):
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-xs text-slate-500">Rp</span>
+                      <input
+                        id="deduction-amount-input"
+                        type="number"
+                        min="0"
+                        step="5000"
+                        value={editingDeduction.amount === 0 ? '' : editingDeduction.amount}
+                        onChange={(e) =>
+                          setEditingDeduction({
+                            ...editingDeduction,
+                            amount: e.target.value === '' ? 0 : Number(e.target.value)
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-rose-300 focus:outline-none focus:border-rose-500"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                      - Alasan / Keterangan Potongan:
+                    </label>
+                    <textarea
+                      id="deduction-reason-input"
+                      rows={2}
+                      value={editingDeduction.reason}
                       onChange={(e) =>
                         setEditingDeduction({
                           ...editingDeduction,
-                          amount: e.target.value === '' ? 0 : Number(e.target.value)
+                          reason: e.target.value
                         })
                       }
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-rose-300 focus:outline-none focus:border-rose-500"
-                      placeholder="0"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
+                      placeholder="Contoh: Deposit seragam kerja, kasbon operasional, denda keterlambatan..."
                     />
                   </div>
                 </div>
 
-                {/* Deduction Reason */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Alasan / Keterangan Potongan:
-                  </label>
-                  <textarea
-                    id="deduction-reason-input"
-                    rows={2}
-                    value={editingDeduction.reason}
-                    onChange={(e) =>
-                      setEditingDeduction({
-                        ...editingDeduction,
-                        reason: e.target.value
-                      })
-                    }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                    placeholder="Contoh: Terlambat hadir, atribut seragam tidak lengkap..."
-                  />
-                </div>
-
-                {/* Kolom Isian Otomatis Total Lembur Pekerja Periode Buka Tutup Timesheet */}
-                <div className="bg-slate-950 p-3 rounded-2xl border border-blue-500/40 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-blue-300 font-bold flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-blue-400" />
-                      <span>Total Lembur Periode Buka-Tutup:</span>
-                    </span>
-                    <span className="font-extrabold text-blue-200 bg-blue-900/50 px-2 py-0.5 rounded-md border border-blue-700/50">
+                {/* ========================================================================= */}
+                {/* BAGIAN 2: LEMBUR OTOMATIS DARI PRESENSI "L"                              */}
+                {/* ========================================================================= */}
+                <div className="bg-slate-950/70 p-3.5 rounded-2xl border border-blue-500/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-blue-300">
+                      <Clock className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Tambahan Lembur (Otomatis dari Presensi &quot;L&quot;)</span>
+                    </div>
+                    <span className="font-bold text-xs text-blue-200 bg-blue-900/50 px-2 py-0.5 rounded-md border border-blue-700/50">
                       {periodOvertime.totalHours} Jam ({periodOvertime.totalDays} hari L)
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400">
-                      Jumlah Total Lembur Otomatis:
-                    </span>
-                    <span className="text-base font-black text-emerald-400 font-mono">
-                      {formatCurrency(periodOvertime.totalAmount)}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-slate-500">
-                    Logika: (Upah Harian {formatCurrency(editingDeduction.employee.dailyRate)} / 8) × {periodOvertime.totalHours} Jam Lembur
-                  </div>
-                  {periodOvertime.totalAmount > 0 && editingDeduction.bonus !== periodOvertime.totalAmount && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEditingDeduction({
-                          ...editingDeduction,
-                          bonus: periodOvertime.totalAmount,
-                          bonusReason:
-                            editingDeduction.bonusReason ||
-                            `Lembur ${periodOvertime.totalHours} Jam Periode ${formatDMY(startDay, startMonth, startYear)} s/d ${formatDMY(endDay, endMonth, endYear)}`
-                        })
-                      }
-                      className="w-full py-1.5 px-3 bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-500/50 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <span>Terapkan Nilai Lembur Ini ke Insentif ({formatCurrency(periodOvertime.totalAmount)})</span>
-                    </button>
-                  )}
-                </div>
 
-                {/* Bonus / Lembur Amount */}
-                <div>
-                  <label className="block text-xs font-semibold text-emerald-300 mb-1">
-                    Insentif / Tambahan Lembur (Opsional - Rp):
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-xs text-slate-500">Rp</span>
-                    <input
-                      id="bonus-amount-input"
-                      type="number"
-                      min="0"
-                      step="5000"
-                      value={editingDeduction.bonus === 0 ? '' : editingDeduction.bonus}
+                  <div className="text-[11px] text-slate-400 bg-blue-950/30 p-2 rounded-xl border border-blue-900/40 flex justify-between items-center">
+                    <span>Hitungan Lembur Otomatis:</span>
+                    <span className="font-bold text-blue-300 font-mono">
+                      ({formatCurrency(editingDeduction.employee.dailyRate)} ÷ 8) × {periodOvertime.totalHours} jam = {formatCurrency(periodOvertime.totalAmount)}
+                    </span>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-blue-300">
+                        + Tambahan Lembur (Rp):
+                      </label>
+                      {periodOvertime.totalAmount > 0 && editingDeduction.overtimeAmount !== periodOvertime.totalAmount && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditingDeduction({
+                              ...editingDeduction,
+                              overtimeAmount: periodOvertime.totalAmount,
+                              overtimeReason:
+                                editingDeduction.overtimeReason ||
+                                `Lembur ${periodOvertime.totalHours} Jam Periode ${formatDMY(startDay, startMonth, startYear)} s/d ${formatDMY(endDay, endMonth, endYear)}`
+                            })
+                          }
+                          className="text-[10px] text-blue-400 hover:text-blue-300 underline font-medium cursor-pointer"
+                        >
+                          Gunakan Otomatis ({formatCurrency(periodOvertime.totalAmount)})
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-xs text-slate-500">Rp</span>
+                      <input
+                        id="overtime-amount-input"
+                        type="number"
+                        min="0"
+                        step="5000"
+                        value={editingDeduction.overtimeAmount === 0 ? '' : (editingDeduction.overtimeAmount ?? '')}
+                        onChange={(e) =>
+                          setEditingDeduction({
+                            ...editingDeduction,
+                            overtimeAmount: e.target.value === '' ? 0 : Number(e.target.value)
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-blue-300 focus:outline-none focus:border-blue-500"
+                        placeholder="0"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      *Lembur otomatis terisi jika user mengisi &quot;L&quot; pada tabel matrix sesuai hitungan lembur, dan dapat disesuaikan manual.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                      - Alasan / Keterangan Tambahan Lembur:
+                    </label>
+                    <textarea
+                      id="overtime-reason-input"
+                      rows={2}
+                      value={editingDeduction.overtimeReason || ''}
                       onChange={(e) =>
                         setEditingDeduction({
                           ...editingDeduction,
-                          bonus: e.target.value === '' ? 0 : Number(e.target.value)
+                          overtimeReason: e.target.value
                         })
                       }
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
-                      placeholder="0"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      placeholder="Contoh: Lembur pekerjaan weekend, lembur bongkar muat..."
                     />
                   </div>
-                  {periodOvertime.totalHours === 0 && (
-                    <p className="text-[10px] text-slate-400 mt-1 italic">
-                      *Data lembur tidak tercatat pada periode ini (0 Jam). Kolom dibiarkan kosong bila tidak ada lembur.
-                    </p>
-                  )}
                 </div>
 
-                {/* Alasan / Keterangan Insentif / Tambahan Lembur */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Alasan / Keterangan Insentif / Tambahan Lembur:
-                  </label>
-                  <textarea
-                    id="bonus-reason-input"
-                    rows={2}
-                    value={editingDeduction.bonusReason}
-                    onChange={(e) =>
-                      setEditingDeduction({
-                        ...editingDeduction,
-                        bonusReason: e.target.value
-                      })
-                    }
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                    placeholder="Contoh: Lembur proyek akhir pekan, insentif target kebersihan..."
-                  />
+                {/* ========================================================================= */}
+                {/* BAGIAN 3: TAMBAHAN INSENTIF                                              */}
+                {/* ========================================================================= */}
+                <div className="bg-slate-950/70 p-3.5 rounded-2xl border border-emerald-500/30 space-y-2.5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>Tambahan Insentif</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-emerald-300 mb-1">
+                      + Tambahan Insentif (Rp):
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-xs text-slate-500">Rp</span>
+                      <input
+                        id="incentive-amount-input"
+                        type="number"
+                        min="0"
+                        step="5000"
+                        value={editingDeduction.incentiveAmount === 0 ? '' : (editingDeduction.incentiveAmount ?? '')}
+                        onChange={(e) =>
+                          setEditingDeduction({
+                            ...editingDeduction,
+                            incentiveAmount: e.target.value === '' ? 0 : Number(e.target.value)
+                          })
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3 py-2 text-sm font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
+                        placeholder="0"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      *Dapat diisi secara manual untuk insentif performa atau tunjangan khusus.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                      - Alasan / Keterangan Insentif:
+                    </label>
+                    <textarea
+                      id="incentive-reason-input"
+                      rows={2}
+                      value={editingDeduction.incentiveReason || ''}
+                      onChange={(e) =>
+                        setEditingDeduction({
+                          ...editingDeduction,
+                          incentiveReason: e.target.value
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                      placeholder="Contoh: Insentif target kebersihan, bonus kehadiran penuh, insentif event..."
+                    />
+                  </div>
+                </div>
+
+                {/* ========================================================================= */}
+                {/* LIVE PREVIEW BOX OF PAYROLL CALCULATION                                  */}
+                {/* ========================================================================= */}
+                <div className="bg-slate-950/90 p-3.5 rounded-2xl border border-amber-500/30 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-amber-300">
+                    <span>Estimasi Gaji Bersih Periode Ini:</span>
+                    <span className="text-sm font-black font-mono text-amber-400">
+                      {formatCurrency(previewNet)}
+                    </span>
+                  </div>
+                  <div className="text-[11px] space-y-1 pt-1.5 border-t border-slate-800 text-slate-300">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400">Upah Hadir ({empStats.hadir} Hari):</span>
+                      <span className="font-mono">{formatCurrency(empStats.hadir * editingDeduction.employee.dailyRate)}</span>
+                    </div>
+                    {inputOvertime > 0 && (
+                      <div className="flex justify-between items-center text-blue-400">
+                        <span>+ Tambahan Lembur:</span>
+                        <span className="font-mono font-bold">+{formatCurrency(inputOvertime)}</span>
+                      </div>
+                    )}
+                    {inputIncentive > 0 && (
+                      <div className="flex justify-between items-center text-emerald-400">
+                        <span>+ Tambahan Insentif:</span>
+                        <span className="font-mono font-bold">+{formatCurrency(inputIncentive)}</span>
+                      </div>
+                    )}
+                    {inputOvertime === 0 && inputIncentive === 0 && Number(editingDeduction.bonus) > 0 && (
+                      <div className="flex justify-between items-center text-emerald-400">
+                        <span>+ Tambahan Lainnya:</span>
+                        <span className="font-mono font-bold">+{formatCurrency(Number(editingDeduction.bonus))}</span>
+                      </div>
+                    )}
+                    {inputDeduction > 0 && (
+                      <div className="flex justify-between items-center text-rose-400">
+                        <span>- Potongan (Deposit/Denda/Kasbon):</span>
+                        <span className="font-mono font-bold">-{formatCurrency(inputDeduction)}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Modal Actions */}
               <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
                 <button
+                  type="button"
+                  id="cancel-deduction-btn"
                   onClick={() => setEditingDeduction(null)}
                   className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
+                  type="button"
                   id="save-deduction-btn"
                   onClick={handleSaveDeduction}
                   className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-amber-500/20 transition-colors cursor-pointer"
                 >
-                  Simpan Potongan & Lembur
+                  Simpan
                 </button>
               </div>
             </div>
@@ -2808,6 +3055,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                 let totalLemburSum = 0;
                 let totalLemburHoursSum = 0;
                 let totalDeductionSum = 0;
+                let totalBonusSum = 0;
                 let totalGrossSum = 0;
                 let totalNetSum = 0;
 
@@ -2821,6 +3069,7 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                   totalLemburSum += stats.lembur;
                   totalLemburHoursSum += stats.lemburHours;
                   totalDeductionSum += stats.deduction;
+                  totalBonusSum += stats.effectiveBonus;
                   totalGrossSum += stats.grossPay;
                   totalNetSum += stats.netPay;
 
@@ -3064,16 +3313,16 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                                   {row.stats.lembur > 0 ? `${row.stats.lembur} (${row.stats.lemburHours}j)` : '0'}
                                 </td>
                                 <td className="py-1.5 px-2 text-right font-mono text-[9px] border-r border-slate-200">
-                                  {row.stats.deduction > 0 && (row.stats.bonus > 0 || row.stats.lemburPay > 0) ? (
+                                  {row.stats.deduction > 0 && row.stats.effectiveBonus > 0 ? (
                                     <div className="leading-tight">
-                                      <span className="text-emerald-700">+{formatCurrency(row.stats.bonus > 0 ? row.stats.bonus : row.stats.lemburPay)}</span>
+                                      <span className="text-emerald-700">+{formatCurrency(row.stats.effectiveBonus)}</span>
                                       <br />
                                       <span className="text-rose-700">-{formatCurrency(row.stats.deduction)}</span>
                                     </div>
                                   ) : row.stats.deduction > 0 ? (
                                     <span className="text-rose-700">-{formatCurrency(row.stats.deduction)}</span>
-                                  ) : (row.stats.bonus > 0 || row.stats.lemburPay > 0) ? (
-                                    <span className="text-emerald-700">+{formatCurrency(row.stats.bonus > 0 ? row.stats.bonus : row.stats.lemburPay)}</span>
+                                  ) : row.stats.effectiveBonus > 0 ? (
+                                    <span className="text-emerald-700">+{formatCurrency(row.stats.effectiveBonus)}</span>
                                   ) : (
                                     <span className="text-slate-400">-</span>
                                   )}
@@ -3114,7 +3363,9 @@ export const EagleTimesheet: React.FC<EagleTimesheetProps> = ({
                               {totalLemburSum} ({totalLemburHoursSum}j)
                             </td>
                             <td className="py-2.5 px-2 text-right font-mono text-slate-700 bg-slate-50 border-r border-slate-300 text-[9px]">
-                              -{formatCurrency(totalDeductionSum)}
+                              {totalBonusSum > 0 && <span className="text-emerald-700 block">+{formatCurrency(totalBonusSum)}</span>}
+                              {totalDeductionSum > 0 && <span className="text-rose-700 block">-{formatCurrency(totalDeductionSum)}</span>}
+                              {totalBonusSum === 0 && totalDeductionSum === 0 && '-'}
                             </td>
                             <td className="py-2.5 px-2 text-right font-mono text-slate-950 bg-amber-200 text-xs font-black">
                               {formatCurrency(totalNetSum)}
